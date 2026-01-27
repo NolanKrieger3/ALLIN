@@ -28,6 +28,7 @@ class GamePlayer {
   final int currentBet;
   final bool isReady;
   final bool hasActed; // Track if player has acted in current betting round
+  final String? lastAction; // Track last action for UI indicator (CALL, CHECK, FOLD, RAISE, ALL-IN)
 
   GamePlayer({
     required this.uid,
@@ -38,6 +39,7 @@ class GamePlayer {
     this.currentBet = 0,
     this.isReady = false,
     this.hasActed = false,
+    this.lastAction,
   });
 
   Map<String, dynamic> toJson() => {
@@ -49,6 +51,7 @@ class GamePlayer {
         'currentBet': currentBet,
         'isReady': isReady,
         'hasActed': hasActed,
+        'lastAction': lastAction,
       };
 
   factory GamePlayer.fromJson(Map<String, dynamic> json) {
@@ -64,6 +67,7 @@ class GamePlayer {
       currentBet: json['currentBet'] as int? ?? 0,
       isReady: json['isReady'] as bool? ?? false,
       hasActed: json['hasActed'] as bool? ?? false,
+      lastAction: json['lastAction'] as String?,
     );
   }
 
@@ -76,6 +80,7 @@ class GamePlayer {
     int? currentBet,
     bool? isReady,
     bool? hasActed,
+    Object? lastAction = _sentinel,
   }) {
     return GamePlayer(
       uid: uid ?? this.uid,
@@ -86,9 +91,13 @@ class GamePlayer {
       currentBet: currentBet ?? this.currentBet,
       isReady: isReady ?? this.isReady,
       hasActed: hasActed ?? this.hasActed,
+      lastAction: lastAction == _sentinel ? this.lastAction : lastAction as String?,
     );
   }
 }
+
+// Sentinel value to distinguish between "not provided" and "explicitly null"
+const _sentinel = Object();
 
 /// Represents a game room
 class GameRoom {
@@ -111,6 +120,8 @@ class GameRoom {
   final String gameType; // cash, sitandgo, private
   final int lastRaiseAmount; // Track minimum raise amount
   final bool isPrivate; // Whether this is a private room with room code sharing
+  final bool bbHasOption; // Big blind's option to raise preflop if no raises
+  final String? winningHandName; // Description of the winning hand at showdown
 
   GameRoom({
     required this.id,
@@ -132,6 +143,8 @@ class GameRoom {
     this.isPrivate = false,
     this.gameType = 'cash',
     this.lastRaiseAmount = 0,
+    this.bbHasOption = true,
+    this.winningHandName,
   });
 
   Map<String, dynamic> toJson() => {
@@ -154,6 +167,8 @@ class GameRoom {
         'gameType': gameType,
         'lastRaiseAmount': lastRaiseAmount,
         'isPrivate': isPrivate,
+        'bbHasOption': bbHasOption,
+        'winningHandName': winningHandName,
       };
 
   factory GameRoom.fromJson(Map<String, dynamic> json, String docId) {
@@ -182,6 +197,8 @@ class GameRoom {
       gameType: json['gameType'] as String? ?? 'cash',
       lastRaiseAmount: json['lastRaiseAmount'] as int? ?? 0,
       isPrivate: json['isPrivate'] as bool? ?? false,
+      bbHasOption: json['bbHasOption'] as bool? ?? true,
+      winningHandName: json['winningHandName'] as String?,
     );
   }
 
@@ -205,6 +222,8 @@ class GameRoom {
     String? gameType,
     int? lastRaiseAmount,
     bool? isPrivate,
+    bool? bbHasOption,
+    String? winningHandName,
   }) {
     return GameRoom(
       id: id ?? this.id,
@@ -226,6 +245,8 @@ class GameRoom {
       gameType: gameType ?? this.gameType,
       lastRaiseAmount: lastRaiseAmount ?? this.lastRaiseAmount,
       isPrivate: isPrivate ?? this.isPrivate,
+      bbHasOption: bbHasOption ?? this.bbHasOption,
+      winningHandName: winningHandName ?? this.winningHandName,
     );
   }
 

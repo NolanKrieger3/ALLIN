@@ -35,5 +35,58 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Add more state properties as needed for your app
+  // Player currency - single source of truth
+  int _coins = 10000;
+  int get coins => _coins;
+
+  int _gems = 100;
+  int get gems => _gems;
+
+  void setCoins(int amount) {
+    _coins = amount;
+    notifyListeners();
+  }
+
+  void addCoins(int amount) {
+    _coins += amount;
+    notifyListeners();
+  }
+
+  void spendCoins(int amount) {
+    if (_coins >= amount) {
+      _coins -= amount;
+      notifyListeners();
+    }
+  }
+
+  void setGems(int amount) {
+    _gems = amount;
+    notifyListeners();
+  }
+
+  void addGems(int amount) {
+    _gems += amount;
+    notifyListeners();
+  }
+
+  void spendGems(int amount) {
+    if (_gems >= amount) {
+      _gems -= amount;
+      notifyListeners();
+    }
+  }
+
+  /// Format coins/gems for display (e.g., 10000 -> "10,000")
+  String formatCurrency(int amount) {
+    if (amount >= 1000000) {
+      return '${(amount / 1000000).toStringAsFixed(1)}M';
+    } else if (amount >= 1000) {
+      final formatted = amount.toString().replaceAllMapped(
+        RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+        (Match m) => '${m[1]},',
+      );
+      return formatted;
+    }
+    return amount.toString();
+  }
 }

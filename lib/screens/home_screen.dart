@@ -5,8 +5,12 @@ import '../widgets/mobile_wrapper.dart';
 import '../widgets/friends_widgets.dart';
 import '../models/friend.dart';
 import '../services/friends_service.dart';
+import '../services/user_preferences.dart';
 import 'game_screen.dart';
 import 'lobby_screen.dart';
+import 'multiplayer_game_screen.dart';
+import '../services/game_service.dart';
+import '../services/auth_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -23,14 +27,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return MobileWrapper(
       child: Scaffold(
         backgroundColor: const Color(0xFF0D0D0D),
-        body: IndexedStack(
-          index: _currentIndex,
-          children: const [
-            _ShopTab(),
-            _HomeTab(),
-            _ProfileTab(),
-          ],
-        ),
+        body: IndexedStack(index: _currentIndex, children: const [_ShopTab(), _HomeTab(), _ProfileTab()]),
         bottomNavigationBar: _buildBottomNav(),
       ),
     );
@@ -41,9 +38,7 @@ class _HomeScreenState extends State<HomeScreen> {
       padding: const EdgeInsets.symmetric(vertical: 16),
       decoration: BoxDecoration(
         color: const Color(0xFF0D0D0D),
-        border: Border(
-          top: BorderSide(color: Colors.white.withValues(alpha: 0.06)),
-        ),
+        border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.06))),
       ),
       child: SafeArea(
         child: Row(
@@ -97,6 +92,7 @@ class _HomeTabState extends State<_HomeTab> {
   List<Friend> _friends = [];
   int _unreadNotifications = 0;
   int _pendingFriendRequests = 0;
+  int _chipBalance = 1000;
   StreamSubscription? _friendsSub;
   StreamSubscription? _notificationsSub;
   StreamSubscription? _requestsSub;
@@ -106,20 +102,30 @@ class _HomeTabState extends State<_HomeTab> {
     super.initState();
     _friendsService.initialize();
     _loadFriendsData();
-    
+    _loadChipBalance();
+
     _friendsSub = _friendsService.friendsStream.listen((friends) {
       if (mounted) setState(() => _friends = friends);
     });
-    
+
     _notificationsSub = _friendsService.notificationsStream.listen((notifications) {
       if (mounted) {
         setState(() => _unreadNotifications = notifications.where((n) => !n.isRead).length);
       }
     });
-    
+
     _requestsSub = _friendsService.friendRequestsStream.listen((requests) {
       if (mounted) setState(() => _pendingFriendRequests = requests.length);
     });
+  }
+  
+  void _loadChipBalance() {
+    setState(() => _chipBalance = UserPreferences.chips);
+  }
+  
+  Future<void> _addTestChips() async {
+    await UserPreferences.addChips(10000);
+    _loadChipBalance();
   }
 
   @override
@@ -134,7 +140,7 @@ class _HomeTabState extends State<_HomeTab> {
     final friends = await _friendsService.getAllFriends();
     final unreadCount = await _friendsService.getUnreadNotificationCount();
     final requestCount = await _friendsService.getPendingFriendRequestCount();
-    
+
     if (mounted) {
       setState(() {
         _friends = friends;
@@ -152,25 +158,247 @@ class _HomeTabState extends State<_HomeTab> {
         insetPadding: const EdgeInsets.all(16),
         child: Container(
           constraints: const BoxConstraints(maxWidth: 420, maxHeight: 600),
-          child: NotificationPanel(
-            onClose: () => Navigator.of(context).pop(),
-          ),
+          child: NotificationPanel(onClose: () => Navigator.of(context).pop()),
         ),
       ),
     );
   }
 
   void _showAddFriendDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => const AddFriendDialog(),
-    );
+    showDialog(context: context, builder: (context) => const AddFriendDialog());
   }
 
   void _showFriendsListDialog() {
+    showDialog(context: context, builder: (context) => const FriendsListDialog());
+  }
+
+  void _showDevMenu() {
+    final parentContext = context;
+    final parentNavigator = Navigator.of(context);
+    final parentScaffoldMessenger = ScaffoldMessenger.of(context);
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1A1A1A),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (sheetContext) => Container(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Developer Options',
+              style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 20),
+            ListTile(
+              leading: const Icon(Icons.swap_horiz, color: Color(0xFFFF9800)),
+              title: const Text('Switch Test Account', style: TextStyle(color: Colors.white)),
+              subtitle: Text(
+                'Current: ${AuthService().currentUser?.email ?? "Anonymous"}',
+                style: const TextStyle(color: Colors.white54),
+              ),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                _showAccountSwitcher();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.person_add, color: Color(0xFF9C27B0)),
+              title: const Text('Create Test Account', style: TextStyle(color: Colors.white)),
+              subtitle: const Text('Register new test user', style: TextStyle(color: Colors.white54)),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                _showCreateTestAccount();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.add_box, color: Color(0xFF4CAF50)),
+              title: const Text('Add Test Chips', style: TextStyle(color: Colors.white)),
+              subtitle: const Text('+10,000 chips', style: TextStyle(color: Colors.white54)),
+              onTap: () async {
+                Navigator.pop(sheetContext);
+                await _addTestChips();
+                parentScaffoldMessenger.showSnackBar(SnackBar(content: Text('Added 10,000 chips! New balance: ${UserPreferences.formatChips(UserPreferences.chips)}')));
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.meeting_room, color: Color(0xFF2196F3)),
+              title: const Text('Create Test Room', style: TextStyle(color: Colors.white)),
+              subtitle: const Text('Quick room for testing', style: TextStyle(color: Colors.white54)),
+              onTap: () async {
+                Navigator.pop(sheetContext);
+                try {
+                  final room = await GameService().createRoom(isPrivate: true);
+                  if (mounted) {
+                    parentNavigator.push(MaterialPageRoute(builder: (_) => MultiplayerGameScreen(roomId: room.id)));
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    parentScaffoldMessenger.showSnackBar(SnackBar(content: Text('Error: $e')));
+                  }
+                }
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.login, color: Color(0xFF00BCD4)),
+              title: const Text('Sign In Anonymously', style: TextStyle(color: Colors.white)),
+              subtitle: const Text('Quick anonymous login', style: TextStyle(color: Colors.white54)),
+              onTap: () async {
+                Navigator.pop(sheetContext);
+                try {
+                  await AuthService().signInAnonymously();
+                  if (mounted) {
+                    parentScaffoldMessenger.showSnackBar(const SnackBar(content: Text('Signed in anonymously!')));
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    parentScaffoldMessenger.showSnackBar(SnackBar(content: Text('Error: $e')));
+                  }
+                }
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.logout, color: Color(0xFFFF4444)),
+              title: const Text('Sign Out', style: TextStyle(color: Colors.white)),
+              onTap: () async {
+                Navigator.pop(sheetContext);
+                try {
+                  await AuthService().signOut();
+                  if (mounted) {
+                    parentScaffoldMessenger.showSnackBar(const SnackBar(content: Text('Signed out!')));
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    parentScaffoldMessenger.showSnackBar(SnackBar(content: Text('Error: $e')));
+                  }
+                }
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showAccountSwitcher() {
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
     showDialog(
       context: context,
-      builder: (context) => const FriendsListDialog(),
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A1A),
+        title: const Text('Switch Test Account', style: TextStyle(color: Colors.white)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Sign in with email:', style: TextStyle(color: Colors.white70, fontSize: 12)),
+            const SizedBox(height: 10),
+            _buildAccountOption(dialogContext, scaffoldMessenger, 'test1@allin.dev', 'Test123!'),
+            _buildAccountOption(dialogContext, scaffoldMessenger, 'test2@allin.dev', 'Test123!'),
+            _buildAccountOption(dialogContext, scaffoldMessenger, 'test3@allin.dev', 'Test123!'),
+          ],
+        ),
+        actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel'))],
+      ),
+    );
+  }
+
+  void _showCreateTestAccount() {
+    final emailController = TextEditingController();
+    final passwordController = TextEditingController();
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A1A),
+        title: const Text('Create Test Account', style: TextStyle(color: Colors.white)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: emailController,
+              style: const TextStyle(color: Colors.white),
+              decoration: const InputDecoration(
+                hintText: 'Email',
+                hintStyle: TextStyle(color: Colors.white38),
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: passwordController,
+              obscureText: true,
+              style: const TextStyle(color: Colors.white),
+              decoration: const InputDecoration(
+                hintText: 'Password (min 6 chars)',
+                hintStyle: TextStyle(color: Colors.white38),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              try {
+                await AuthService().registerWithEmail(
+                  email: emailController.text.trim(),
+                  password: passwordController.text,
+                );
+                if (mounted) {
+                  scaffoldMessenger.showSnackBar(
+                    SnackBar(content: Text('Created & signed in as ${emailController.text}')),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  scaffoldMessenger.showSnackBar(SnackBar(content: Text('Error: $e')));
+                }
+              }
+            },
+            child: const Text('Create'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAccountOption(
+    BuildContext dialogContext,
+    ScaffoldMessengerState scaffoldMessenger,
+    String email,
+    String password,
+  ) {
+    final isCurrentUser = AuthService().currentUser?.email == email;
+    return ListTile(
+      title: Text(email, style: const TextStyle(color: Colors.white)),
+      trailing: isCurrentUser ? const Icon(Icons.check_circle, color: Color(0xFF4CAF50)) : null,
+      onTap: isCurrentUser
+          ? null
+          : () async {
+              Navigator.pop(dialogContext);
+              try {
+                await AuthService().signOut();
+                await AuthService().signInWithEmail(email: email, password: password);
+                if (mounted) {
+                  scaffoldMessenger.showSnackBar(SnackBar(content: Text('Signed in as $email')));
+                }
+              } catch (e) {
+                // If sign-in fails, try to create the account first
+                try {
+                  await AuthService().registerWithEmail(email: email, password: password);
+                  if (mounted) {
+                    scaffoldMessenger.showSnackBar(SnackBar(content: Text('Created & signed in as $email')));
+                  }
+                } catch (createError) {
+                  if (mounted) {
+                    scaffoldMessenger.showSnackBar(SnackBar(content: Text('Failed: $createError')));
+                  }
+                }
+              }
+            },
     );
   }
 
@@ -197,43 +425,51 @@ class _HomeTabState extends State<_HomeTab> {
                       ),
                       borderRadius: BorderRadius.circular(14),
                     ),
-                    child: const Center(
-                      child: Text('👤', style: TextStyle(fontSize: 22)),
-                    ),
+                    child: const Center(child: Text('👤', style: TextStyle(fontSize: 22))),
                   ),
                   const SizedBox(width: 12),
                   // Greeting
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Welcome back', style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13)),
+                      const Text(
+                        'Player123',
+                        style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
+                  const Spacer(),
+                  // Inline Balance Display
+                  GestureDetector(
+                    onTap: () {
+                      // Navigate to shop tab (index 0)
+                      final homeState = context.findAncestorStateOfType<_HomeScreenState>();
+                      homeState?.setState(() => homeState._currentIndex = 0);
+                    },
+                    child: Row(
                       children: [
+                        const Text('🪙', style: TextStyle(fontSize: 16)),
+                        const SizedBox(width: 4),
                         Text(
-                          'Welcome back',
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.5),
-                            fontSize: 13,
-                          ),
+                          UserPreferences.formatChips(_chipBalance),
+                          style: const TextStyle(color: Color(0xFFD4AF37), fontSize: 15, fontWeight: FontWeight.w600),
                         ),
-                        const Text(
-                          'Player123',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
+                        const SizedBox(width: 4),
+                        Icon(Icons.add_circle, color: const Color(0xFFD4AF37).withValues(alpha: 0.7), size: 16),
                       ],
                     ),
                   ),
+                  const SizedBox(width: 12),
                   // Notification Bell
                   GestureDetector(
                     onTap: _showNotificationPanel,
                     child: Container(
-                      width: 44,
-                      height: 44,
+                      width: 40,
+                      height: 40,
                       decoration: BoxDecoration(
                         color: Colors.white.withValues(alpha: 0.06),
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: BorderRadius.circular(12),
                       ),
                       child: Stack(
                         children: [
@@ -241,26 +477,23 @@ class _HomeTabState extends State<_HomeTab> {
                             child: Icon(
                               Icons.notifications_outlined,
                               color: Colors.white.withValues(alpha: 0.7),
-                              size: 22,
+                              size: 20,
                             ),
                           ),
                           if (_unreadNotifications > 0 || _pendingFriendRequests > 0)
                             Positioned(
-                              top: 8,
-                              right: 8,
+                              top: 6,
+                              right: 6,
                               child: Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                                constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
-                                decoration: const BoxDecoration(
-                                  color: Color(0xFFFF4444),
-                                  shape: BoxShape.circle,
-                                ),
+                                constraints: const BoxConstraints(minWidth: 14, minHeight: 14),
+                                decoration: const BoxDecoration(color: Color(0xFFFF4444), shape: BoxShape.circle),
                                 child: Center(
                                   child: Text(
                                     '${_unreadNotifications + _pendingFriendRequests}',
                                     style: const TextStyle(
                                       color: Colors.white,
-                                      fontSize: 10,
+                                      fontSize: 9,
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),
@@ -269,34 +502,6 @@ class _HomeTabState extends State<_HomeTab> {
                             ),
                         ],
                       ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // Balance Cards
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: _BalanceCard(
-                      emoji: '🪙',
-                      label: 'Chips',
-                      value: '1,000',
-                      gradient: const [Color(0xFFD4AF37), Color(0xFFB8860B)],
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _BalanceCard(
-                      emoji: '💎',
-                      label: 'Gems',
-                      value: '100',
-                      gradient: const [Color(0xFF9C27B0), Color(0xFF7B1FA2)],
                     ),
                   ),
                 ],
@@ -317,10 +522,7 @@ class _HomeTabState extends State<_HomeTab> {
                       subtitle: 'Play Now',
                       emoji: '🎮',
                       gradient: const [Color(0xFF1E88E5), Color(0xFF1565C0)],
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const LobbyScreen()),
-                      ),
+                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LobbyScreen())),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -332,9 +534,7 @@ class _HomeTabState extends State<_HomeTab> {
                       gradient: const [Color(0xFF43A047), Color(0xFF2E7D32)],
                       onTap: () => Navigator.push(
                         context,
-                        MaterialPageRoute(
-                          builder: (_) => const GameScreen(gameMode: 'Practice'),
-                        ),
+                        MaterialPageRoute(builder: (_) => const GameScreen(gameMode: 'Practice')),
                       ),
                     ),
                   ),
@@ -362,9 +562,7 @@ class _HomeTabState extends State<_HomeTab> {
                             ],
                           ),
                           borderRadius: BorderRadius.circular(18),
-                          border: Border.all(
-                            color: const Color(0xFF4CAF50).withValues(alpha: 0.3),
-                          ),
+                          border: Border.all(color: const Color(0xFF4CAF50).withValues(alpha: 0.3)),
                         ),
                         child: Column(
                           children: [
@@ -375,26 +573,17 @@ class _HomeTabState extends State<_HomeTab> {
                                 color: const Color(0xFF4CAF50).withValues(alpha: 0.2),
                                 borderRadius: BorderRadius.circular(14),
                               ),
-                              child: const Center(
-                                child: Text('➕', style: TextStyle(fontSize: 22)),
-                              ),
+                              child: const Center(child: Text('➕', style: TextStyle(fontSize: 22))),
                             ),
                             const SizedBox(height: 12),
                             const Text(
                               'Create Room',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                              ),
+                              style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600),
                             ),
                             const SizedBox(height: 4),
                             Text(
                               'Host a private game',
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.5),
-                                fontSize: 12,
-                              ),
+                              style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12),
                             ),
                           ],
                         ),
@@ -415,9 +604,7 @@ class _HomeTabState extends State<_HomeTab> {
                             ],
                           ),
                           borderRadius: BorderRadius.circular(18),
-                          border: Border.all(
-                            color: const Color(0xFF2196F3).withValues(alpha: 0.3),
-                          ),
+                          border: Border.all(color: const Color(0xFF2196F3).withValues(alpha: 0.3)),
                         ),
                         child: Column(
                           children: [
@@ -428,26 +615,17 @@ class _HomeTabState extends State<_HomeTab> {
                                 color: const Color(0xFF2196F3).withValues(alpha: 0.2),
                                 borderRadius: BorderRadius.circular(14),
                               ),
-                              child: const Center(
-                                child: Text('🔗', style: TextStyle(fontSize: 22)),
-                              ),
+                              child: const Center(child: Text('🔗', style: TextStyle(fontSize: 22))),
                             ),
                             const SizedBox(height: 12),
                             const Text(
                               'Join Room',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                              ),
+                              style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600),
                             ),
                             const SizedBox(height: 4),
                             Text(
                               'Enter room code',
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.5),
-                                fontSize: 12,
-                              ),
+                              style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12),
                             ),
                           ],
                         ),
@@ -498,19 +676,12 @@ class _HomeTabState extends State<_HomeTab> {
                               children: [
                                 const Text(
                                   'Club',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w700,
-                                  ),
+                                  style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700),
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
                                   'Join or create a club',
-                                  style: TextStyle(
-                                    color: Colors.white.withValues(alpha: 0.5),
-                                    fontSize: 13,
-                                  ),
+                                  style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13),
                                 ),
                               ],
                             ),
@@ -518,16 +689,14 @@ class _HomeTabState extends State<_HomeTab> {
                           AnimatedRotation(
                             turns: _clubExpanded ? 0.5 : 0,
                             duration: const Duration(milliseconds: 200),
-                            child: Icon(
-                              Icons.keyboard_arrow_down,
-                              color: Colors.white.withValues(alpha: 0.5),
-                            ),
+                            child: Icon(Icons.keyboard_arrow_down, color: Colors.white.withValues(alpha: 0.5)),
                           ),
                         ],
                       ),
                     ),
                   ),
-                  if (_clubExpanded) ...[                    const SizedBox(height: 14),
+                  if (_clubExpanded) ...[
+                    const SizedBox(height: 14),
                     Container(
                       padding: const EdgeInsets.all(18),
                       decoration: BoxDecoration(
@@ -536,28 +705,17 @@ class _HomeTabState extends State<_HomeTab> {
                       ),
                       child: Column(
                         children: [
-                          const Text(
-                            '🎯',
-                            style: TextStyle(fontSize: 40),
-                          ),
+                          const Text('🎯', style: TextStyle(fontSize: 40)),
                           const SizedBox(height: 12),
                           const Text(
                             'No Club Yet',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
-                            ),
+                            style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700),
                           ),
                           const SizedBox(height: 8),
                           Text(
                             'Join a club to compete in championships\nand earn exclusive rewards!',
                             textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.5),
-                              fontSize: 13,
-                              height: 1.5,
-                            ),
+                            style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13, height: 1.5),
                           ),
                           const SizedBox(height: 18),
                           Row(
@@ -568,14 +726,9 @@ class _HomeTabState extends State<_HomeTab> {
                                   style: OutlinedButton.styleFrom(
                                     side: const BorderSide(color: Color(0xFFE91E63)),
                                     padding: const EdgeInsets.symmetric(vertical: 14),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                   ),
-                                  child: const Text(
-                                    'Create Club',
-                                    style: TextStyle(color: Color(0xFFE91E63)),
-                                  ),
+                                  child: const Text('Create Club', style: TextStyle(color: Color(0xFFE91E63))),
                                 ),
                               ),
                               const SizedBox(width: 12),
@@ -585,14 +738,9 @@ class _HomeTabState extends State<_HomeTab> {
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: const Color(0xFFE91E63),
                                     padding: const EdgeInsets.symmetric(vertical: 14),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                   ),
-                                  child: const Text(
-                                    'Join Club',
-                                    style: TextStyle(color: Colors.white),
-                                  ),
+                                  child: const Text('Join Club', style: TextStyle(color: Colors.white)),
                                 ),
                               ),
                             ],
@@ -607,9 +755,7 @@ class _HomeTabState extends State<_HomeTab> {
           ),
 
           // Bottom spacing
-          const SliverToBoxAdapter(
-            child: SizedBox(height: 30),
-          ),
+          const SliverToBoxAdapter(child: SizedBox(height: 30)),
         ],
       ),
     );
@@ -620,9 +766,7 @@ class _HomeTabState extends State<_HomeTab> {
       context: context,
       builder: (context) => Dialog(
         backgroundColor: const Color(0xFF1A1A1A),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         child: Container(
           width: 340,
           padding: const EdgeInsets.all(24),
@@ -636,61 +780,46 @@ class _HomeTabState extends State<_HomeTab> {
                   color: const Color(0xFF4CAF50).withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: const Center(
-                  child: Text('➕', style: TextStyle(fontSize: 36)),
-                ),
+                child: const Center(child: Text('➕', style: TextStyle(fontSize: 36))),
               ),
               const SizedBox(height: 20),
               const Text(
                 'Create Private Room',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
-                ),
+                style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 8),
               Text(
                 'Your room code will be generated',
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.5),
-                  fontSize: 14,
-                ),
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 14),
               ),
               const SizedBox(height: 24),
               ElevatedButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const LobbyScreen()),
-                  );
+                onPressed: () async {
+                  final navigator = Navigator.of(context);
+                  final scaffoldMessenger = ScaffoldMessenger.of(context);
+                  navigator.pop();
+                  try {
+                    final gameService = GameService();
+                    final room = await gameService.createRoom(isPrivate: true);
+                    navigator.push(MaterialPageRoute(builder: (_) => MultiplayerGameScreen(roomId: room.id)));
+                  } catch (e) {
+                    scaffoldMessenger.showSnackBar(SnackBar(content: Text('Failed to create room: $e')));
+                  }
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF4CAF50),
                   padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                 ),
                 child: const Text(
                   'Create Room',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                  ),
+                  style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700),
                 ),
               ),
               const SizedBox(height: 12),
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: Text(
-                  'Cancel',
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.5),
-                  ),
-                ),
+                child: Text('Cancel', style: TextStyle(color: Colors.white.withValues(alpha: 0.5))),
               ),
             ],
           ),
@@ -701,14 +830,12 @@ class _HomeTabState extends State<_HomeTab> {
 
   void _showJoinRoomDialog(BuildContext context) {
     final codeController = TextEditingController();
-    
+
     showDialog(
       context: context,
       builder: (context) => Dialog(
         backgroundColor: const Color(0xFF1A1A1A),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         child: Container(
           width: 340,
           padding: const EdgeInsets.all(24),
@@ -722,26 +849,17 @@ class _HomeTabState extends State<_HomeTab> {
                   color: const Color(0xFF2196F3).withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: const Center(
-                  child: Text('🔗', style: TextStyle(fontSize: 36)),
-                ),
+                child: const Center(child: Text('🔗', style: TextStyle(fontSize: 36))),
               ),
               const SizedBox(height: 20),
               const Text(
                 'Join Private Room',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
-                ),
+                style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 8),
               Text(
                 'Enter the room code from your friend',
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.5),
-                  fontSize: 14,
-                ),
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 14),
               ),
               const SizedBox(height: 24),
               TextField(
@@ -755,16 +873,10 @@ class _HomeTabState extends State<_HomeTab> {
                 ),
                 decoration: InputDecoration(
                   hintText: 'XXXXXX',
-                  hintStyle: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.2),
-                    letterSpacing: 8,
-                  ),
+                  hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.2), letterSpacing: 8),
                   filled: true,
                   fillColor: Colors.white.withValues(alpha: 0.05),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: BorderSide.none,
-                  ),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
                   contentPadding: const EdgeInsets.symmetric(vertical: 16),
                 ),
                 textCapitalization: TextCapitalization.characters,
@@ -773,40 +885,35 @@ class _HomeTabState extends State<_HomeTab> {
               ),
               const SizedBox(height: 20),
               ElevatedButton(
-                onPressed: () {
+                onPressed: () async {
                   if (codeController.text.length == 6) {
-                    Navigator.pop(context);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const LobbyScreen()),
-                    );
+                    final roomCode = codeController.text.toUpperCase();
+                    final navigator = Navigator.of(context);
+                    final scaffoldMessenger = ScaffoldMessenger.of(context);
+                    navigator.pop();
+                    try {
+                      final gameService = GameService();
+                      await gameService.joinRoom(roomCode);
+                      navigator.push(MaterialPageRoute(builder: (_) => MultiplayerGameScreen(roomId: roomCode)));
+                    } catch (e) {
+                      scaffoldMessenger.showSnackBar(SnackBar(content: Text('Failed to join room: $e')));
+                    }
                   }
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF2196F3),
                   padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                 ),
                 child: const Text(
                   'Join Room',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                  ),
+                  style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700),
                 ),
               ),
               const SizedBox(height: 12),
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: Text(
-                  'Cancel',
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.5),
-                  ),
-                ),
+                child: Text('Cancel', style: TextStyle(color: Colors.white.withValues(alpha: 0.5))),
               ),
             ],
           ),
@@ -868,15 +975,11 @@ class _ShopTabState extends State<_ShopTab> with SingleTickerProviderStateMixin 
               children: [
                 const Text(
                   'Shop',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 28,
-                    fontWeight: FontWeight.w700,
-                  ),
+                  style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w700),
                 ),
                 Row(
                   children: [
-                    _BalanceChip(emoji: '🪙', amount: '50,000', color: const Color(0xFFD4AF37)),
+                    _BalanceChip(emoji: '🪙', amount: '1,000', color: const Color(0xFFD4AF37)),
                     const SizedBox(width: 8),
                     _BalanceChip(emoji: '💎', amount: '100', color: const Color(0xFF9C27B0)),
                   ],
@@ -885,7 +988,7 @@ class _ShopTabState extends State<_ShopTab> with SingleTickerProviderStateMixin 
             ),
           ),
           const SizedBox(height: 16),
-          
+
           // Category Tabs
           Container(
             height: 44,
@@ -898,10 +1001,7 @@ class _ShopTabState extends State<_ShopTab> with SingleTickerProviderStateMixin 
               controller: _tabController,
               isScrollable: true,
               tabAlignment: TabAlignment.start,
-              indicator: BoxDecoration(
-                color: const Color(0xFF2196F3),
-                borderRadius: BorderRadius.circular(10),
-              ),
+              indicator: BoxDecoration(color: const Color(0xFF2196F3), borderRadius: BorderRadius.circular(10)),
               indicatorSize: TabBarIndicatorSize.tab,
               indicatorPadding: const EdgeInsets.all(3),
               dividerColor: Colors.transparent,
@@ -909,31 +1009,30 @@ class _ShopTabState extends State<_ShopTab> with SingleTickerProviderStateMixin 
               unselectedLabelColor: Colors.white54,
               labelPadding: const EdgeInsets.symmetric(horizontal: 16),
               labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-              tabs: _categories.map((cat) => Tab(
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(cat['icon'], style: const TextStyle(fontSize: 14)),
-                    const SizedBox(width: 4),
-                    Text(cat['name']),
-                  ],
-                ),
-              )).toList(),
+              tabs: _categories
+                  .map(
+                    (cat) => Tab(
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(cat['icon'], style: const TextStyle(fontSize: 14)),
+                          const SizedBox(width: 4),
+                          Text(cat['name']),
+                        ],
+                      ),
+                    ),
+                  )
+                  .toList(),
             ),
           ),
           const SizedBox(height: 16),
-          
+
           // Content
           Expanded(
             child: TabBarView(
               controller: _tabController,
-              children: [
-                _buildFeaturedTab(),
-                _buildCurrencyTab(),
-                _buildCosmeticsTab(),
-                _buildChestsTab(),
-              ],
+              children: [_buildFeaturedTab(), _buildCurrencyTab(), _buildCosmeticsTab(), _buildChestsTab()],
             ),
           ),
         ],
@@ -977,9 +1076,7 @@ class _ShopTabState extends State<_ShopTab> with SingleTickerProviderStateMixin 
                       color: Colors.white.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(18),
                     ),
-                    child: const Center(
-                      child: Text('🎡', style: TextStyle(fontSize: 36)),
-                    ),
+                    child: const Center(child: Text('🎡', style: TextStyle(fontSize: 36))),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
@@ -1012,10 +1109,7 @@ class _ShopTabState extends State<_ShopTab> with SingleTickerProviderStateMixin 
                   ),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(14),
-                    ),
+                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)),
                     child: const Text(
                       'CLAIM',
                       style: TextStyle(color: Color(0xFF2E7D32), fontWeight: FontWeight.w800, fontSize: 14),
@@ -1026,7 +1120,7 @@ class _ShopTabState extends State<_ShopTab> with SingleTickerProviderStateMixin 
             ),
           ),
           const SizedBox(height: 20),
-          
+
           // Premium Wheel
           Row(
             children: [
@@ -1072,7 +1166,10 @@ class _ShopTabState extends State<_ShopTab> with SingleTickerProviderStateMixin 
                             children: [
                               Text('💎', style: TextStyle(fontSize: 14)),
                               SizedBox(width: 4),
-                              Text('50', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                              Text(
+                                '50',
+                                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+                              ),
                             ],
                           ),
                         ),
@@ -1132,7 +1229,7 @@ class _ShopTabState extends State<_ShopTab> with SingleTickerProviderStateMixin 
             ],
           ),
           const SizedBox(height: 24),
-          
+
           // Hot Deals section label
           Row(
             children: [
@@ -1157,7 +1254,7 @@ class _ShopTabState extends State<_ShopTab> with SingleTickerProviderStateMixin 
             ],
           ),
           const SizedBox(height: 14),
-          
+
           // Starter Pack
           _HotDealCard(
             title: 'Starter Pack',
@@ -1169,7 +1266,7 @@ class _ShopTabState extends State<_ShopTab> with SingleTickerProviderStateMixin 
             gradient: [const Color(0xFF2196F3), const Color(0xFF1565C0)],
           ),
           const SizedBox(height: 12),
-          
+
           // VIP Bundle
           _HotDealCard(
             title: 'VIP Bundle',
@@ -1198,45 +1295,131 @@ class _ShopTabState extends State<_ShopTab> with SingleTickerProviderStateMixin 
           const SizedBox(height: 12),
           Row(
             children: [
-              Expanded(child: _CurrencyCard(emoji: '💎', amount: '100', price: '\$0.99', color: const Color(0xFF9C27B0))),
+              Expanded(
+                child: _CurrencyCard(emoji: '💎', amount: '100', price: '\$0.99', color: const Color(0xFF9C27B0)),
+              ),
               const SizedBox(width: 10),
-              Expanded(child: _CurrencyCard(emoji: '💎', amount: '500', price: '\$4.99', color: const Color(0xFF9C27B0), bonus: '+50')),
+              Expanded(
+                child: _CurrencyCard(
+                  emoji: '💎',
+                  amount: '500',
+                  price: '\$4.99',
+                  color: const Color(0xFF9C27B0),
+                  bonus: '+50',
+                ),
+              ),
               const SizedBox(width: 10),
-              Expanded(child: _CurrencyCard(emoji: '💎', amount: '1,200', price: '\$9.99', color: const Color(0xFF9C27B0), bonus: '+200', isBest: true)),
+              Expanded(
+                child: _CurrencyCard(
+                  emoji: '💎',
+                  amount: '1,200',
+                  price: '\$9.99',
+                  color: const Color(0xFF9C27B0),
+                  bonus: '+200',
+                  isBest: true,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 10),
           Row(
             children: [
-              Expanded(child: _CurrencyCard(emoji: '💎', amount: '2,500', price: '\$19.99', color: const Color(0xFF9C27B0), bonus: '+500')),
+              Expanded(
+                child: _CurrencyCard(
+                  emoji: '💎',
+                  amount: '2,500',
+                  price: '\$19.99',
+                  color: const Color(0xFF9C27B0),
+                  bonus: '+500',
+                ),
+              ),
               const SizedBox(width: 10),
-              Expanded(child: _CurrencyCard(emoji: '💎', amount: '6,500', price: '\$49.99', color: const Color(0xFF9C27B0), bonus: '+1500')),
+              Expanded(
+                child: _CurrencyCard(
+                  emoji: '💎',
+                  amount: '6,500',
+                  price: '\$49.99',
+                  color: const Color(0xFF9C27B0),
+                  bonus: '+1500',
+                ),
+              ),
               const SizedBox(width: 10),
-              Expanded(child: _CurrencyCard(emoji: '💎', amount: '14K', price: '\$99.99', color: const Color(0xFF9C27B0), bonus: '+4000')),
+              Expanded(
+                child: _CurrencyCard(
+                  emoji: '💎',
+                  amount: '14K',
+                  price: '\$99.99',
+                  color: const Color(0xFF9C27B0),
+                  bonus: '+4000',
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 28),
-          
+
           // Chips Section
           const _SectionLabel(emoji: '🪙', title: 'Chips'),
           const SizedBox(height: 12),
           Row(
             children: [
-              Expanded(child: _CurrencyCard(emoji: '🪙', amount: '10K', price: '\$0.99', color: const Color(0xFFD4AF37))),
+              Expanded(
+                child: _CurrencyCard(emoji: '🪙', amount: '10K', price: '\$0.99', color: const Color(0xFFD4AF37)),
+              ),
               const SizedBox(width: 10),
-              Expanded(child: _CurrencyCard(emoji: '🪙', amount: '50K', price: '\$4.99', color: const Color(0xFFD4AF37), bonus: '+5K')),
+              Expanded(
+                child: _CurrencyCard(
+                  emoji: '🪙',
+                  amount: '50K',
+                  price: '\$4.99',
+                  color: const Color(0xFFD4AF37),
+                  bonus: '+5K',
+                ),
+              ),
               const SizedBox(width: 10),
-              Expanded(child: _CurrencyCard(emoji: '🪙', amount: '150K', price: '\$9.99', color: const Color(0xFFD4AF37), bonus: '+25K', isBest: true)),
+              Expanded(
+                child: _CurrencyCard(
+                  emoji: '🪙',
+                  amount: '150K',
+                  price: '\$9.99',
+                  color: const Color(0xFFD4AF37),
+                  bonus: '+25K',
+                  isBest: true,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 10),
           Row(
             children: [
-              Expanded(child: _CurrencyCard(emoji: '🪙', amount: '500K', price: '\$19.99', color: const Color(0xFFD4AF37), bonus: '+100K')),
+              Expanded(
+                child: _CurrencyCard(
+                  emoji: '🪙',
+                  amount: '500K',
+                  price: '\$19.99',
+                  color: const Color(0xFFD4AF37),
+                  bonus: '+100K',
+                ),
+              ),
               const SizedBox(width: 10),
-              Expanded(child: _CurrencyCard(emoji: '🪙', amount: '1.5M', price: '\$49.99', color: const Color(0xFFD4AF37), bonus: '+350K')),
+              Expanded(
+                child: _CurrencyCard(
+                  emoji: '🪙',
+                  amount: '1.5M',
+                  price: '\$49.99',
+                  color: const Color(0xFFD4AF37),
+                  bonus: '+350K',
+                ),
+              ),
               const SizedBox(width: 10),
-              Expanded(child: _CurrencyCard(emoji: '🪙', amount: '5M', price: '\$99.99', color: const Color(0xFFD4AF37), bonus: '+1.5M')),
+              Expanded(
+                child: _CurrencyCard(
+                  emoji: '🪙',
+                  amount: '5M',
+                  price: '\$99.99',
+                  color: const Color(0xFFD4AF37),
+                  bonus: '+1.5M',
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 30),
@@ -1277,7 +1460,7 @@ class _ShopTabState extends State<_ShopTab> with SingleTickerProviderStateMixin 
             ],
           ),
           SizedBox(height: 12),
-          
+
           // Table Themes Category
           _CosmeticCategoryDropdown(
             emoji: '🎨',
@@ -1304,7 +1487,7 @@ class _ShopTabState extends State<_ShopTab> with SingleTickerProviderStateMixin 
             ],
           ),
           SizedBox(height: 12),
-          
+
           // Avatars Category
           _CosmeticCategoryDropdown(
             emoji: '👤',
@@ -1331,7 +1514,7 @@ class _ShopTabState extends State<_ShopTab> with SingleTickerProviderStateMixin 
             ],
           ),
           SizedBox(height: 12),
-          
+
           // Emotes Category
           _CosmeticCategoryDropdown(
             emoji: '😎',
@@ -1391,7 +1574,7 @@ class _ShopTabState extends State<_ShopTab> with SingleTickerProviderStateMixin 
             ),
           ),
           const SizedBox(height: 20),
-          
+
           // Chests Grid
           _ModernChestCard(
             name: 'Bronze Chest',
@@ -1436,24 +1619,15 @@ class _ShopTabState extends State<_ShopTab> with SingleTickerProviderStateMixin 
   }
 
   static void _showDailySpinDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => const _DailySpinDialog(),
-    );
+    showDialog(context: context, builder: (context) => const _DailySpinDialog());
   }
 
   static void _showGemWheelDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => const _GemWheelDialog(),
-    );
+    showDialog(context: context, builder: (context) => const _GemWheelDialog());
   }
 
   static void _showLuckyHandDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => const _LuckyHandDialog(),
-    );
+    showDialog(context: context, builder: (context) => const _LuckyHandDialog());
   }
 }
 
@@ -1536,10 +1710,7 @@ class _CurrencyCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isBest ? color : color.withValues(alpha: 0.3),
-          width: isBest ? 2 : 1,
-        ),
+        border: Border.all(color: isBest ? color : color.withValues(alpha: 0.3), width: isBest ? 2 : 1),
       ),
       child: Column(
         children: [
@@ -1547,10 +1718,7 @@ class _CurrencyCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               margin: const EdgeInsets.only(bottom: 6),
-              decoration: BoxDecoration(
-                color: color,
-                borderRadius: BorderRadius.circular(6),
-              ),
+              decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(6)),
               child: const Text(
                 'BEST VALUE',
                 style: TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.w800),
@@ -1560,10 +1728,7 @@ class _CurrencyCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               margin: const EdgeInsets.only(bottom: 6),
-              decoration: BoxDecoration(
-                color: const Color(0xFF4CAF50),
-                borderRadius: BorderRadius.circular(6),
-              ),
+              decoration: BoxDecoration(color: const Color(0xFF4CAF50), borderRadius: BorderRadius.circular(6)),
               child: Text(
                 bonus!,
                 style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.w700),
@@ -1580,10 +1745,7 @@ class _CurrencyCard extends StatelessWidget {
           const SizedBox(height: 8),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
-            ),
+            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8)),
             child: Text(
               price,
               style: const TextStyle(color: Colors.black, fontSize: 11, fontWeight: FontWeight.w700),
@@ -1602,12 +1764,7 @@ class _CosmeticItem extends StatelessWidget {
   final String price;
   final bool isOwned;
 
-  const _CosmeticItem({
-    required this.emoji,
-    required this.name,
-    required this.price,
-    this.isOwned = false,
-  });
+  const _CosmeticItem({required this.emoji, required this.name, required this.price, this.isOwned = false});
 
   @override
   Widget build(BuildContext context) {
@@ -1684,14 +1841,20 @@ class _CosmeticItem extends StatelessWidget {
             children: [
               Text(emoji, style: const TextStyle(fontSize: 56)),
               const SizedBox(height: 16),
-              Text(name, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700)),
+              Text(
+                name,
+                style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700),
+              ),
               const SizedBox(height: 8),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   const Text('💎', style: TextStyle(fontSize: 18)),
                   const SizedBox(width: 6),
-                  Text(price, style: const TextStyle(color: Color(0xFF9C27B0), fontSize: 20, fontWeight: FontWeight.w700)),
+                  Text(
+                    price,
+                    style: const TextStyle(color: Color(0xFF9C27B0), fontSize: 20, fontWeight: FontWeight.w700),
+                  ),
                 ],
               ),
               const SizedBox(height: 24),
@@ -1722,7 +1885,10 @@ class _CosmeticItem extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
-                      child: const Text('Buy', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                      child: const Text(
+                        'Buy',
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                      ),
                     ),
                   ),
                 ],
@@ -1742,12 +1908,7 @@ class _CosmeticItemData {
   final String price;
   final bool isOwned;
 
-  const _CosmeticItemData({
-    required this.emoji,
-    required this.name,
-    required this.price,
-    this.isOwned = false,
-  });
+  const _CosmeticItemData({required this.emoji, required this.name, required this.price, this.isOwned = false});
 }
 
 // Cosmetic category dropdown with rarity sub-dropdowns
@@ -1797,49 +1958,26 @@ class _CosmeticCategoryDropdownState extends State<_CosmeticCategoryDropdown> {
                   Expanded(
                     child: Text(
                       widget.title,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
+                      style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
                     ),
                   ),
                   AnimatedRotation(
                     turns: _isExpanded ? 0.5 : 0,
                     duration: const Duration(milliseconds: 200),
-                    child: Icon(
-                      Icons.keyboard_arrow_down,
-                      color: Colors.white.withValues(alpha: 0.5),
-                    ),
+                    child: Icon(Icons.keyboard_arrow_down, color: Colors.white.withValues(alpha: 0.5)),
                   ),
                 ],
               ),
             ),
           ),
-          
+
           // Rarity sub-dropdowns
           if (_isExpanded) ...[
             Divider(height: 1, color: Colors.white.withValues(alpha: 0.08)),
-            _RaritySubDropdown(
-              rarity: 'Common',
-              color: const Color(0xFF9E9E9E),
-              items: widget.commonItems,
-            ),
-            _RaritySubDropdown(
-              rarity: 'Rare',
-              color: const Color(0xFF2196F3),
-              items: widget.rareItems,
-            ),
-            _RaritySubDropdown(
-              rarity: 'Epic',
-              color: const Color(0xFF9C27B0),
-              items: widget.epicItems,
-            ),
-            _RaritySubDropdown(
-              rarity: 'Legendary',
-              color: const Color(0xFFD4AF37),
-              items: widget.legendaryItems,
-            ),
+            _RaritySubDropdown(rarity: 'Common', color: const Color(0xFF9E9E9E), items: widget.commonItems),
+            _RaritySubDropdown(rarity: 'Rare', color: const Color(0xFF2196F3), items: widget.rareItems),
+            _RaritySubDropdown(rarity: 'Epic', color: const Color(0xFF9C27B0), items: widget.epicItems),
+            _RaritySubDropdown(rarity: 'Legendary', color: const Color(0xFFD4AF37), items: widget.legendaryItems),
           ],
         ],
       ),
@@ -1853,11 +1991,7 @@ class _RaritySubDropdown extends StatefulWidget {
   final Color color;
   final List<_CosmeticItemData> items;
 
-  const _RaritySubDropdown({
-    required this.rarity,
-    required this.color,
-    required this.items,
-  });
+  const _RaritySubDropdown({required this.rarity, required this.color, required this.items});
 
   @override
   State<_RaritySubDropdown> createState() => _RaritySubDropdownState();
@@ -1875,9 +2009,7 @@ class _RaritySubDropdownState extends State<_RaritySubDropdown> {
           onTap: () => setState(() => _isExpanded = !_isExpanded),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: widget.color.withValues(alpha: 0.08),
-            ),
+            decoration: BoxDecoration(color: widget.color.withValues(alpha: 0.08)),
             child: Row(
               children: [
                 Container(
@@ -1886,48 +2018,31 @@ class _RaritySubDropdownState extends State<_RaritySubDropdown> {
                   decoration: BoxDecoration(
                     color: widget.color,
                     shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: widget.color.withValues(alpha: 0.5),
-                        blurRadius: 6,
-                        spreadRadius: 1,
-                      ),
-                    ],
+                    boxShadow: [BoxShadow(color: widget.color.withValues(alpha: 0.5), blurRadius: 6, spreadRadius: 1)],
                   ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     widget.rarity,
-                    style: TextStyle(
-                      color: widget.color,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: TextStyle(color: widget.color, fontSize: 13, fontWeight: FontWeight.w600),
                   ),
                 ),
                 Text(
                   '${widget.items.length} items',
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.4),
-                    fontSize: 11,
-                  ),
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 11),
                 ),
                 const SizedBox(width: 8),
                 AnimatedRotation(
                   turns: _isExpanded ? 0.5 : 0,
                   duration: const Duration(milliseconds: 200),
-                  child: Icon(
-                    Icons.keyboard_arrow_down,
-                    color: Colors.white.withValues(alpha: 0.4),
-                    size: 20,
-                  ),
+                  child: Icon(Icons.keyboard_arrow_down, color: Colors.white.withValues(alpha: 0.4), size: 20),
                 ),
               ],
             ),
           ),
         ),
-        
+
         // Items grid
         if (_isExpanded)
           Container(
@@ -1936,13 +2051,17 @@ class _RaritySubDropdownState extends State<_RaritySubDropdown> {
             child: Wrap(
               spacing: 10,
               runSpacing: 10,
-              children: widget.items.map((item) => _CosmeticGridItem(
-                emoji: item.emoji,
-                name: item.name,
-                price: item.price,
-                isOwned: item.isOwned,
-                rarityColor: widget.color,
-              )).toList(),
+              children: widget.items
+                  .map(
+                    (item) => _CosmeticGridItem(
+                      emoji: item.emoji,
+                      name: item.name,
+                      price: item.price,
+                      isOwned: item.isOwned,
+                      rarityColor: widget.color,
+                    ),
+                  )
+                  .toList(),
             ),
           ),
       ],
@@ -1977,9 +2096,7 @@ class _CosmeticGridItem extends StatelessWidget {
           color: Colors.white.withValues(alpha: 0.05),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isOwned 
-                ? const Color(0xFF4CAF50).withValues(alpha: 0.5) 
-                : rarityColor.withValues(alpha: 0.3),
+            color: isOwned ? const Color(0xFF4CAF50).withValues(alpha: 0.5) : rarityColor.withValues(alpha: 0.3),
           ),
         ),
         child: Column(
@@ -2050,14 +2167,20 @@ class _CosmeticGridItem extends StatelessWidget {
                 child: Text(emoji, style: const TextStyle(fontSize: 48)),
               ),
               const SizedBox(height: 16),
-              Text(name, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700)),
+              Text(
+                name,
+                style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700),
+              ),
               const SizedBox(height: 8),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   const Text('💎', style: TextStyle(fontSize: 18)),
                   const SizedBox(width: 6),
-                  Text(price, style: TextStyle(color: rarityColor, fontSize: 20, fontWeight: FontWeight.w700)),
+                  Text(
+                    price,
+                    style: TextStyle(color: rarityColor, fontSize: 20, fontWeight: FontWeight.w700),
+                  ),
                 ],
               ),
               const SizedBox(height: 24),
@@ -2088,7 +2211,10 @@ class _CosmeticGridItem extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
-                      child: const Text('Buy', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                      child: const Text(
+                        'Buy',
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                      ),
                     ),
                   ),
                 ],
@@ -2154,7 +2280,10 @@ class _HotDealCard extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Text(title, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700)),
+                    Text(
+                      title,
+                      style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700),
+                    ),
                     if (isBest) ...[
                       const SizedBox(width: 8),
                       Container(
@@ -2163,7 +2292,10 @@ class _HotDealCard extends StatelessWidget {
                           color: const Color(0xFFE91E63),
                           borderRadius: BorderRadius.circular(6),
                         ),
-                        child: const Text('BEST', style: TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.w800)),
+                        child: const Text(
+                          'BEST',
+                          style: TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.w800),
+                        ),
                       ),
                     ],
                   ],
@@ -2174,14 +2306,18 @@ class _HotDealCard extends StatelessWidget {
                 Wrap(
                   spacing: 4,
                   runSpacing: 2,
-                  children: items.map((item) => Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(item, style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 9)),
-                  )).toList(),
+                  children: items
+                      .map(
+                        (item) => Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(item, style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 9)),
+                        ),
+                      )
+                      .toList(),
                 ),
               ],
             ),
@@ -2200,11 +2336,11 @@ class _HotDealCard extends StatelessWidget {
               const SizedBox(height: 2),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(
-                  color: gradient[0],
-                  borderRadius: BorderRadius.circular(12),
+                decoration: BoxDecoration(color: gradient[0], borderRadius: BorderRadius.circular(12)),
+                child: Text(
+                  price,
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14),
                 ),
-                child: Text(price, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14)),
               ),
             ],
           ),
@@ -2247,7 +2383,10 @@ class _ModernChestCard extends StatelessWidget {
             end: Alignment.bottomRight,
           ),
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: gradient[0].withValues(alpha: isBest ? 0.8 : 0.4), width: isBest ? 2 : 1),
+          border: Border.all(
+            color: gradient[0].withValues(alpha: isBest ? 0.8 : 0.4),
+            width: isBest ? 2 : 1,
+          ),
         ),
         child: Row(
           children: [
@@ -2267,7 +2406,10 @@ class _ModernChestCard extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      Text(name, style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w700)),
+                      Text(
+                        name,
+                        style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w700),
+                      ),
                       const SizedBox(width: 8),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -2275,7 +2417,10 @@ class _ModernChestCard extends StatelessWidget {
                           color: gradient[0].withValues(alpha: 0.3),
                           borderRadius: BorderRadius.circular(6),
                         ),
-                        child: Text(rarity, style: TextStyle(color: gradient[0], fontSize: 9, fontWeight: FontWeight.w700)),
+                        child: Text(
+                          rarity,
+                          style: TextStyle(color: gradient[0], fontSize: 9, fontWeight: FontWeight.w700),
+                        ),
                       ),
                     ],
                   ),
@@ -2283,29 +2428,36 @@ class _ModernChestCard extends StatelessWidget {
                   Wrap(
                     spacing: 6,
                     runSpacing: 4,
-                    children: rewards.map((reward) => Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(reward, style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 10)),
-                    )).toList(),
+                    children: rewards
+                        .map(
+                          (reward) => Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              reward,
+                              style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 10),
+                            ),
+                          ),
+                        )
+                        .toList(),
                   ),
                 ],
               ),
             ),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: gradient[0],
-                borderRadius: BorderRadius.circular(14),
-              ),
+              decoration: BoxDecoration(color: gradient[0], borderRadius: BorderRadius.circular(14)),
               child: Row(
                 children: [
                   const Text('💎', style: TextStyle(fontSize: 14)),
                   const SizedBox(width: 4),
-                  Text(price.toString(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15)),
+                  Text(
+                    price.toString(),
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15),
+                  ),
                 ],
               ),
             ),
@@ -2328,7 +2480,10 @@ class _ModernChestCard extends StatelessWidget {
             children: [
               Text(emoji, style: const TextStyle(fontSize: 64)),
               const SizedBox(height: 16),
-              Text(name, style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w700)),
+              Text(
+                name,
+                style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w700),
+              ),
               const SizedBox(height: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -2336,31 +2491,36 @@ class _ModernChestCard extends StatelessWidget {
                   color: gradient[0].withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Text(rarity, style: TextStyle(color: gradient[0], fontSize: 12, fontWeight: FontWeight.w600)),
+                child: Text(
+                  rarity,
+                  style: TextStyle(color: gradient[0], fontSize: 12, fontWeight: FontWeight.w600),
+                ),
               ),
               const SizedBox(height: 20),
               Text('Possible Rewards:', style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 13)),
               const SizedBox(height: 10),
-              ...rewards.map((r) => Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.check_circle, color: gradient[0], size: 16),
-                    const SizedBox(width: 8),
-                    Text(r, style: const TextStyle(color: Colors.white, fontSize: 14)),
-                  ],
+              ...rewards.map(
+                (r) => Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.check_circle, color: gradient[0], size: 16),
+                      const SizedBox(width: 8),
+                      Text(r, style: const TextStyle(color: Colors.white, fontSize: 14)),
+                    ],
+                  ),
                 ),
-              )),
+              ),
               const SizedBox(height: 24),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: () {
                     Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Opened $name!'), backgroundColor: gradient[0]),
-                    );
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(SnackBar(content: Text('Opened $name!'), backgroundColor: gradient[0]));
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: gradient[0],
@@ -2372,7 +2532,10 @@ class _ModernChestCard extends StatelessWidget {
                     children: [
                       const Text('💎', style: TextStyle(fontSize: 18)),
                       const SizedBox(width: 8),
-                      Text('Open for $price', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700)),
+                      Text(
+                        'Open for $price',
+                        style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700),
+                      ),
                     ],
                   ),
                 ),
@@ -2430,16 +2593,238 @@ class _ProfileTabState extends State<_ProfileTab> {
   }
 
   void _showAddFriendDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => const AddFriendDialog(),
-    );
+    showDialog(context: context, builder: (context) => const AddFriendDialog());
   }
 
   void _showFriendsListDialog() {
+    showDialog(context: context, builder: (context) => const FriendsListDialog());
+  }
+
+  void _showDevMenu(BuildContext context) {
+    final parentScaffoldMessenger = ScaffoldMessenger.of(context);
+    final parentNavigator = Navigator.of(context);
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1A1A1A),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (sheetContext) => Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              '🛠️ Developer Menu',
+              style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 20),
+            ListTile(
+              leading: const Icon(Icons.swap_horiz, color: Color(0xFFFF9800)),
+              title: const Text('Switch Test Account', style: TextStyle(color: Colors.white)),
+              subtitle: Text(
+                'Current: ${AuthService().currentUser?.email ?? "Anonymous"}',
+                style: const TextStyle(color: Colors.white54),
+              ),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                _showAccountSwitcher(context);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.person_add, color: Color(0xFF9C27B0)),
+              title: const Text('Create Test Account', style: TextStyle(color: Colors.white)),
+              subtitle: const Text('Register new test user', style: TextStyle(color: Colors.white54)),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                _showCreateTestAccount(context);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.add_box, color: Color(0xFF4CAF50)),
+              title: const Text('Add Test Chips', style: TextStyle(color: Colors.white)),
+              subtitle: const Text('+10,000 chips', style: TextStyle(color: Colors.white54)),
+              onTap: () async {
+                Navigator.pop(sheetContext);
+                await UserPreferences.addChips(10000);
+                parentScaffoldMessenger.showSnackBar(SnackBar(content: Text('Added 10,000 chips! New balance: ${UserPreferences.formatChips(UserPreferences.chips)}')));
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.meeting_room, color: Color(0xFF2196F3)),
+              title: const Text('Create Test Room', style: TextStyle(color: Colors.white)),
+              subtitle: const Text('Quick room for testing', style: TextStyle(color: Colors.white54)),
+              onTap: () async {
+                Navigator.pop(sheetContext);
+                try {
+                  final room = await GameService().createRoom(isPrivate: true);
+                  if (mounted) {
+                    parentNavigator.push(MaterialPageRoute(builder: (_) => MultiplayerGameScreen(roomId: room.id)));
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    parentScaffoldMessenger.showSnackBar(SnackBar(content: Text('Error: $e')));
+                  }
+                }
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.login, color: Color(0xFF00BCD4)),
+              title: const Text('Sign In Anonymously', style: TextStyle(color: Colors.white)),
+              subtitle: const Text('Quick anonymous login', style: TextStyle(color: Colors.white54)),
+              onTap: () async {
+                Navigator.pop(sheetContext);
+                try {
+                  await AuthService().signInAnonymously();
+                  if (mounted) {
+                    parentScaffoldMessenger.showSnackBar(const SnackBar(content: Text('Signed in anonymously!')));
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    parentScaffoldMessenger.showSnackBar(SnackBar(content: Text('Error: $e')));
+                  }
+                }
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.logout, color: Color(0xFFFF4444)),
+              title: const Text('Sign Out', style: TextStyle(color: Colors.white)),
+              onTap: () async {
+                Navigator.pop(sheetContext);
+                try {
+                  await AuthService().signOut();
+                  if (mounted) {
+                    parentScaffoldMessenger.showSnackBar(const SnackBar(content: Text('Signed out!')));
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    parentScaffoldMessenger.showSnackBar(SnackBar(content: Text('Error: $e')));
+                  }
+                }
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showAccountSwitcher(BuildContext context) {
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
     showDialog(
       context: context,
-      builder: (context) => const FriendsListDialog(),
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A1A),
+        title: const Text('Switch Test Account', style: TextStyle(color: Colors.white)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Sign in with email:', style: TextStyle(color: Colors.white70, fontSize: 12)),
+            const SizedBox(height: 10),
+            _buildAccountOption(dialogContext, scaffoldMessenger, 'test1@allin.dev', 'Test123!'),
+            _buildAccountOption(dialogContext, scaffoldMessenger, 'test2@allin.dev', 'Test123!'),
+            _buildAccountOption(dialogContext, scaffoldMessenger, 'test3@allin.dev', 'Test123!'),
+          ],
+        ),
+        actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel'))],
+      ),
+    );
+  }
+
+  void _showCreateTestAccount(BuildContext context) {
+    final emailController = TextEditingController();
+    final passwordController = TextEditingController();
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A1A),
+        title: const Text('Create Test Account', style: TextStyle(color: Colors.white)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: emailController,
+              style: const TextStyle(color: Colors.white),
+              decoration: const InputDecoration(
+                hintText: 'Email',
+                hintStyle: TextStyle(color: Colors.white38),
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: passwordController,
+              obscureText: true,
+              style: const TextStyle(color: Colors.white),
+              decoration: const InputDecoration(
+                hintText: 'Password (min 6 chars)',
+                hintStyle: TextStyle(color: Colors.white38),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              try {
+                await AuthService().registerWithEmail(
+                  email: emailController.text.trim(),
+                  password: passwordController.text,
+                );
+                if (mounted) {
+                  scaffoldMessenger.showSnackBar(
+                    SnackBar(content: Text('Created & signed in as ${emailController.text}')),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  scaffoldMessenger.showSnackBar(SnackBar(content: Text('Error: $e')));
+                }
+              }
+            },
+            child: const Text('Create'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAccountOption(
+    BuildContext dialogContext,
+    ScaffoldMessengerState scaffoldMessenger,
+    String email,
+    String password,
+  ) {
+    final isCurrentUser = AuthService().currentUser?.email == email;
+    return ListTile(
+      title: Text(email, style: const TextStyle(color: Colors.white)),
+      trailing: isCurrentUser ? const Icon(Icons.check_circle, color: Color(0xFF4CAF50)) : null,
+      onTap: isCurrentUser
+          ? null
+          : () async {
+              Navigator.pop(dialogContext);
+              try {
+                await AuthService().signOut();
+                await AuthService().signInWithEmail(email: email, password: password);
+                if (mounted) {
+                  scaffoldMessenger.showSnackBar(SnackBar(content: Text('Signed in as $email')));
+                }
+              } catch (e) {
+                // If sign-in fails, try to create the account first
+                try {
+                  await AuthService().registerWithEmail(email: email, password: password);
+                  if (mounted) {
+                    scaffoldMessenger.showSnackBar(SnackBar(content: Text('Created & signed in as $email')));
+                  }
+                } catch (createError) {
+                  if (mounted) {
+                    scaffoldMessenger.showSnackBar(SnackBar(content: Text('Failed: $createError')));
+                  }
+                }
+              }
+            },
     );
   }
 
@@ -2457,27 +2842,39 @@ class _ProfileTabState extends State<_ProfileTab> {
                 children: [
                   const Text(
                     'Profile',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 28,
-                      fontWeight: FontWeight.w700,
-                    ),
+                    style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w700),
                   ),
-                  GestureDetector(
-                    onTap: () => _showSettings(context),
-                    child: Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.06),
-                        borderRadius: BorderRadius.circular(14),
+                  Row(
+                    children: [
+                      // Dev Button
+                      GestureDetector(
+                        onTap: () => _showDevMenu(context),
+                        child: Container(
+                          width: 44,
+                          height: 44,
+                          margin: const EdgeInsets.only(right: 8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFF9800).withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: const Color(0xFFFF9800).withValues(alpha: 0.5)),
+                          ),
+                          child: const Center(child: Icon(Icons.bug_report, color: Color(0xFFFF9800), size: 22)),
+                        ),
                       ),
-                      child: Icon(
-                        Icons.settings_outlined,
-                        color: Colors.white.withValues(alpha: 0.7),
-                        size: 22,
+                      // Settings Button
+                      GestureDetector(
+                        onTap: () => _showSettings(context),
+                        child: Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.06),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Icon(Icons.settings_outlined, color: Colors.white.withValues(alpha: 0.7), size: 22),
+                        ),
                       ),
-                    ),
+                    ],
                   ),
                 ],
               ),
@@ -2515,18 +2912,12 @@ class _ProfileTabState extends State<_ProfileTab> {
                         ),
                         borderRadius: BorderRadius.circular(24),
                       ),
-                      child: const Center(
-                        child: Text('👤', style: TextStyle(fontSize: 36)),
-                      ),
+                      child: const Center(child: Text('👤', style: TextStyle(fontSize: 36))),
                     ),
                     const SizedBox(height: 16),
                     const Text(
                       'Player123',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 24,
-                        fontWeight: FontWeight.w700,
-                      ),
+                      style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w700),
                     ),
                     const SizedBox(height: 6),
                     Container(
@@ -2542,11 +2933,7 @@ class _ProfileTabState extends State<_ProfileTab> {
                           const SizedBox(width: 4),
                           const Text(
                             'Unranked',
-                            style: TextStyle(
-                              color: Color(0xFF9E9E9E),
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                            ),
+                            style: TextStyle(color: Color(0xFF9E9E9E), fontSize: 13, fontWeight: FontWeight.w600),
                           ),
                         ],
                       ),
@@ -2584,14 +2971,10 @@ class _ProfileTabState extends State<_ProfileTab> {
                           width: 44,
                           height: 44,
                           decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFF9C27B0), Color(0xFF673AB7)],
-                            ),
+                            gradient: const LinearGradient(colors: [Color(0xFF9C27B0), Color(0xFF673AB7)]),
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          child: const Center(
-                            child: Text('🏅', style: TextStyle(fontSize: 22)),
-                          ),
+                          child: const Center(child: Text('🏅', style: TextStyle(fontSize: 22))),
                         ),
                         const SizedBox(width: 14),
                         Expanded(
@@ -2602,11 +2985,7 @@ class _ProfileTabState extends State<_ProfileTab> {
                                 children: [
                                   const Text(
                                     'Season 1',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w700,
-                                    ),
+                                    style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700),
                                   ),
                                   const SizedBox(width: 8),
                                   Container(
@@ -2629,10 +3008,7 @@ class _ProfileTabState extends State<_ProfileTab> {
                               const SizedBox(height: 4),
                               Text(
                                 '28 days remaining',
-                                style: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.5),
-                                  fontSize: 12,
-                                ),
+                                style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12),
                               ),
                             ],
                           ),
@@ -2642,19 +3018,12 @@ class _ProfileTabState extends State<_ProfileTab> {
                           children: [
                             const Text(
                               'Bronze III',
-                              style: TextStyle(
-                                color: Color(0xFFCD7F32),
-                                fontSize: 14,
-                                fontWeight: FontWeight.w700,
-                              ),
+                              style: TextStyle(color: Color(0xFFCD7F32), fontSize: 14, fontWeight: FontWeight.w700),
                             ),
                             const SizedBox(height: 2),
                             Text(
                               '0 / 100 RP',
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.4),
-                                fontSize: 11,
-                              ),
+                              style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 11),
                             ),
                           ],
                         ),
@@ -2689,9 +3058,7 @@ class _ProfileTabState extends State<_ProfileTab> {
                           height: 8,
                           width: 0, // 0% progress
                           decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFFCD7F32), Color(0xFFB87333)],
-                            ),
+                            gradient: const LinearGradient(colors: [Color(0xFFCD7F32), Color(0xFFB87333)]),
                             borderRadius: BorderRadius.circular(4),
                           ),
                         ),
@@ -2703,10 +3070,7 @@ class _ProfileTabState extends State<_ProfileTab> {
                       children: [
                         Text(
                           'Win ranked games to earn RP and climb!',
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.5),
-                            fontSize: 12,
-                          ),
+                          style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12),
                         ),
                       ],
                     ),
@@ -2745,11 +3109,7 @@ class _ProfileTabState extends State<_ProfileTab> {
                           ),
                           child: Text(
                             '${_friends.where((f) => f.isOnline).length} online',
-                            style: const TextStyle(
-                              color: Color(0xFF4CAF50),
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                            ),
+                            style: const TextStyle(color: Color(0xFF4CAF50), fontSize: 11, fontWeight: FontWeight.w600),
                           ),
                         ),
                       ),
@@ -2769,23 +3129,16 @@ class _ProfileTabState extends State<_ProfileTab> {
                             padding: const EdgeInsets.symmetric(vertical: 20),
                             child: Column(
                               children: [
-                                Icon(Icons.people_outline, 
-                                    color: Colors.white.withValues(alpha: 0.3), size: 40),
+                                Icon(Icons.people_outline, color: Colors.white.withValues(alpha: 0.3), size: 40),
                                 const SizedBox(height: 8),
                                 Text(
                                   'No friends yet',
-                                  style: TextStyle(
-                                    color: Colors.white.withValues(alpha: 0.5),
-                                    fontSize: 13,
-                                  ),
+                                  style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13),
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
                                   'Add friends to play together!',
-                                  style: TextStyle(
-                                    color: Colors.white.withValues(alpha: 0.3),
-                                    fontSize: 12,
-                                  ),
+                                  style: TextStyle(color: Colors.white.withValues(alpha: 0.3), fontSize: 12),
                                 ),
                               ],
                             ),
@@ -2793,14 +3146,17 @@ class _ProfileTabState extends State<_ProfileTab> {
                         else
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceAround,
-                            children: _friends.take(4).map((friend) => 
-                              _FriendAvatarExpanded(
-                                name: friend.username, 
-                                isOnline: friend.isOnline, 
-                                onChallenge: () => _showChallengeDialog(context, friend.username),
-                                onGift: () => _showGiftDialog(context, friend.username),
-                              ),
-                            ).toList(),
+                            children: _friends
+                                .take(4)
+                                .map(
+                                  (friend) => _FriendAvatarExpanded(
+                                    name: friend.username,
+                                    isOnline: friend.isOnline,
+                                    onChallenge: () => _showChallengeDialog(context, friend.username),
+                                    onGift: () => _showGiftDialog(context, friend.username),
+                                  ),
+                                )
+                                .toList(),
                           ),
                         const SizedBox(height: 16),
                         Row(
@@ -2814,9 +3170,7 @@ class _ProfileTabState extends State<_ProfileTab> {
                                   foregroundColor: Colors.white,
                                   side: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
                                   padding: const EdgeInsets.symmetric(vertical: 12),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                 ),
                               ),
                             ),
@@ -2830,9 +3184,7 @@ class _ProfileTabState extends State<_ProfileTab> {
                                   foregroundColor: Colors.white,
                                   side: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
                                   padding: const EdgeInsets.symmetric(vertical: 12),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                 ),
                               ),
                             ),
@@ -2885,19 +3237,12 @@ class _ProfileTabState extends State<_ProfileTab> {
                               children: [
                                 const Text(
                                   'Statistics',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w700,
-                                  ),
+                                  style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700),
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
                                   '0 games played',
-                                  style: TextStyle(
-                                    color: Colors.white.withValues(alpha: 0.5),
-                                    fontSize: 13,
-                                  ),
+                                  style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13),
                                 ),
                               ],
                             ),
@@ -2919,7 +3264,7 @@ class _ProfileTabState extends State<_ProfileTab> {
               ),
             ),
           ),
-          
+
           // Statistics Content (Expandable)
           if (_statisticsExpanded)
             SliverToBoxAdapter(
@@ -2929,41 +3274,65 @@ class _ProfileTabState extends State<_ProfileTab> {
                   children: [
                     Row(
                       children: [
-                        const Expanded(child: _StatCard(value: '0', label: 'Games')),
+                        const Expanded(
+                          child: _StatCard(value: '0', label: 'Games'),
+                        ),
                         const SizedBox(width: 10),
-                        const Expanded(child: _StatCard(value: '0', label: 'Wins')),
+                        const Expanded(
+                          child: _StatCard(value: '0', label: 'Wins'),
+                        ),
                         const SizedBox(width: 10),
-                        const Expanded(child: _StatCard(value: '0%', label: 'Win Rate')),
+                        const Expanded(
+                          child: _StatCard(value: '0%', label: 'Win Rate'),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 10),
                     Row(
                       children: [
-                        const Expanded(child: _StatCard(value: '0', label: 'Best Streak')),
+                        const Expanded(
+                          child: _StatCard(value: '0', label: 'Best Streak'),
+                        ),
                         const SizedBox(width: 10),
-                        const Expanded(child: _StatCard(value: '0', label: 'Earnings')),
+                        const Expanded(
+                          child: _StatCard(value: '0', label: 'Earnings'),
+                        ),
                         const SizedBox(width: 10),
-                        const Expanded(child: _StatCard(value: 'Lv.1', label: 'Level')),
+                        const Expanded(
+                          child: _StatCard(value: 'Lv.1', label: 'Level'),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 10),
                     Row(
                       children: [
-                        const Expanded(child: _StatCard(value: '-', label: 'Rank')),
+                        const Expanded(
+                          child: _StatCard(value: '-', label: 'Rank'),
+                        ),
                         const SizedBox(width: 10),
-                        const Expanded(child: _StatCard(value: '1,000', label: 'ELO')),
+                        const Expanded(
+                          child: _StatCard(value: '1,000', label: 'ELO'),
+                        ),
                         const SizedBox(width: 10),
-                        const Expanded(child: _StatCard(value: '0', label: 'Trophies')),
+                        const Expanded(
+                          child: _StatCard(value: '0', label: 'Trophies'),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 10),
                     Row(
                       children: [
-                        const Expanded(child: _StatCard(value: '0', label: 'Duels Won')),
+                        const Expanded(
+                          child: _StatCard(value: '0', label: 'Duels Won'),
+                        ),
                         const SizedBox(width: 10),
-                        const Expanded(child: _StatCard(value: '0', label: 'Tournaments')),
+                        const Expanded(
+                          child: _StatCard(value: '0', label: 'Tournaments'),
+                        ),
                         const SizedBox(width: 10),
-                        const Expanded(child: _StatCard(value: '0', label: 'Hands')),
+                        const Expanded(
+                          child: _StatCard(value: '0', label: 'Hands'),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 20),
@@ -2982,11 +3351,7 @@ class _ProfileTabState extends State<_ProfileTab> {
                             children: [
                               const Text(
                                 'Chip Balance History',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                ),
+                                style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600),
                               ),
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -2996,11 +3361,7 @@ class _ProfileTabState extends State<_ProfileTab> {
                                 ),
                                 child: const Text(
                                   '7 Days',
-                                  style: TextStyle(
-                                    color: Color(0xFF4CAF50),
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w600,
-                                  ),
+                                  style: TextStyle(color: Color(0xFF4CAF50), fontSize: 10, fontWeight: FontWeight.w600),
                                 ),
                               ),
                             ],
@@ -3009,64 +3370,19 @@ class _ProfileTabState extends State<_ProfileTab> {
                           // Simple line graph representation
                           SizedBox(
                             height: 100,
-                            child: CustomPaint(
-                              size: const Size(double.infinity, 100),
-                              painter: _ChipGraphPainter(),
-                            ),
+                            child: CustomPaint(size: const Size(double.infinity, 100), painter: _ChipGraphPainter()),
                           ),
                           const SizedBox(height: 12),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(
-                                'Mon',
-                                style: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.3),
-                                  fontSize: 10,
-                                ),
-                              ),
-                              Text(
-                                'Tue',
-                                style: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.3),
-                                  fontSize: 10,
-                                ),
-                              ),
-                              Text(
-                                'Wed',
-                                style: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.3),
-                                  fontSize: 10,
-                                ),
-                              ),
-                              Text(
-                                'Thu',
-                                style: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.3),
-                                  fontSize: 10,
-                                ),
-                              ),
-                              Text(
-                                'Fri',
-                                style: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.3),
-                                  fontSize: 10,
-                                ),
-                              ),
-                              Text(
-                                'Sat',
-                                style: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.3),
-                                  fontSize: 10,
-                                ),
-                              ),
-                              Text(
-                                'Sun',
-                                style: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.3),
-                                  fontSize: 10,
-                                ),
-                              ),
+                              Text('Mon', style: TextStyle(color: Colors.white.withValues(alpha: 0.3), fontSize: 10)),
+                              Text('Tue', style: TextStyle(color: Colors.white.withValues(alpha: 0.3), fontSize: 10)),
+                              Text('Wed', style: TextStyle(color: Colors.white.withValues(alpha: 0.3), fontSize: 10)),
+                              Text('Thu', style: TextStyle(color: Colors.white.withValues(alpha: 0.3), fontSize: 10)),
+                              Text('Fri', style: TextStyle(color: Colors.white.withValues(alpha: 0.3), fontSize: 10)),
+                              Text('Sat', style: TextStyle(color: Colors.white.withValues(alpha: 0.3), fontSize: 10)),
+                              Text('Sun', style: TextStyle(color: Colors.white.withValues(alpha: 0.3), fontSize: 10)),
                             ],
                           ),
                         ],
@@ -3116,19 +3432,12 @@ class _ProfileTabState extends State<_ProfileTab> {
                               children: [
                                 const Text(
                                   'Achievements',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w700,
-                                  ),
+                                  style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700),
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
                                   '0 / 100 Unlocked',
-                                  style: TextStyle(
-                                    color: Colors.white.withValues(alpha: 0.5),
-                                    fontSize: 13,
-                                  ),
+                                  style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13),
                                 ),
                               ],
                             ),
@@ -3150,7 +3459,7 @@ class _ProfileTabState extends State<_ProfileTab> {
               ),
             ),
           ),
-          
+
           // Achievement Grid (Expandable)
           if (_achievementsExpanded)
             SliverPadding(
@@ -3196,11 +3505,7 @@ class _ProfileTabState extends State<_ProfileTab> {
                         ),
                         child: const Text(
                           'FREE',
-                          style: TextStyle(
-                            color: Color(0xFFD4AF37),
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                          ),
+                          style: TextStyle(color: Color(0xFFD4AF37), fontSize: 10, fontWeight: FontWeight.w700),
                         ),
                       ),
                     ],
@@ -3229,20 +3534,13 @@ class _ProfileTabState extends State<_ProfileTab> {
                                 const SizedBox(width: 10),
                                 const Text(
                                   'Tier 1',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w700,
-                                  ),
+                                  style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700),
                                 ),
                               ],
                             ),
                             Text(
                               '0 / 1000 XP',
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.6),
-                                fontSize: 13,
-                              ),
+                              style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 13),
                             ),
                           ],
                         ),
@@ -3275,9 +3573,7 @@ class _ProfileTabState extends State<_ProfileTab> {
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                             decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                colors: [Color(0xFFD4AF37), Color(0xFFB8860B)],
-                              ),
+                              gradient: const LinearGradient(colors: [Color(0xFFD4AF37), Color(0xFFB8860B)]),
                               borderRadius: BorderRadius.circular(14),
                             ),
                             child: Row(
@@ -3292,9 +3588,7 @@ class _ProfileTabState extends State<_ProfileTab> {
                                         color: Colors.white.withValues(alpha: 0.2),
                                         borderRadius: BorderRadius.circular(10),
                                       ),
-                                      child: const Center(
-                                        child: Text('👑', style: TextStyle(fontSize: 18)),
-                                      ),
+                                      child: const Center(child: Text('👑', style: TextStyle(fontSize: 18))),
                                     ),
                                     const SizedBox(width: 12),
                                     Column(
@@ -3310,10 +3604,7 @@ class _ProfileTabState extends State<_ProfileTab> {
                                         ),
                                         Text(
                                           'Unlock exclusive rewards & 2x XP!',
-                                          style: TextStyle(
-                                            color: Colors.white.withValues(alpha: 0.8),
-                                            fontSize: 11,
-                                          ),
+                                          style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 11),
                                         ),
                                       ],
                                     ),
@@ -3391,19 +3682,12 @@ class _ProfileTabState extends State<_ProfileTab> {
                               children: [
                                 const Text(
                                   'Invite Friends',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w700,
-                                  ),
+                                  style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700),
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
                                   'Earn rewards for referrals',
-                                  style: TextStyle(
-                                    color: Colors.white.withValues(alpha: 0.5),
-                                    fontSize: 13,
-                                  ),
+                                  style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13),
                                 ),
                               ],
                             ),
@@ -3411,10 +3695,7 @@ class _ProfileTabState extends State<_ProfileTab> {
                           AnimatedRotation(
                             turns: _referralExpanded ? 0.5 : 0,
                             duration: const Duration(milliseconds: 200),
-                            child: Icon(
-                              Icons.keyboard_arrow_down,
-                              color: Colors.white.withValues(alpha: 0.5),
-                            ),
+                            child: Icon(Icons.keyboard_arrow_down, color: Colors.white.withValues(alpha: 0.5)),
                           ),
                         ],
                       ),
@@ -3435,10 +3716,7 @@ class _ProfileTabState extends State<_ProfileTab> {
                             children: [
                               Text(
                                 'Your Referral Code',
-                                style: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.5),
-                                  fontSize: 13,
-                                ),
+                                style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13),
                               ),
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -3448,11 +3726,7 @@ class _ProfileTabState extends State<_ProfileTab> {
                                 ),
                                 child: const Text(
                                   '0 invited',
-                                  style: TextStyle(
-                                    color: Color(0xFF4CAF50),
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                  ),
+                                  style: TextStyle(color: Color(0xFF4CAF50), fontSize: 11, fontWeight: FontWeight.w600),
                                 ),
                               ),
                             ],
@@ -3479,11 +3753,7 @@ class _ProfileTabState extends State<_ProfileTab> {
                                 const SizedBox(width: 12),
                                 GestureDetector(
                                   onTap: () {},
-                                  child: Icon(
-                                    Icons.copy,
-                                    color: Colors.white.withValues(alpha: 0.5),
-                                    size: 20,
-                                  ),
+                                  child: Icon(Icons.copy, color: Colors.white.withValues(alpha: 0.5), size: 20),
                                 ),
                               ],
                             ),
@@ -3491,11 +3761,7 @@ class _ProfileTabState extends State<_ProfileTab> {
                           const SizedBox(height: 16),
                           const Text(
                             'Rewards per friend',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                            ),
+                            style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600),
                           ),
                           const SizedBox(height: 12),
                           Row(
@@ -3515,18 +3781,11 @@ class _ProfileTabState extends State<_ProfileTab> {
                                   ),
                                   Text(
                                     'Chips',
-                                    style: TextStyle(
-                                      color: Colors.white.withValues(alpha: 0.5),
-                                      fontSize: 11,
-                                    ),
+                                    style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 11),
                                   ),
                                 ],
                               ),
-                              Container(
-                                width: 1,
-                                height: 40,
-                                color: Colors.white.withValues(alpha: 0.1),
-                              ),
+                              Container(width: 1, height: 40, color: Colors.white.withValues(alpha: 0.1)),
                               Column(
                                 children: [
                                   const Text('💎', style: TextStyle(fontSize: 24)),
@@ -3541,10 +3800,7 @@ class _ProfileTabState extends State<_ProfileTab> {
                                   ),
                                   Text(
                                     'Gems',
-                                    style: TextStyle(
-                                      color: Colors.white.withValues(alpha: 0.5),
-                                      fontSize: 11,
-                                    ),
+                                    style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 11),
                                   ),
                                 ],
                               ),
@@ -3561,9 +3817,7 @@ class _ProfileTabState extends State<_ProfileTab> {
                                 backgroundColor: const Color(0xFF4CAF50),
                                 foregroundColor: Colors.white,
                                 padding: const EdgeInsets.symmetric(vertical: 14),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                               ),
                             ),
                           ),
@@ -3577,9 +3831,7 @@ class _ProfileTabState extends State<_ProfileTab> {
           ),
 
           // Bottom Spacing
-          const SliverToBoxAdapter(
-            child: SizedBox(height: 40),
-          ),
+          const SliverToBoxAdapter(child: SizedBox(height: 40)),
         ],
       ),
     );
@@ -3590,9 +3842,7 @@ class _ProfileTabState extends State<_ProfileTab> {
       context: context,
       builder: (context) => Dialog(
         backgroundColor: const Color(0xFF1A1A1A),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         child: Container(
           width: 340,
           padding: const EdgeInsets.all(24),
@@ -3603,40 +3853,23 @@ class _ProfileTabState extends State<_ProfileTab> {
                 width: 72,
                 height: 72,
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFFE91E63), Color(0xFFC2185B)],
-                  ),
+                  gradient: const LinearGradient(colors: [Color(0xFFE91E63), Color(0xFFC2185B)]),
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: const Center(
-                  child: Text('⚔️', style: TextStyle(fontSize: 36)),
-                ),
+                child: const Center(child: Text('⚔️', style: TextStyle(fontSize: 36))),
               ),
               const SizedBox(height: 20),
               Text(
                 'Challenge $friendName',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
-                ),
+                style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 12),
               Text(
                 'Send a heads-up duel challenge!',
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.6),
-                  fontSize: 14,
-                ),
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 14),
               ),
               const SizedBox(height: 24),
-              Text(
-                'Select Stakes',
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.5),
-                  fontSize: 12,
-                ),
-              ),
+              Text('Select Stakes', style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12)),
               const SizedBox(height: 12),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -3655,9 +3888,7 @@ class _ProfileTabState extends State<_ProfileTab> {
                       style: OutlinedButton.styleFrom(
                         side: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
                         padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
                       child: const Text('Cancel', style: TextStyle(color: Colors.white)),
                     ),
@@ -3678,9 +3909,7 @@ class _ProfileTabState extends State<_ProfileTab> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFFE91E63),
                         padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
                       child: const Text(
                         'Send Challenge',
@@ -3702,9 +3931,7 @@ class _ProfileTabState extends State<_ProfileTab> {
       context: context,
       builder: (context) => Dialog(
         backgroundColor: const Color(0xFF1A1A1A),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         child: Container(
           width: 340,
           padding: const EdgeInsets.all(24),
@@ -3715,43 +3942,25 @@ class _ProfileTabState extends State<_ProfileTab> {
                 width: 72,
                 height: 72,
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF4CAF50), Color(0xFF388E3C)],
-                  ),
+                  gradient: const LinearGradient(colors: [Color(0xFF4CAF50), Color(0xFF388E3C)]),
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: const Center(
-                  child: Text('🎁', style: TextStyle(fontSize: 36)),
-                ),
+                child: const Center(child: Text('🎁', style: TextStyle(fontSize: 36))),
               ),
               const SizedBox(height: 20),
               Text(
                 'Gift to $friendName',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
-                ),
+                style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 24),
               Row(
                 children: [
                   Expanded(
-                    child: _GiftOption(
-                      emoji: '🪙',
-                      label: 'Chips',
-                      amount: '1,000',
-                      isSelected: true,
-                    ),
+                    child: _GiftOption(emoji: '🪙', label: 'Chips', amount: '1,000', isSelected: true),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: _GiftOption(
-                      emoji: '💎',
-                      label: 'Gems',
-                      amount: '10',
-                      isSelected: false,
-                    ),
+                    child: _GiftOption(emoji: '💎', label: 'Gems', amount: '10', isSelected: false),
                   ),
                 ],
               ),
@@ -3764,9 +3973,7 @@ class _ProfileTabState extends State<_ProfileTab> {
                       style: OutlinedButton.styleFrom(
                         side: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
                         padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
                       child: const Text('Cancel', style: TextStyle(color: Colors.white)),
                     ),
@@ -3787,9 +3994,7 @@ class _ProfileTabState extends State<_ProfileTab> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF4CAF50),
                         padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
                       child: const Text(
                         'Send Gift',
@@ -3811,14 +4016,9 @@ class _ProfileTabState extends State<_ProfileTab> {
       context: context,
       builder: (context) => Dialog(
         backgroundColor: const Color(0xFF1A1A1A),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(context).size.height * 0.8,
-            maxWidth: 360,
-          ),
+          constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.8, maxWidth: 360),
           child: SingleChildScrollView(
             child: Padding(
               padding: const EdgeInsets.all(24),
@@ -3829,31 +4029,20 @@ class _ProfileTabState extends State<_ProfileTab> {
                     width: 80,
                     height: 80,
                     decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFFD4AF37), Color(0xFFB8860B)],
-                      ),
+                      gradient: const LinearGradient(colors: [Color(0xFFD4AF37), Color(0xFFB8860B)]),
                       borderRadius: BorderRadius.circular(24),
                     ),
-                    child: const Center(
-                      child: Text('👑', style: TextStyle(fontSize: 40)),
-                    ),
+                    child: const Center(child: Text('👑', style: TextStyle(fontSize: 40))),
                   ),
                   const SizedBox(height: 20),
                   const Text(
                     'Premium Pass',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 24,
-                      fontWeight: FontWeight.w700,
-                    ),
+                    style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w700),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     'Unlock exclusive rewards!',
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.6),
-                      fontSize: 14,
-                    ),
+                    style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 14),
                   ),
                   const SizedBox(height: 24),
                   _PremiumBenefit(icon: '⚡', text: '2x XP on all games'),
@@ -3872,18 +4061,13 @@ class _ProfileTabState extends State<_ProfileTab> {
                       onPressed: () {
                         Navigator.pop(context);
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Premium Pass purchased!'),
-                            backgroundColor: Color(0xFFD4AF37),
-                          ),
+                          const SnackBar(content: Text('Premium Pass purchased!'), backgroundColor: Color(0xFFD4AF37)),
                         );
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFFD4AF37),
                         padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -3892,11 +4076,7 @@ class _ProfileTabState extends State<_ProfileTab> {
                           const SizedBox(width: 8),
                           const Text(
                             'Buy for 500 Gems',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                            ),
+                            style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700),
                           ),
                         ],
                       ),
@@ -3905,12 +4085,7 @@ class _ProfileTabState extends State<_ProfileTab> {
                   const SizedBox(height: 8),
                   TextButton(
                     onPressed: () => Navigator.pop(context),
-                    child: Text(
-                      'Maybe Later',
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.5),
-                      ),
-                    ),
+                    child: Text('Maybe Later', style: TextStyle(color: Colors.white.withValues(alpha: 0.5))),
                   ),
                 ],
               ),
@@ -3926,9 +4101,7 @@ class _ProfileTabState extends State<_ProfileTab> {
       context: context,
       builder: (context) => Dialog(
         backgroundColor: const Color(0xFF1A1A1A),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         child: Container(
           width: 340,
           padding: const EdgeInsets.all(24),
@@ -3940,11 +4113,7 @@ class _ProfileTabState extends State<_ProfileTab> {
                 children: [
                   const Text(
                     'Settings',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 22,
-                      fontWeight: FontWeight.w700,
-                    ),
+                    style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w700),
                   ),
                   IconButton(
                     onPressed: () => Navigator.pop(context),
@@ -3981,53 +4150,24 @@ class _BalanceCard extends StatelessWidget {
   final String value;
   final List<Color> gradient;
 
-  const _BalanceCard({
-    required this.emoji,
-    required this.label,
-    required this.value,
-    required this.gradient,
-  });
+  const _BalanceCard({required this.emoji, required this.label, required this.value, required this.gradient});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [gradient[0].withValues(alpha: 0.2), gradient[1].withValues(alpha: 0.1)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: gradient[0].withValues(alpha: 0.3)),
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.06), borderRadius: BorderRadius.circular(12)),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Text(emoji, style: const TextStyle(fontSize: 26)),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.5),
-                    fontSize: 12,
-                  ),
-                ),
-                Text(
-                  value,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
+          Text(emoji, style: const TextStyle(fontSize: 20)),
+          const SizedBox(width: 8),
+          Text(
+            value,
+            style: TextStyle(color: gradient[0], fontSize: 17, fontWeight: FontWeight.w600),
           ),
-          Icon(Icons.add_circle_outline, color: Colors.white.withValues(alpha: 0.4), size: 22),
+          const SizedBox(width: 6),
+          Icon(Icons.add, color: Colors.white.withValues(alpha: 0.3), size: 16),
         ],
       ),
     );
@@ -4056,19 +4196,9 @@ class _QuickPlayCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: gradient,
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
+          gradient: LinearGradient(colors: gradient, begin: Alignment.topLeft, end: Alignment.bottomRight),
           borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: gradient[0].withValues(alpha: 0.3),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
+          boxShadow: [BoxShadow(color: gradient[0].withValues(alpha: 0.3), blurRadius: 12, offset: const Offset(0, 4))],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -4085,13 +4215,7 @@ class _QuickPlayCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 2),
-            Text(
-              subtitle,
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.8),
-                fontSize: 13,
-              ),
-            ),
+            Text(subtitle, style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 13)),
           ],
         ),
       ),
@@ -4105,12 +4229,7 @@ class _ShopItemCard extends StatelessWidget {
   final String price;
   final bool isBest;
 
-  const _ShopItemCard({
-    required this.emoji,
-    required this.amount,
-    required this.price,
-    this.isBest = false,
-  });
+  const _ShopItemCard({required this.emoji, required this.amount, required this.price, this.isBest = false});
 
   @override
   Widget build(BuildContext context) {
@@ -4129,43 +4248,25 @@ class _ShopItemCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               margin: const EdgeInsets.only(bottom: 8),
-              decoration: BoxDecoration(
-                color: const Color(0xFFD4AF37),
-                borderRadius: BorderRadius.circular(6),
-              ),
+              decoration: BoxDecoration(color: const Color(0xFFD4AF37), borderRadius: BorderRadius.circular(6)),
               child: const Text(
                 'BEST',
-                style: TextStyle(
-                  color: Colors.black,
-                  fontSize: 9,
-                  fontWeight: FontWeight.w800,
-                ),
+                style: TextStyle(color: Colors.black, fontSize: 9, fontWeight: FontWeight.w800),
               ),
             ),
           Text(emoji, style: const TextStyle(fontSize: 28)),
           const SizedBox(height: 8),
           Text(
             amount,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-            ),
+            style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 10),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(10),
-            ),
+            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10)),
             child: Text(
               price,
-              style: const TextStyle(
-                color: Colors.black,
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-              ),
+              style: const TextStyle(color: Colors.black, fontSize: 12, fontWeight: FontWeight.w700),
             ),
           ),
         ],
@@ -4184,28 +4285,15 @@ class _StatCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 18),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.04),
-        borderRadius: BorderRadius.circular(14),
-      ),
+      decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.04), borderRadius: BorderRadius.circular(14)),
       child: Column(
         children: [
           Text(
             value,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-            ),
+            style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.5),
-              fontSize: 11,
-            ),
-          ),
+          Text(label, style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 11)),
         ],
       ),
     );
@@ -4234,11 +4322,7 @@ class _FriendAvatar extends StatelessWidget {
               child: Center(
                 child: Text(
                   name[0],
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600),
                 ),
               ),
             ),
@@ -4259,13 +4343,7 @@ class _FriendAvatar extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 6),
-        Text(
-          name,
-          style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.6),
-            fontSize: 11,
-          ),
-        ),
+        Text(name, style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 11)),
       ],
     );
   }
@@ -4277,12 +4355,7 @@ class _SettingsItem extends StatelessWidget {
   final bool hasToggle;
   final bool isDestructive;
 
-  const _SettingsItem({
-    required this.icon,
-    required this.title,
-    this.hasToggle = false,
-    this.isDestructive = false,
-  });
+  const _SettingsItem({required this.icon, required this.title, this.hasToggle = false, this.isDestructive = false});
 
   @override
   Widget build(BuildContext context) {
@@ -4290,33 +4363,18 @@ class _SettingsItem extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 10),
       child: Row(
         children: [
-          Icon(
-            icon,
-            color: isDestructive ? const Color(0xFFFF4444) : Colors.white.withValues(alpha: 0.7),
-            size: 22,
-          ),
+          Icon(icon, color: isDestructive ? const Color(0xFFFF4444) : Colors.white.withValues(alpha: 0.7), size: 22),
           const SizedBox(width: 14),
           Expanded(
             child: Text(
               title,
-              style: TextStyle(
-                color: isDestructive ? const Color(0xFFFF4444) : Colors.white,
-                fontSize: 16,
-              ),
+              style: TextStyle(color: isDestructive ? const Color(0xFFFF4444) : Colors.white, fontSize: 16),
             ),
           ),
           if (hasToggle)
-            Switch(
-              value: true,
-              onChanged: (v) {},
-              activeColor: const Color(0xFF4CAF50),
-            )
+            Switch(value: true, onChanged: (v) {}, activeThumbColor: const Color(0xFF4CAF50))
           else
-            Icon(
-              Icons.chevron_right,
-              color: Colors.white.withValues(alpha: 0.3),
-              size: 20,
-            ),
+            Icon(Icons.chevron_right, color: Colors.white.withValues(alpha: 0.3), size: 20),
         ],
       ),
     );
@@ -4334,8 +4392,7 @@ class _DailySpinDialog extends StatefulWidget {
   State<_DailySpinDialog> createState() => _DailySpinDialogState();
 }
 
-class _DailySpinDialogState extends State<_DailySpinDialog>
-    with SingleTickerProviderStateMixin {
+class _DailySpinDialogState extends State<_DailySpinDialog> with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _animation;
   bool _isSpinning = false;
@@ -4371,16 +4428,17 @@ class _DailySpinDialogState extends State<_DailySpinDialog>
     if (_isSpinning || _hasSpun) return;
     setState(() => _isSpinning = true);
     _controller.reset();
-    
+
     final random = Random();
     final prizeIndex = random.nextInt(_prizes.length);
     final rotations = 5 + random.nextDouble() * 3;
     final targetAngle = rotations * 2 * pi + (prizeIndex / _prizes.length) * 2 * pi;
-    
-    _animation = Tween<double>(begin: 0, end: targetAngle).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic),
-    );
-    
+
+    _animation = Tween<double>(
+      begin: 0,
+      end: targetAngle,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
+
     _controller.forward().then((_) {
       setState(() {
         _isSpinning = false;
@@ -4415,10 +4473,7 @@ class _DailySpinDialogState extends State<_DailySpinDialog>
                     animation: _animation,
                     builder: (context, child) => Transform.rotate(
                       angle: _animation.value,
-                      child: CustomPaint(
-                        size: const Size(180, 180),
-                        painter: _WheelPainter(_prizes, _colors),
-                      ),
+                      child: CustomPaint(size: const Size(180, 180), painter: _WheelPainter(_prizes, _colors)),
                     ),
                   ),
                   Container(
@@ -4492,8 +4547,7 @@ class _GemWheelDialog extends StatefulWidget {
   State<_GemWheelDialog> createState() => _GemWheelDialogState();
 }
 
-class _GemWheelDialogState extends State<_GemWheelDialog>
-    with SingleTickerProviderStateMixin {
+class _GemWheelDialogState extends State<_GemWheelDialog> with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _animation;
   bool _isSpinning = false;
@@ -4537,16 +4591,17 @@ class _GemWheelDialogState extends State<_GemWheelDialog>
       _gemsBalance -= _spinCost;
     });
     _controller.reset();
-    
+
     final random = Random();
     final prizeIndex = random.nextInt(_prizes.length);
     final rotations = 6 + random.nextDouble() * 4;
     final targetAngle = rotations * 2 * pi + (prizeIndex / _prizes.length) * 2 * pi;
-    
-    _animation = Tween<double>(begin: 0, end: targetAngle).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic),
-    );
-    
+
+    _animation = Tween<double>(
+      begin: 0,
+      end: targetAngle,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
+
     _controller.forward().then((_) {
       setState(() {
         _isSpinning = false;
@@ -4571,7 +4626,10 @@ class _GemWheelDialogState extends State<_GemWheelDialog>
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('🎰 Gem Wheel', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w700)),
+                const Text(
+                  '🎰 Gem Wheel',
+                  style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w700),
+                ),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
@@ -4582,7 +4640,10 @@ class _GemWheelDialogState extends State<_GemWheelDialog>
                     children: [
                       const Text('💎', style: TextStyle(fontSize: 14)),
                       const SizedBox(width: 4),
-                      Text('$_gemsBalance', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                      Text(
+                        '$_gemsBalance',
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                      ),
                     ],
                   ),
                 ),
@@ -4599,10 +4660,7 @@ class _GemWheelDialogState extends State<_GemWheelDialog>
                     animation: _animation,
                     builder: (context, child) => Transform.rotate(
                       angle: _animation.value,
-                      child: CustomPaint(
-                        size: const Size(200, 200),
-                        painter: _GemWheelPainter(_prizes, _colors),
-                      ),
+                      child: CustomPaint(size: const Size(200, 200), painter: _GemWheelPainter(_prizes, _colors)),
                     ),
                   ),
                   Container(
@@ -4623,14 +4681,20 @@ class _GemWheelDialogState extends State<_GemWheelDialog>
             if (_hasSpun)
               Column(
                 children: [
-                  const Text('🎉 JACKPOT!', style: TextStyle(color: Color(0xFFD4AF37), fontSize: 22, fontWeight: FontWeight.w700)),
+                  const Text(
+                    '🎉 JACKPOT!',
+                    style: TextStyle(color: Color(0xFFD4AF37), fontSize: 22, fontWeight: FontWeight.w700),
+                  ),
                   const SizedBox(height: 8),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       const Text('🪙', style: TextStyle(fontSize: 28)),
                       const SizedBox(width: 8),
-                      Text(_formatNumber(_wonAmount), style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w700)),
+                      Text(
+                        _formatNumber(_wonAmount),
+                        style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w700),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 20),
@@ -4657,7 +4721,12 @@ class _GemWheelDialogState extends State<_GemWheelDialog>
                             padding: const EdgeInsets.symmetric(vertical: 12),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           ),
-                          onPressed: _gemsBalance >= _spinCost ? () { setState(() => _hasSpun = false); _spin(); } : null,
+                          onPressed: _gemsBalance >= _spinCost
+                              ? () {
+                                  setState(() => _hasSpun = false);
+                                  _spin();
+                                }
+                              : null,
                           child: const Text('Again 💎50'),
                         ),
                       ),
@@ -4679,7 +4748,10 @@ class _GemWheelDialogState extends State<_GemWheelDialog>
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text(_isSpinning ? 'Spinning...' : 'SPIN', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+                      Text(
+                        _isSpinning ? 'Spinning...' : 'SPIN',
+                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                      ),
                       if (!_isSpinning) ...[
                         const SizedBox(width: 10),
                         Container(
@@ -4711,17 +4783,16 @@ class _WheelPointer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return CustomPaint(
-      size: const Size(20, 16),
-      painter: _PointerPainter(),
-    );
+    return CustomPaint(size: const Size(20, 16), painter: _PointerPainter());
   }
 }
 
 class _PointerPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = Colors.white..style = PaintingStyle.fill;
+    final paint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
     final path = Path()
       ..moveTo(size.width / 2, size.height)
       ..lineTo(0, 0)
@@ -4746,18 +4817,29 @@ class _WheelPainter extends CustomPainter {
     final segmentAngle = 2 * pi / prizes.length;
 
     for (int i = 0; i < prizes.length; i++) {
-      final paint = Paint()..color = colors[i % colors.length]..style = PaintingStyle.fill;
-      canvas.drawArc(Rect.fromCircle(center: center, radius: radius), -pi / 2 + i * segmentAngle, segmentAngle, true, paint);
+      final paint = Paint()
+        ..color = colors[i % colors.length]
+        ..style = PaintingStyle.fill;
+      canvas.drawArc(
+        Rect.fromCircle(center: center, radius: radius),
+        -pi / 2 + i * segmentAngle,
+        segmentAngle,
+        true,
+        paint,
+      );
 
       final textAngle = -pi / 2 + i * segmentAngle + segmentAngle / 2;
       final textX = center.dx + radius * 0.65 * cos(textAngle);
       final textY = center.dy + radius * 0.65 * sin(textAngle);
 
       final textPainter = TextPainter(
-        text: TextSpan(text: '${prizes[i]}', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+        text: TextSpan(
+          text: '${prizes[i]}',
+          style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+        ),
         textDirection: TextDirection.ltr,
       )..layout();
-      
+
       canvas.save();
       canvas.translate(textX, textY);
       canvas.rotate(textAngle + pi / 2);
@@ -4784,18 +4866,34 @@ class _GemWheelPainter extends CustomPainter {
     final segmentAngle = 2 * pi / prizes.length;
 
     for (int i = 0; i < prizes.length; i++) {
-      final paint = Paint()..color = colors[i % colors.length]..style = PaintingStyle.fill;
-      canvas.drawArc(Rect.fromCircle(center: center, radius: radius), -pi / 2 + i * segmentAngle, segmentAngle, true, paint);
+      final paint = Paint()
+        ..color = colors[i % colors.length]
+        ..style = PaintingStyle.fill;
+      canvas.drawArc(
+        Rect.fromCircle(center: center, radius: radius),
+        -pi / 2 + i * segmentAngle,
+        segmentAngle,
+        true,
+        paint,
+      );
 
       final textAngle = -pi / 2 + i * segmentAngle + segmentAngle / 2;
       final textX = center.dx + radius * 0.7 * cos(textAngle);
       final textY = center.dy + radius * 0.7 * sin(textAngle);
 
       final textPainter = TextPainter(
-        text: TextSpan(text: _fmt(prizes[i]), style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold, shadows: [Shadow(color: Colors.black54, blurRadius: 2)])),
+        text: TextSpan(
+          text: _fmt(prizes[i]),
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 10,
+            fontWeight: FontWeight.bold,
+            shadows: [Shadow(color: Colors.black54, blurRadius: 2)],
+          ),
+        ),
         textDirection: TextDirection.ltr,
       )..layout();
-      
+
       canvas.save();
       canvas.translate(textX, textY);
       canvas.rotate(textAngle + pi / 2);
@@ -4803,7 +4901,14 @@ class _GemWheelPainter extends CustomPainter {
       canvas.restore();
     }
 
-    canvas.drawCircle(center, radius, Paint()..color = Colors.white..style = PaintingStyle.stroke..strokeWidth = 3);
+    canvas.drawCircle(
+      center,
+      radius,
+      Paint()
+        ..color = Colors.white
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3,
+    );
   }
 
   @override
@@ -4852,7 +4957,7 @@ class _AchievementCard extends StatelessWidget {
     _AchievementData('🔥', 'Hot Start', 'Win first hand of a game', false, 0.0),
     _AchievementData('💪', 'Getting Strong', 'Reach level 10', false, 0.0),
     _AchievementData('📈', 'On The Rise', 'Win 5 games total', false, 0.0),
-    
+
     // Hands (11-25)
     _AchievementData('🃏', 'Royal Flush', 'Hit a Royal Flush', false, 0.0),
     _AchievementData('🎰', 'Straight Flush', 'Hit a Straight Flush', false, 0.0),
@@ -4869,7 +4974,7 @@ class _AchievementCard extends StatelessWidget {
     _AchievementData('♣️', 'Club Crusher', 'Win with club flush', false, 0.0),
     _AchievementData('🂡', 'Ace High', 'Win with Ace high', false, 0.0),
     _AchievementData('👑', 'Pocket Kings', 'Win with pocket Kings', false, 0.0),
-    
+
     // Wins (26-40)
     _AchievementData('🔥', 'Win Streak 3', 'Win 3 hands in a row', false, 0.0),
     _AchievementData('🔥', 'Win Streak 5', 'Win 5 hands in a row', false, 0.0),
@@ -4886,7 +4991,7 @@ class _AchievementCard extends StatelessWidget {
     _AchievementData('🐢', 'Patient Win', 'Win a game over 30 minutes', false, 0.0),
     _AchievementData('🎪', 'Comeback King', 'Win after being down 90%', false, 0.0),
     _AchievementData('🦁', 'Dominant Win', 'Win with 10x starting chips', false, 0.0),
-    
+
     // Chips (41-55)
     _AchievementData('💰', 'First 10K', 'Accumulate 10,000 chips', false, 0.0),
     _AchievementData('💰', 'First 100K', 'Accumulate 100,000 chips', false, 0.0),
@@ -4903,7 +5008,7 @@ class _AchievementCard extends StatelessWidget {
     _AchievementData('💫', 'Jackpot', 'Hit the jackpot on the wheel', false, 0.0),
     _AchievementData('🌟', 'Mega Jackpot', 'Win 100,000 from the wheel', false, 0.0),
     _AchievementData('✨', 'Ultra Jackpot', 'Win 1,000,000 from the wheel', false, 0.0),
-    
+
     // Multiplayer (56-70)
     _AchievementData('⚔️', 'Duel Winner', 'Win your first heads-up duel', false, 0.0),
     _AchievementData('⚔️', '10 Duels Won', 'Win 10 heads-up duels', false, 0.0),
@@ -4920,7 +5025,7 @@ class _AchievementCard extends StatelessWidget {
     _AchievementData('🌎', 'Globe Trotter', 'Play in 10 countries', false, 0.0),
     _AchievementData('🏆', 'Tournament Win', 'Win a Sit & Go tournament', false, 0.0),
     _AchievementData('🥇', 'Champion', 'Win 10 Sit & Go tournaments', false, 0.0),
-    
+
     // Bluffing (71-80)
     _AchievementData('🎭', 'Bluff Master', 'Win with a bluff 10 times', false, 0.0),
     _AchievementData('🤥', 'Big Bluff', 'Win an all-in bluff', false, 0.0),
@@ -4932,7 +5037,7 @@ class _AchievementCard extends StatelessWidget {
     _AchievementData('🧊', 'Ice Cold', 'Fold pocket Aces preflop', false, 0.0),
     _AchievementData('🔮', 'Mind Reader', 'Call a bluff correctly 10 times', false, 0.0),
     _AchievementData('🎯', 'Perfect Read', 'Predict opponent cards correctly', false, 0.0),
-    
+
     // All-In (81-90)
     _AchievementData('🌟', 'All In Win', 'Win your first all-in', false, 0.0),
     _AchievementData('🌟', '10 All In Wins', 'Win 10 all-in hands', false, 0.0),
@@ -4944,7 +5049,7 @@ class _AchievementCard extends StatelessWidget {
     _AchievementData('☄️', 'Comet', 'Win 5 all-ins in a row', false, 0.0),
     _AchievementData('🌌', 'Galaxy Brain', 'Win 10 all-ins in a row', false, 0.0),
     _AchievementData('👑', 'All In King', 'Win 20 all-ins in a row', false, 0.0),
-    
+
     // Special (91-100)
     _AchievementData('🎄', 'Holiday Special', 'Play on Christmas Day', false, 0.0),
     _AchievementData('🎃', 'Spooky Win', 'Win on Halloween', false, 0.0),
@@ -4969,7 +5074,7 @@ class _AchievementCard extends StatelessWidget {
     );
   }
 
-void _showAchievementDialog(BuildContext context) {
+  void _showAchievementDialog(BuildContext context) {
     showDialog(
       context: context,
       builder: (context) => Dialog(
@@ -4977,9 +5082,7 @@ void _showAchievementDialog(BuildContext context) {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
           side: BorderSide(
-            color: isUnlocked
-                ? const Color(0xFFD4AF37).withValues(alpha: 0.5)
-                : Colors.white.withValues(alpha: 0.1),
+            color: isUnlocked ? const Color(0xFFD4AF37).withValues(alpha: 0.5) : Colors.white.withValues(alpha: 0.1),
             width: 2,
           ),
         ),
@@ -5004,13 +5107,7 @@ void _showAchievementDialog(BuildContext context) {
                   ),
                 ),
                 child: Center(
-                  child: Text(
-                    emoji,
-                    style: TextStyle(
-                      fontSize: 36,
-                      color: isUnlocked ? null : Colors.grey,
-                    ),
-                  ),
+                  child: Text(emoji, style: TextStyle(fontSize: 36, color: isUnlocked ? null : Colors.grey)),
                 ),
               ),
               const SizedBox(height: 16),
@@ -5032,10 +5129,7 @@ void _showAchievementDialog(BuildContext context) {
                 ),
                 child: Text(
                   description,
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.8),
-                    fontSize: 14,
-                  ),
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 14),
                   textAlign: TextAlign.center,
                 ),
               ),
@@ -5046,9 +5140,7 @@ void _showAchievementDialog(BuildContext context) {
                   decoration: BoxDecoration(
                     color: const Color(0xFF4CAF50).withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: const Color(0xFF4CAF50).withValues(alpha: 0.5),
-                    ),
+                    border: Border.all(color: const Color(0xFF4CAF50).withValues(alpha: 0.5)),
                   ),
                   child: const Row(
                     mainAxisSize: MainAxisSize.min,
@@ -5072,10 +5164,7 @@ void _showAchievementDialog(BuildContext context) {
                   children: [
                     Text(
                       '${(progress * 100).toInt()}% Complete',
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.5),
-                        fontSize: 12,
-                      ),
+                      style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12),
                     ),
                     const SizedBox(height: 8),
                     SizedBox(
@@ -5122,9 +5211,7 @@ void _showAchievementDialog(BuildContext context) {
                 style: TextButton.styleFrom(
                   backgroundColor: Colors.white.withValues(alpha: 0.1),
                   padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
                 child: const Text(
                   'Close',
@@ -5145,14 +5232,10 @@ void _showAchievementDialog(BuildContext context) {
       child: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: isUnlocked
-              ? const Color(0xFFD4AF37).withValues(alpha: 0.1)
-              : Colors.white.withValues(alpha: 0.04),
+          color: isUnlocked ? const Color(0xFFD4AF37).withValues(alpha: 0.1) : Colors.white.withValues(alpha: 0.04),
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: isUnlocked
-                ? const Color(0xFFD4AF37).withValues(alpha: 0.4)
-                : Colors.white.withValues(alpha: 0.08),
+            color: isUnlocked ? const Color(0xFFD4AF37).withValues(alpha: 0.4) : Colors.white.withValues(alpha: 0.08),
             width: 1.5,
           ),
         ),
@@ -5172,13 +5255,7 @@ void _showAchievementDialog(BuildContext context) {
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Center(
-                    child: Text(
-                      emoji,
-                      style: TextStyle(
-                        fontSize: 18,
-                        color: isUnlocked ? null : Colors.grey,
-                      ),
-                    ),
+                    child: Text(emoji, style: TextStyle(fontSize: 18, color: isUnlocked ? null : Colors.grey)),
                   ),
                 ),
                 if (isUnlocked)
@@ -5238,11 +5315,7 @@ class _RankTier extends StatelessWidget {
   final Color color;
   final bool isActive;
 
-  const _RankTier({
-    required this.name,
-    required this.color,
-    required this.isActive,
-  });
+  const _RankTier({required this.name, required this.color, required this.isActive});
 
   @override
   Widget build(BuildContext context) {
@@ -5257,11 +5330,7 @@ class _RankTier extends StatelessWidget {
             border: isActive ? Border.all(color: color, width: 2) : null,
           ),
           child: Center(
-            child: Icon(
-              Icons.military_tech,
-              size: 18,
-              color: isActive ? color : Colors.white.withValues(alpha: 0.2),
-            ),
+            child: Icon(Icons.military_tech, size: 18, color: isActive ? color : Colors.white.withValues(alpha: 0.2)),
           ),
         ),
         const SizedBox(height: 4),
@@ -5288,12 +5357,7 @@ class _CustomizationCard extends StatelessWidget {
   final String price;
   final bool isOwned;
 
-  const _CustomizationCard({
-    required this.emoji,
-    required this.name,
-    required this.price,
-    this.isOwned = false,
-  });
+  const _CustomizationCard({required this.emoji, required this.name, required this.price, this.isOwned = false});
 
   @override
   Widget build(BuildContext context) {
@@ -5304,9 +5368,7 @@ class _CustomizationCard extends StatelessWidget {
             context: context,
             builder: (context) => Dialog(
               backgroundColor: const Color(0xFF1A1A1A),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-              ),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
               child: Container(
                 padding: const EdgeInsets.all(24),
                 child: Column(
@@ -5316,11 +5378,7 @@ class _CustomizationCard extends StatelessWidget {
                     const SizedBox(height: 16),
                     Text(
                       name,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                      ),
+                      style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700),
                     ),
                     const SizedBox(height: 8),
                     Row(
@@ -5330,11 +5388,7 @@ class _CustomizationCard extends StatelessWidget {
                         const SizedBox(width: 6),
                         Text(
                           price,
-                          style: const TextStyle(
-                            color: Color(0xFF2196F3),
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                          ),
+                          style: const TextStyle(color: Color(0xFF2196F3), fontSize: 18, fontWeight: FontWeight.w700),
                         ),
                       ],
                     ),
@@ -5347,9 +5401,7 @@ class _CustomizationCard extends StatelessWidget {
                             style: OutlinedButton.styleFrom(
                               side: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
                               padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                             ),
                             child: const Text('Cancel', style: TextStyle(color: Colors.white)),
                           ),
@@ -5360,18 +5412,13 @@ class _CustomizationCard extends StatelessWidget {
                             onPressed: () {
                               Navigator.pop(context);
                               ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('Purchased $name!'),
-                                  backgroundColor: const Color(0xFF4CAF50),
-                                ),
+                                SnackBar(content: Text('Purchased $name!'), backgroundColor: const Color(0xFF4CAF50)),
                               );
                             },
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFF2196F3),
                               padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                             ),
                             child: const Text('Buy', style: TextStyle(color: Colors.white)),
                           ),
@@ -5389,14 +5436,10 @@ class _CustomizationCard extends StatelessWidget {
         width: 90,
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: isOwned
-              ? const Color(0xFF4CAF50).withValues(alpha: 0.1)
-              : Colors.white.withValues(alpha: 0.04),
+          color: isOwned ? const Color(0xFF4CAF50).withValues(alpha: 0.1) : Colors.white.withValues(alpha: 0.04),
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: isOwned
-                ? const Color(0xFF4CAF50).withValues(alpha: 0.3)
-                : Colors.white.withValues(alpha: 0.06),
+            color: isOwned ? const Color(0xFF4CAF50).withValues(alpha: 0.3) : Colors.white.withValues(alpha: 0.06),
           ),
         ),
         child: Column(
@@ -5406,11 +5449,7 @@ class _CustomizationCard extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               name,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-              ),
+              style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
               textAlign: TextAlign.center,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -5424,11 +5463,7 @@ class _CustomizationCard extends StatelessWidget {
                   const SizedBox(width: 4),
                   const Text(
                     'Owned',
-                    style: TextStyle(
-                      color: Color(0xFF4CAF50),
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: TextStyle(color: Color(0xFF4CAF50), fontSize: 10, fontWeight: FontWeight.w600),
                   ),
                 ],
               )
@@ -5440,11 +5475,7 @@ class _CustomizationCard extends StatelessWidget {
                   const SizedBox(width: 4),
                   Text(
                     price,
-                    style: const TextStyle(
-                      color: Color(0xFF2196F3),
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                    ),
+                    style: const TextStyle(color: Color(0xFF2196F3), fontSize: 11, fontWeight: FontWeight.w700),
                   ),
                 ],
               ),
@@ -5482,10 +5513,7 @@ class _ChestCard extends StatelessWidget {
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [
-              gradient[0].withValues(alpha: 0.3),
-              gradient[1].withValues(alpha: 0.15),
-            ],
+            colors: [gradient[0].withValues(alpha: 0.3), gradient[1].withValues(alpha: 0.15)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -5501,9 +5529,7 @@ class _ChestCard extends StatelessWidget {
                 color: gradient[0].withValues(alpha: 0.3),
                 borderRadius: BorderRadius.circular(16),
               ),
-              child: Center(
-                child: Text(emoji, style: const TextStyle(fontSize: 32)),
-              ),
+              child: Center(child: Text(emoji, style: const TextStyle(fontSize: 32))),
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -5512,51 +5538,42 @@ class _ChestCard extends StatelessWidget {
                 children: [
                   Text(
                     name,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                    ),
+                    style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700),
                   ),
                   const SizedBox(height: 6),
                   Wrap(
                     spacing: 6,
                     runSpacing: 4,
-                    children: rewards.take(3).map((reward) => Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        reward,
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.7),
-                          fontSize: 10,
-                        ),
-                      ),
-                    )).toList(),
+                    children: rewards
+                        .take(3)
+                        .map(
+                          (reward) => Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              reward,
+                              style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 10),
+                            ),
+                          ),
+                        )
+                        .toList(),
                   ),
                 ],
               ),
             ),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              decoration: BoxDecoration(
-                color: gradient[0],
-                borderRadius: BorderRadius.circular(14),
-              ),
+              decoration: BoxDecoration(color: gradient[0], borderRadius: BorderRadius.circular(14)),
               child: Row(
                 children: [
                   const Text('💎', style: TextStyle(fontSize: 14)),
                   const SizedBox(width: 4),
                   Text(
                     price.toString(),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 15,
-                    ),
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15),
                   ),
                 ],
               ),
@@ -5572,9 +5589,7 @@ class _ChestCard extends StatelessWidget {
       context: context,
       builder: (context) => Dialog(
         backgroundColor: const Color(0xFF1A1A1A),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         child: Container(
           width: 340,
           padding: const EdgeInsets.all(24),
@@ -5585,25 +5600,15 @@ class _ChestCard extends StatelessWidget {
                 width: 100,
                 height: 100,
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: gradient,
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
+                  gradient: LinearGradient(colors: gradient, begin: Alignment.topLeft, end: Alignment.bottomRight),
                   borderRadius: BorderRadius.circular(24),
                 ),
-                child: Center(
-                  child: Text(emoji, style: const TextStyle(fontSize: 50)),
-                ),
+                child: Center(child: Text(emoji, style: const TextStyle(fontSize: 50))),
               ),
               const SizedBox(height: 20),
               Text(
                 name,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 24,
-                  fontWeight: FontWeight.w700,
-                ),
+                style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 16),
               Container(
@@ -5624,22 +5629,18 @@ class _ChestCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 10),
-                    ...rewards.map((reward) => Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 3),
-                      child: Row(
-                        children: [
-                          Icon(Icons.star, color: gradient[0], size: 16),
-                          const SizedBox(width: 8),
-                          Text(
-                            reward,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ],
+                    ...rewards.map(
+                      (reward) => Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 3),
+                        child: Row(
+                          children: [
+                            Icon(Icons.star, color: gradient[0], size: 16),
+                            const SizedBox(width: 8),
+                            Text(reward, style: const TextStyle(color: Colors.white, fontSize: 14)),
+                          ],
+                        ),
                       ),
-                    )),
+                    ),
                   ],
                 ),
               ),
@@ -5652,9 +5653,7 @@ class _ChestCard extends StatelessWidget {
                       style: OutlinedButton.styleFrom(
                         side: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
                         padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
                       child: const Text('Cancel', style: TextStyle(color: Colors.white)),
                     ),
@@ -5669,9 +5668,7 @@ class _ChestCard extends StatelessWidget {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: gradient[0],
                         padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -5698,15 +5695,13 @@ class _ChestCard extends StatelessWidget {
   void _showChestOpenAnimation(BuildContext context) {
     // Simulate random reward
     final randomReward = rewards[DateTime.now().millisecond % rewards.length];
-    
+
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) => Dialog(
         backgroundColor: const Color(0xFF1A1A1A),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         child: Container(
           width: 300,
           padding: const EdgeInsets.all(32),
@@ -5717,11 +5712,7 @@ class _ChestCard extends StatelessWidget {
               const SizedBox(height: 20),
               const Text(
                 '🎉 You Got! 🎉',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                ),
+                style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 12),
               Container(
@@ -5732,11 +5723,7 @@ class _ChestCard extends StatelessWidget {
                 ),
                 child: Text(
                   randomReward,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                  ),
+                  style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700),
                 ),
               ),
               const SizedBox(height: 24),
@@ -5745,9 +5732,7 @@ class _ChestCard extends StatelessWidget {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF4CAF50),
                   padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
                 child: const Text(
                   'Collect',
@@ -5797,11 +5782,7 @@ class _FriendAvatarExpanded extends StatelessWidget {
                 child: Center(
                   child: Text(
                     name[0],
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w600),
                   ),
                 ),
               ),
@@ -5822,13 +5803,7 @@ class _FriendAvatarExpanded extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 6),
-          Text(
-            name,
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.6),
-              fontSize: 11,
-            ),
-          ),
+          Text(name, style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 11)),
         ],
       ),
     );
@@ -5839,9 +5814,7 @@ class _FriendAvatarExpanded extends StatelessWidget {
       context: context,
       builder: (context) => Dialog(
         backgroundColor: const Color(0xFF1A1A1A),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         child: Container(
           width: 320,
           padding: const EdgeInsets.all(24),
@@ -5863,22 +5836,14 @@ class _FriendAvatarExpanded extends StatelessWidget {
                 child: Center(
                   child: Text(
                     name[0],
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 36,
-                      fontWeight: FontWeight.w700,
-                    ),
+                    style: const TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.w700),
                   ),
                 ),
               ),
               const SizedBox(height: 14),
               Text(
                 name,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
-                ),
+                style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 4),
               Row(
@@ -5895,10 +5860,7 @@ class _FriendAvatarExpanded extends StatelessWidget {
                   const SizedBox(width: 6),
                   Text(
                     isOnline ? 'Online Now' : 'Last seen 2h ago',
-                    style: TextStyle(
-                      color: isOnline ? const Color(0xFF4CAF50) : Colors.grey,
-                      fontSize: 13,
-                    ),
+                    style: TextStyle(color: isOnline ? const Color(0xFF4CAF50) : Colors.grey, fontSize: 13),
                   ),
                 ],
               ),
@@ -5913,11 +5875,7 @@ class _FriendAvatarExpanded extends StatelessWidget {
                 ),
                 child: const Text(
                   '🏆 Gold III',
-                  style: TextStyle(
-                    color: Color(0xFFD4AF37),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: TextStyle(color: Color(0xFFD4AF37), fontSize: 12, fontWeight: FontWeight.w600),
                 ),
               ),
               const SizedBox(height: 20),
@@ -5992,9 +5950,7 @@ class _FriendAvatarExpanded extends StatelessWidget {
                         backgroundColor: const Color(0xFFE91E63),
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       ),
                     ),
                   ),
@@ -6011,9 +5967,7 @@ class _FriendAvatarExpanded extends StatelessWidget {
                         backgroundColor: const Color(0xFF4CAF50),
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       ),
                     ),
                   ),
@@ -6024,10 +5978,7 @@ class _FriendAvatarExpanded extends StatelessWidget {
                 onPressed: () {
                   Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Added to friends!'),
-                      backgroundColor: Color(0xFF2196F3),
-                    ),
+                    const SnackBar(content: Text('Added to friends!'), backgroundColor: Color(0xFF2196F3)),
                   );
                 },
                 icon: const Icon(Icons.person_add, size: 18),
@@ -6037,20 +5988,13 @@ class _FriendAvatarExpanded extends StatelessWidget {
                   side: BorderSide(color: Colors.white.withValues(alpha: 0.3)),
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   minimumSize: const Size(double.infinity, 0),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
               ),
               const SizedBox(height: 10),
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: Text(
-                  'Close',
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.5),
-                  ),
-                ),
+                child: Text('Close', style: TextStyle(color: Colors.white.withValues(alpha: 0.5))),
               ),
             ],
           ),
@@ -6068,10 +6012,7 @@ class _ProfileStat extends StatelessWidget {
   final String label;
   final String value;
 
-  const _ProfileStat({
-    required this.label,
-    required this.value,
-  });
+  const _ProfileStat({required this.label, required this.value});
 
   @override
   Widget build(BuildContext context) {
@@ -6079,20 +6020,10 @@ class _ProfileStat extends StatelessWidget {
       children: [
         Text(
           value,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-          ),
+          style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700),
         ),
         const SizedBox(height: 2),
-        Text(
-          label,
-          style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.5),
-            fontSize: 11,
-          ),
-        ),
+        Text(label, style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 11)),
       ],
     );
   }
@@ -6106,25 +6037,16 @@ class _StakeOption extends StatelessWidget {
   final String amount;
   final bool isSelected;
 
-  const _StakeOption({
-    required this.amount,
-    required this.isSelected,
-  });
+  const _StakeOption({required this.amount, required this.isSelected});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
-        color: isSelected
-            ? const Color(0xFFE91E63).withValues(alpha: 0.2)
-            : Colors.white.withValues(alpha: 0.05),
+        color: isSelected ? const Color(0xFFE91E63).withValues(alpha: 0.2) : Colors.white.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: isSelected
-              ? const Color(0xFFE91E63)
-              : Colors.white.withValues(alpha: 0.1),
-        ),
+        border: Border.all(color: isSelected ? const Color(0xFFE91E63) : Colors.white.withValues(alpha: 0.1)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -6155,27 +6077,16 @@ class _GiftOption extends StatelessWidget {
   final String amount;
   final bool isSelected;
 
-  const _GiftOption({
-    required this.emoji,
-    required this.label,
-    required this.amount,
-    required this.isSelected,
-  });
+  const _GiftOption({required this.emoji, required this.label, required this.amount, required this.isSelected});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isSelected
-            ? const Color(0xFF4CAF50).withValues(alpha: 0.2)
-            : Colors.white.withValues(alpha: 0.05),
+        color: isSelected ? const Color(0xFF4CAF50).withValues(alpha: 0.2) : Colors.white.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: isSelected
-              ? const Color(0xFF4CAF50)
-              : Colors.white.withValues(alpha: 0.1),
-        ),
+        border: Border.all(color: isSelected ? const Color(0xFF4CAF50) : Colors.white.withValues(alpha: 0.1)),
       ),
       child: Column(
         children: [
@@ -6183,11 +6094,7 @@ class _GiftOption extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             label,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-            ),
+            style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 4),
           Text(
@@ -6212,11 +6119,7 @@ class _TierReward extends StatelessWidget {
   final String label;
   final bool isFree;
 
-  const _TierReward({
-    required this.emoji,
-    required this.label,
-    required this.isFree,
-  });
+  const _TierReward({required this.emoji, required this.label, required this.isFree});
 
   @override
   Widget build(BuildContext context) {
@@ -6236,31 +6139,17 @@ class _TierReward extends StatelessWidget {
                   : const Color(0xFFD4AF37).withValues(alpha: 0.5),
             ),
           ),
-          child: Center(
-            child: Text(emoji, style: const TextStyle(fontSize: 20)),
-          ),
+          child: Center(child: Text(emoji, style: const TextStyle(fontSize: 20))),
         ),
         const SizedBox(height: 6),
-        Text(
-          label,
-          style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.5),
-            fontSize: 10,
-          ),
-        ),
+        Text(label, style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 10)),
         if (!isFree)
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               const Text('👑', style: TextStyle(fontSize: 8)),
               const SizedBox(width: 2),
-              Text(
-                'Premium',
-                style: TextStyle(
-                  color: const Color(0xFFD4AF37).withValues(alpha: 0.8),
-                  fontSize: 8,
-                ),
-              ),
+              Text('Premium', style: TextStyle(color: const Color(0xFFD4AF37).withValues(alpha: 0.8), fontSize: 8)),
             ],
           ),
       ],
@@ -6276,30 +6165,18 @@ class _PremiumBenefit extends StatelessWidget {
   final String icon;
   final String text;
 
-  const _PremiumBenefit({
-    required this.icon,
-    required this.text,
-  });
+  const _PremiumBenefit({required this.icon, required this.text});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.04),
-        borderRadius: BorderRadius.circular(10),
-      ),
+      decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.04), borderRadius: BorderRadius.circular(10)),
       child: Row(
         children: [
           Text(icon, style: const TextStyle(fontSize: 18)),
           const SizedBox(width: 12),
-          Text(
-            text,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 14,
-            ),
-          ),
+          Text(text, style: const TextStyle(color: Colors.white, fontSize: 14)),
         ],
       ),
     );
@@ -6326,10 +6203,7 @@ class _ChipGraphPainter extends CustomPainter {
       ..shader = LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
-        colors: [
-          const Color(0xFF4CAF50).withValues(alpha: 0.3),
-          const Color(0xFF4CAF50).withValues(alpha: 0.0),
-        ],
+        colors: [const Color(0xFF4CAF50).withValues(alpha: 0.3), const Color(0xFF4CAF50).withValues(alpha: 0.0)],
       ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
 
     final path = Path();
@@ -6381,11 +6255,7 @@ class _ChipGraphPainter extends CustomPainter {
       ..color = Colors.white.withValues(alpha: 0.1)
       ..strokeWidth = 1;
 
-    canvas.drawLine(
-      Offset(0, size.height / 2),
-      Offset(size.width, size.height / 2),
-      baselinePaint,
-    );
+    canvas.drawLine(Offset(0, size.height / 2), Offset(size.width, size.height / 2), baselinePaint);
   }
 
   @override
@@ -6405,7 +6275,7 @@ class _LuckyHandDialogState extends State<_LuckyHandDialog> with TickerProviderS
   int? _selectedCard;
   bool _isRevealing = false;
   int _wonAmount = 0;
-  
+
   // Card prizes - one card is the jackpot!
   final List<int> _cardPrizes = [500, 1000, 2500, 5000, 10000];
   final List<bool> _cardFlipped = [false, false, false, false, false];
@@ -6417,18 +6287,13 @@ class _LuckyHandDialogState extends State<_LuckyHandDialog> with TickerProviderS
     super.initState();
     // Shuffle prizes
     _cardPrizes.shuffle(Random());
-    
+
     // Create flip animations for each card
     for (int i = 0; i < 5; i++) {
-      final controller = AnimationController(
-        duration: const Duration(milliseconds: 400),
-        vsync: this,
-      );
+      final controller = AnimationController(duration: const Duration(milliseconds: 400), vsync: this);
       _flipControllers.add(controller);
       _flipAnimations.add(
-        Tween<double>(begin: 0, end: pi).animate(
-          CurvedAnimation(parent: controller, curve: Curves.easeInOut),
-        ),
+        Tween<double>(begin: 0, end: pi).animate(CurvedAnimation(parent: controller, curve: Curves.easeInOut)),
       );
     }
   }
@@ -6443,19 +6308,19 @@ class _LuckyHandDialogState extends State<_LuckyHandDialog> with TickerProviderS
 
   void _selectCard(int index) {
     if (_hasPlayed || _isRevealing) return;
-    
+
     setState(() {
       _selectedCard = index;
       _isRevealing = true;
     });
-    
+
     // Flip the selected card
     _flipControllers[index].forward().then((_) {
       setState(() {
         _cardFlipped[index] = true;
         _wonAmount = _cardPrizes[index];
       });
-      
+
       // Reveal all other cards after a delay
       Future.delayed(const Duration(milliseconds: 500), () {
         if (!mounted) return;
@@ -6517,13 +6382,10 @@ class _LuckyHandDialogState extends State<_LuckyHandDialog> with TickerProviderS
             const SizedBox(height: 8),
             Text(
               _hasPlayed ? 'You won!' : 'Pick a card to reveal your prize!',
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.7),
-                fontSize: 14,
-              ),
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 14),
             ),
             const SizedBox(height: 24),
-            
+
             // Cards row
             SizedBox(
               height: 120,
@@ -6539,7 +6401,7 @@ class _LuckyHandDialogState extends State<_LuckyHandDialog> with TickerProviderS
                         builder: (context, child) {
                           final angle = _flipAnimations[index].value;
                           final showFront = angle < pi / 2;
-                          
+
                           return Transform(
                             alignment: Alignment.center,
                             transform: Matrix4.identity()
@@ -6559,17 +6421,14 @@ class _LuckyHandDialogState extends State<_LuckyHandDialog> with TickerProviderS
                                 color: showFront ? null : _getPrizeColor(_cardPrizes[index]),
                                 borderRadius: BorderRadius.circular(8),
                                 border: Border.all(
-                                  color: _selectedCard == index
-                                      ? Colors.white
-                                      : Colors.white.withValues(alpha: 0.3),
+                                  color: _selectedCard == index ? Colors.white : Colors.white.withValues(alpha: 0.3),
                                   width: _selectedCard == index ? 2 : 1,
                                 ),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: (_selectedCard == index
-                                            ? Colors.white
-                                            : const Color(0xFFD4AF37))
-                                        .withValues(alpha: 0.3),
+                                    color: (_selectedCard == index ? Colors.white : const Color(0xFFD4AF37)).withValues(
+                                      alpha: 0.3,
+                                    ),
                                     blurRadius: _selectedCard == index ? 12 : 4,
                                     spreadRadius: _selectedCard == index ? 2 : 0,
                                   ),
@@ -6577,11 +6436,14 @@ class _LuckyHandDialogState extends State<_LuckyHandDialog> with TickerProviderS
                               ),
                               child: Center(
                                 child: showFront
-                                    ? const Text('?', style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 28,
-                                        fontWeight: FontWeight.w800,
-                                      ))
+                                    ? const Text(
+                                        '?',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 28,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      )
                                     : Transform(
                                         alignment: Alignment.center,
                                         transform: Matrix4.identity()..rotateY(pi),
@@ -6611,7 +6473,7 @@ class _LuckyHandDialogState extends State<_LuckyHandDialog> with TickerProviderS
               ),
             ),
             const SizedBox(height: 24),
-            
+
             // Result or instruction
             if (_hasPlayed) ...[
               Container(
@@ -6628,11 +6490,7 @@ class _LuckyHandDialogState extends State<_LuckyHandDialog> with TickerProviderS
                     const SizedBox(width: 8),
                     Text(
                       '+${_wonAmount.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},')}',
-                      style: TextStyle(
-                        color: _getPrizeColor(_wonAmount),
-                        fontSize: 28,
-                        fontWeight: FontWeight.w800,
-                      ),
+                      style: TextStyle(color: _getPrizeColor(_wonAmount), fontSize: 28, fontWeight: FontWeight.w800),
                     ),
                   ],
                 ),

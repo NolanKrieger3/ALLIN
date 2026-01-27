@@ -28,29 +28,19 @@ class GameService {
   // ============================================================================
 
   /// Create a new game room
-  Future<GameRoom> createRoom({
-    int bigBlind = 100,
-    int startingChips = 50000,
-    bool isPrivate = false,
-  }) async {
+  Future<GameRoom> createRoom({int bigBlind = 100, int startingChips = 1000, bool isPrivate = false}) async {
     final userId = currentUserId;
     if (userId == null) throw Exception('Must be logged in to create a room');
 
     final token = await _getAuthToken();
-    
+
     // Generate a unique room ID
     final roomId = _generateRoomId();
-    
+
     final room = GameRoom(
       id: roomId,
       hostId: userId,
-      players: [
-        GamePlayer(
-          uid: userId,
-          displayName: currentUserName,
-          chips: startingChips,
-        ),
-      ],
+      players: [GamePlayer(uid: userId, displayName: currentUserName, chips: startingChips)],
       bigBlind: bigBlind,
       smallBlind: bigBlind ~/ 2,
       createdAt: DateTime.now(),
@@ -70,16 +60,14 @@ class GameService {
   }
 
   /// Join an existing room
-  Future<void> joinRoom(String roomId, {int startingChips = 50000}) async {
+  Future<void> joinRoom(String roomId, {int startingChips = 1000}) async {
     final userId = currentUserId;
     if (userId == null) throw Exception('Must be logged in to join a room');
 
     final token = await _getAuthToken();
-    
+
     // Get current room data
-    final response = await http.get(
-      Uri.parse('$_databaseUrl/game_rooms/$roomId.json?auth=$token'),
-    );
+    final response = await http.get(Uri.parse('$_databaseUrl/game_rooms/$roomId.json?auth=$token'));
 
     if (response.statusCode != 200 || response.body == 'null') {
       throw Exception('Room not found');
@@ -92,19 +80,13 @@ class GameService {
     if (room.status != 'waiting') throw Exception('Game already in progress');
     if (room.players.any((p) => p.uid == userId)) return; // Already in room
 
-    final newPlayer = GamePlayer(
-      uid: userId,
-      displayName: currentUserName,
-      chips: startingChips,
-    );
+    final newPlayer = GamePlayer(uid: userId, displayName: currentUserName, chips: startingChips);
 
     final updatedPlayers = [...room.players, newPlayer];
 
     await http.patch(
       Uri.parse('$_databaseUrl/game_rooms/$roomId.json?auth=$token'),
-      body: jsonEncode({
-        'players': updatedPlayers.map((p) => p.toJson()).toList(),
-      }),
+      body: jsonEncode({'players': updatedPlayers.map((p) => p.toJson()).toList()}),
     );
   }
 
@@ -114,10 +96,8 @@ class GameService {
     if (userId == null) return;
 
     final token = await _getAuthToken();
-    
-    final response = await http.get(
-      Uri.parse('$_databaseUrl/game_rooms/$roomId.json?auth=$token'),
-    );
+
+    final response = await http.get(Uri.parse('$_databaseUrl/game_rooms/$roomId.json?auth=$token'));
 
     if (response.statusCode != 200 || response.body == 'null') return;
 
@@ -127,20 +107,13 @@ class GameService {
 
     if (updatedPlayers.isEmpty) {
       // Delete room if no players left
-      await http.delete(
-        Uri.parse('$_databaseUrl/game_rooms/$roomId.json?auth=$token'),
-      );
+      await http.delete(Uri.parse('$_databaseUrl/game_rooms/$roomId.json?auth=$token'));
     } else {
-      final newHostId = room.hostId == userId 
-          ? updatedPlayers.first.uid 
-          : room.hostId;
-      
+      final newHostId = room.hostId == userId ? updatedPlayers.first.uid : room.hostId;
+
       await http.patch(
         Uri.parse('$_databaseUrl/game_rooms/$roomId.json?auth=$token'),
-        body: jsonEncode({
-          'players': updatedPlayers.map((p) => p.toJson()).toList(),
-          'hostId': newHostId,
-        }),
+        body: jsonEncode({'players': updatedPlayers.map((p) => p.toJson()).toList(), 'hostId': newHostId}),
       );
     }
   }
@@ -151,16 +124,14 @@ class GameService {
     if (userId == null) return;
 
     final token = await _getAuthToken();
-    
-    final response = await http.get(
-      Uri.parse('$_databaseUrl/game_rooms/$roomId.json?auth=$token'),
-    );
+
+    final response = await http.get(Uri.parse('$_databaseUrl/game_rooms/$roomId.json?auth=$token'));
 
     if (response.statusCode != 200 || response.body == 'null') return;
 
     final roomData = jsonDecode(response.body) as Map<String, dynamic>;
     final room = GameRoom.fromJson(roomData, roomId);
-    
+
     final updatedPlayers = room.players.map((p) {
       if (p.uid == userId) {
         return p.copyWith(isReady: !p.isReady);
@@ -170,63 +141,86 @@ class GameService {
 
     await http.patch(
       Uri.parse('$_databaseUrl/game_rooms/$roomId.json?auth=$token'),
-      body: jsonEncode({
-        'players': updatedPlayers.map((p) => p.toJson()).toList(),
-      }),
+      body: jsonEncode({'players': updatedPlayers.map((p) => p.toJson()).toList()}),
     );
   }
 
   /// Get available rooms to join (polling-based)
   Stream<List<GameRoom>> getAvailableRooms() {
-    return Stream.periodic(const Duration(seconds: 2))
-        .asyncMap((_) => _fetchAvailableRooms('cash'));
+    return Stream.periodic(const Duration(seconds: 2)).asyncMap((_) => _fetchAvailableRooms('cash'));
   }
 
   /// Get available Sit & Go tournaments to join
   Stream<List<GameRoom>> getAvailableSitAndGoRooms() {
-    return Stream.periodic(const Duration(seconds: 2))
-        .asyncMap((_) => _fetchAvailableRooms('sitandgo'));
+    return Stream.periodic(const Duration(seconds: 2)).asyncMap((_) => _fetchAvailableRooms('sitandgo'));
+  }
+
+  /// Immediately fetch available cash game rooms (no stream delay)
+  Future<List<GameRoom>> fetchAvailableCashRooms() async {
+    return _fetchAvailableRooms('cash');
+  }
+
+  /// Immediately fetch available Sit & Go rooms (no stream delay)
+  Future<List<GameRoom>> fetchAvailableSitAndGoRooms() async {
+    return _fetchAvailableRooms('sitandgo');
   }
 
   Future<List<GameRoom>> _fetchAvailableRooms(String gameType) async {
     final token = await _getAuthToken();
-    
+    final userId = currentUserId;
+
     final response = await http.get(
       Uri.parse('$_databaseUrl/game_rooms.json?auth=$token&orderBy="status"&equalTo="waiting"'),
     );
 
+    print('🔍 Fetching rooms for gameType: $gameType');
+    print('🔍 Response status: ${response.statusCode}');
+    print('🔍 Response body: ${response.body}');
+
     if (response.statusCode != 200 || response.body == 'null') {
+      print('🔍 No rooms found or error');
       return [];
     }
 
     final data = jsonDecode(response.body) as Map<String, dynamic>;
-    return data.entries
+    print('🔍 Total rooms in database: ${data.length}');
+
+    final allRooms = data.entries
         .map((e) => GameRoom.fromJson(Map<String, dynamic>.from(e.value as Map), e.key))
-        .where((room) => !room.isFull && room.gameType == gameType)
         .toList();
+
+    for (final room in allRooms) {
+      print(
+        '🔍 Room ${room.id}: gameType=${room.gameType}, isPrivate=${room.isPrivate}, players=${room.players.length}, isFull=${room.isFull}',
+      );
+      for (final player in room.players) {
+        print('   - Player: ${player.uid} (current user: $userId, match: ${player.uid == userId})');
+      }
+    }
+
+    final filteredRooms = allRooms
+        .where(
+          (room) =>
+              !room.isFull && room.gameType == gameType && !room.isPrivate && !room.players.any((p) => p.uid == userId),
+        )
+        .toList();
+
+    print('🔍 Filtered rooms available to join: ${filteredRooms.length}');
+    return filteredRooms;
   }
 
   /// Create a Sit & Go tournament room
-  Future<GameRoom> createSitAndGoRoom({
-    int startingChips = 10000,
-    int bigBlind = 100,
-  }) async {
+  Future<GameRoom> createSitAndGoRoom({int startingChips = 10000, int bigBlind = 100}) async {
     final userId = currentUserId;
     if (userId == null) throw Exception('Must be logged in to create a room');
 
     final token = await _getAuthToken();
     final roomId = _generateRoomId();
-    
+
     final room = GameRoom(
       id: roomId,
       hostId: userId,
-      players: [
-        GamePlayer(
-          uid: userId,
-          displayName: currentUserName,
-          chips: startingChips,
-        ),
-      ],
+      players: [GamePlayer(uid: userId, displayName: currentUserName, chips: startingChips)],
       maxPlayers: 6,
       bigBlind: bigBlind,
       smallBlind: bigBlind ~/ 2,
@@ -248,16 +242,13 @@ class GameService {
 
   /// Listen to a specific room (polling-based for Windows compatibility)
   Stream<GameRoom?> watchRoom(String roomId) {
-    return Stream.periodic(const Duration(milliseconds: 500))
-        .asyncMap((_) => _fetchRoom(roomId));
+    return Stream.periodic(const Duration(milliseconds: 500)).asyncMap((_) => _fetchRoom(roomId));
   }
 
   Future<GameRoom?> _fetchRoom(String roomId) async {
     final token = await _getAuthToken();
-    
-    final response = await http.get(
-      Uri.parse('$_databaseUrl/game_rooms/$roomId.json?auth=$token'),
-    );
+
+    final response = await http.get(Uri.parse('$_databaseUrl/game_rooms/$roomId.json?auth=$token'));
 
     if (response.statusCode != 200 || response.body == 'null') {
       return null;
@@ -285,7 +276,7 @@ class GameService {
 
     // Create and shuffle deck
     final deck = _createShuffledDeck();
-    
+
     // Deal cards to players
     final updatedPlayers = room.players.map((p) {
       final card1 = deck.removeLast();
@@ -298,19 +289,20 @@ class GameService {
         currentBet: 0,
         hasFolded: false,
         hasActed: false,
+        lastAction: null, // Clear action indicator for new hand
       );
     }).toList();
 
     final numPlayers = updatedPlayers.length;
     final isHeadsUp = numPlayers == 2;
-    
+
     // Blind positions differ in heads-up vs multi-way
     // Heads-up: Dealer posts SB, other player posts BB
     // Multi-way: Player after dealer posts SB, next posts BB
     int sbIndex;
     int bbIndex;
     int firstToAct;
-    
+
     if (isHeadsUp) {
       // Heads-up: Dealer = SB, other = BB
       sbIndex = room.dealerIndex;
@@ -324,11 +316,11 @@ class GameService {
       // Preflop: Player left of BB acts first (UTG)
       firstToAct = (bbIndex + 1) % numPlayers;
     }
-    
+
     // Post blinds (handle case where player doesn't have enough chips)
     final sbAmount = min(room.smallBlind, updatedPlayers[sbIndex].chips);
     final bbAmount = min(room.bigBlind, updatedPlayers[bbIndex].chips);
-    
+
     updatedPlayers[sbIndex] = updatedPlayers[sbIndex].copyWith(
       chips: updatedPlayers[sbIndex].chips - sbAmount,
       currentBet: sbAmount,
@@ -351,16 +343,13 @@ class GameService {
         'currentTurnPlayerId': updatedPlayers[firstToAct].uid,
         'communityCards': [],
         'lastRaiseAmount': room.bigBlind,
+        'bbHasOption': true, // Big blind gets option to raise preflop
       }),
     );
   }
 
   /// Player action (fold, check, call, raise, allin)
-  Future<void> playerAction(
-    String roomId,
-    String action, {
-    int? raiseAmount,
-  }) async {
+  Future<void> playerAction(String roomId, String action, {int? raiseAmount}) async {
     final userId = currentUserId;
     if (userId == null) return;
 
@@ -384,53 +373,68 @@ class GameService {
     // Mark that this player has acted this round
     updatedPlayers[playerIndex] = player.copyWith(hasActed: true);
 
+    String lastActionLabel = action.toUpperCase(); // Default to action name
+
     switch (action) {
       case 'fold':
-        updatedPlayers[playerIndex] = updatedPlayers[playerIndex].copyWith(hasFolded: true);
+        updatedPlayers[playerIndex] = updatedPlayers[playerIndex].copyWith(hasFolded: true, lastAction: 'FOLD');
         break;
-        
+
       case 'check':
         if (currentBet > player.currentBet) {
           throw Exception('Cannot check - must call or raise');
         }
+        updatedPlayers[playerIndex] = updatedPlayers[playerIndex].copyWith(lastAction: 'CHECK');
         break;
-        
+
       case 'call':
         var callAmount = currentBet - player.currentBet;
         // If player doesn't have enough, they go all-in for what they have
         if (callAmount > player.chips) {
           callAmount = player.chips;
+          lastActionLabel = 'ALL-IN';
+        } else {
+          lastActionLabel = 'CALL';
         }
         updatedPlayers[playerIndex] = updatedPlayers[playerIndex].copyWith(
           chips: player.chips - callAmount,
           currentBet: player.currentBet + callAmount,
+          lastAction: lastActionLabel,
         );
         pot += callAmount;
         break;
-        
+
       case 'raise':
         // raiseAmount is the TOTAL bet amount they want to make
         final totalBet = raiseAmount ?? (currentBet + lastRaiseAmount);
         final raiseBy = totalBet - currentBet;
-        
+
         // Minimum raise must be at least the size of the last raise (or BB if first raise)
         if (raiseBy < lastRaiseAmount && totalBet < player.chips + player.currentBet) {
-          throw Exception('Raise must be at least ${lastRaiseAmount}');
+          throw Exception('Raise must be at least $lastRaiseAmount');
         }
-        
+
         final addAmount = totalBet - player.currentBet;
         if (addAmount > player.chips) {
           throw Exception('Not enough chips');
         }
-        
+
+        // Check if this is an all-in raise
+        if (addAmount == player.chips) {
+          lastActionLabel = 'ALL-IN';
+        } else {
+          lastActionLabel = 'RAISE';
+        }
+
         updatedPlayers[playerIndex] = updatedPlayers[playerIndex].copyWith(
           chips: player.chips - addAmount,
           currentBet: totalBet,
+          lastAction: lastActionLabel,
         );
         pot += addAmount;
         lastRaiseAmount = raiseBy;
         currentBet = totalBet;
-        
+
         // Reset hasActed for all other players since there's a raise
         updatedPlayers = updatedPlayers.map((p) {
           if (p.uid != userId && !p.hasFolded) {
@@ -439,17 +443,18 @@ class GameService {
           return p;
         }).toList();
         break;
-        
+
       case 'allin':
         final allInAmount = player.chips;
         final newTotalBet = player.currentBet + allInAmount;
-        
+
         pot += allInAmount;
         updatedPlayers[playerIndex] = updatedPlayers[playerIndex].copyWith(
           currentBet: newTotalBet,
           chips: 0,
+          lastAction: 'ALL-IN',
         );
-        
+
         // If this all-in is a raise, update current bet and reset hasActed
         if (newTotalBet > currentBet) {
           final raiseBy = newTotalBet - currentBet;
@@ -471,9 +476,7 @@ class GameService {
     // Mark current player as having acted
     final currentPlayerIdx = updatedPlayers.indexWhere((p) => p.uid == userId);
     if (currentPlayerIdx != -1) {
-      updatedPlayers[currentPlayerIdx] = updatedPlayers[currentPlayerIdx].copyWith(
-        hasActed: true,
-      );
+      updatedPlayers[currentPlayerIdx] = updatedPlayers[currentPlayerIdx].copyWith(hasActed: true);
     }
 
     // Check if hand is over (only one player left)
@@ -484,7 +487,7 @@ class GameService {
       updatedPlayers[winnerIndex] = updatedPlayers[winnerIndex].copyWith(
         chips: updatedPlayers[winnerIndex].chips + pot,
       );
-      
+
       await http.patch(
         Uri.parse('$_databaseUrl/game_rooms/$roomId.json?auth=$token'),
         body: jsonEncode({
@@ -500,19 +503,46 @@ class GameService {
     // Find next player who can act (not folded and has chips)
     var nextPlayerIndex = (playerIndex + 1) % updatedPlayers.length;
     int loopCount = 0;
-    while ((updatedPlayers[nextPlayerIndex].hasFolded || 
-           updatedPlayers[nextPlayerIndex].chips == 0) &&
-           loopCount < updatedPlayers.length) {
+    while ((updatedPlayers[nextPlayerIndex].hasFolded || updatedPlayers[nextPlayerIndex].chips == 0) &&
+        loopCount < updatedPlayers.length) {
       nextPlayerIndex = (nextPlayerIndex + 1) % updatedPlayers.length;
       loopCount++;
     }
 
+    // Track if BB option was used (any raise or BB checked/called)
+    var bbOptionUsed = !room.bbHasOption; // Already used if false
+
+    // If action is check/call and player is BB preflop with option, it's used
+    if (room.phase == 'preflop' && room.bbHasOption) {
+      final numPlayers = updatedPlayers.length;
+      final isHeadsUp = numPlayers == 2;
+      final bbIndex = isHeadsUp ? (room.dealerIndex + 1) % numPlayers : (room.dealerIndex + 2) % numPlayers;
+
+      if (updatedPlayers[playerIndex].uid == updatedPlayers[bbIndex].uid) {
+        // BB is acting - any action uses the option
+        bbOptionUsed = true;
+      } else if (action == 'raise' || action == 'allin') {
+        // Any raise means BB option becomes a normal call/fold/raise decision
+        bbOptionUsed = true;
+      }
+    }
+
+    // Check if all remaining players are all-in (no more betting possible)
+    final playersWhoCanAct = updatedPlayers.where((p) => !p.hasFolded && p.chips > 0).toList();
+    final allPlayersAllIn = playersWhoCanAct.isEmpty || playersWhoCanAct.length <= 1;
+
+    if (allPlayersAllIn) {
+      // Deal out remaining community cards and go to showdown
+      await _dealToShowdown(roomId, room, updatedPlayers, pot);
+      return;
+    }
+
     // Check if betting round is complete:
     // All active players with chips must have acted AND matched the current bet
-    final playersWhoCanAct = updatedPlayers.where((p) => !p.hasFolded && p.chips > 0).toList();
+    // Special case: preflop BB option - BB gets to act even if all bets are equal
     final allPlayersActed = playersWhoCanAct.every((p) => p.hasActed);
     final allBetsEqual = playersWhoCanAct.every((p) => p.currentBet == currentBet);
-    final bettingComplete = allPlayersActed && allBetsEqual;
+    final bettingComplete = allPlayersActed && allBetsEqual && bbOptionUsed;
 
     if (bettingComplete) {
       // Move to next phase
@@ -526,9 +556,98 @@ class GameService {
           'currentBet': currentBet,
           'lastRaiseAmount': lastRaiseAmount,
           'currentTurnPlayerId': updatedPlayers[nextPlayerIndex].uid,
+          'bbHasOption': !bbOptionUsed,
         }),
       );
     }
+  }
+
+  /// Deal remaining community cards and go directly to showdown (all-in scenario)
+  Future<void> _dealToShowdown(String roomId, GameRoom room, List<GamePlayer> players, int pot) async {
+    final token = await _getAuthToken();
+    final deck = List<String>.from(room.deck);
+    final communityCards = List<PlayingCard>.from(room.communityCards);
+
+    // Deal remaining community cards based on current phase
+    switch (room.phase) {
+      case 'preflop':
+        // Deal flop (burn + 3), turn (burn + 1), river (burn + 1)
+        deck.removeLast(); // Burn
+        for (var i = 0; i < 3; i++) {
+          final card = deck.removeLast().split('|');
+          communityCards.add(PlayingCard(rank: card[0], suit: card[1]));
+        }
+        deck.removeLast(); // Burn
+        final turnCard = deck.removeLast().split('|');
+        communityCards.add(PlayingCard(rank: turnCard[0], suit: turnCard[1]));
+        deck.removeLast(); // Burn
+        final riverCard = deck.removeLast().split('|');
+        communityCards.add(PlayingCard(rank: riverCard[0], suit: riverCard[1]));
+        break;
+      case 'flop':
+        // Deal turn and river
+        deck.removeLast(); // Burn
+        final turnCard2 = deck.removeLast().split('|');
+        communityCards.add(PlayingCard(rank: turnCard2[0], suit: turnCard2[1]));
+        deck.removeLast(); // Burn
+        final riverCard2 = deck.removeLast().split('|');
+        communityCards.add(PlayingCard(rank: riverCard2[0], suit: riverCard2[1]));
+        break;
+      case 'turn':
+        // Deal river only
+        deck.removeLast(); // Burn
+        final riverCard3 = deck.removeLast().split('|');
+        communityCards.add(PlayingCard(rank: riverCard3[0], suit: riverCard3[1]));
+        break;
+      case 'river':
+        // Already at river, just go to showdown
+        break;
+    }
+
+    // Determine winner(s)
+    final activePlayers = players.where((p) => !p.hasFolded).toList();
+    final winnerIndices = HandEvaluator.determineWinners(activePlayers, communityCards);
+
+    if (winnerIndices.isEmpty) {
+      winnerIndices.add(0);
+    }
+
+    final firstWinner = activePlayers[winnerIndices.first];
+    final winningHand = HandEvaluator.evaluateBestHand(firstWinner.cards, communityCards);
+
+    // Split pot among winners
+    final potPerWinner = pot ~/ winnerIndices.length;
+    final remainder = pot % winnerIndices.length;
+
+    final finalPlayers = List<GamePlayer>.from(players);
+    final winnerUids = <String>[];
+
+    for (var i = 0; i < winnerIndices.length; i++) {
+      final winner = activePlayers[winnerIndices[i]];
+      final winnerIdx = finalPlayers.indexWhere((p) => p.uid == winner.uid);
+      if (winnerIdx != -1) {
+        final winAmount = potPerWinner + (i == 0 ? remainder : 0);
+        finalPlayers[winnerIdx] = finalPlayers[winnerIdx].copyWith(chips: finalPlayers[winnerIdx].chips + winAmount);
+        winnerUids.add(winner.uid);
+      }
+    }
+
+    await http.patch(
+      Uri.parse('$_databaseUrl/game_rooms/$roomId.json?auth=$token'),
+      body: jsonEncode({
+        'players': finalPlayers.map((p) => p.toJson()).toList(),
+        'communityCards': communityCards.map((c) => c.toJson()).toList(),
+        'deck': deck,
+        'phase': 'showdown',
+        'pot': 0,
+        'currentBet': 0,
+        'lastRaiseAmount': 0,
+        'status': 'finished',
+        'winnerId': winnerUids.first,
+        'winnerIds': winnerUids,
+        'winningHandName': winningHand.description,
+      }),
+    );
   }
 
   /// Get the first player to act based on game phase
@@ -537,7 +656,7 @@ class GameService {
   int _getFirstToActIndex(GameRoom room, List<GamePlayer> players) {
     final numPlayers = players.length;
     final isHeadsUp = numPlayers == 2;
-    
+
     if (room.phase == 'preflop') {
       if (isHeadsUp) {
         // Heads-up: Dealer (who is SB) acts first preflop
@@ -571,15 +690,13 @@ class GameService {
     final communityCards = List<PlayingCard>.from(room.communityCards);
     String nextPhase;
 
-    // Reset current bets and hasActed for new betting round
-    var updatedPlayers = players.map((p) => p.copyWith(
-      currentBet: 0,
-      hasActed: false,
-    )).toList();
+    // Reset current bets, hasActed, and lastAction for new betting round
+    var updatedPlayers = players.map((p) => p.copyWith(currentBet: 0, hasActed: false, lastAction: null)).toList();
 
     switch (room.phase) {
       case 'preflop':
-        // Deal flop (3 cards)
+        // Burn one card, then deal flop (3 cards)
+        deck.removeLast(); // Burn card
         for (var i = 0; i < 3; i++) {
           final card = deck.removeLast().split('|');
           communityCards.add(PlayingCard(rank: card[0], suit: card[1]));
@@ -587,13 +704,15 @@ class GameService {
         nextPhase = 'flop';
         break;
       case 'flop':
-        // Deal turn (1 card)
+        // Burn one card, then deal turn (1 card)
+        deck.removeLast(); // Burn card
         final card = deck.removeLast().split('|');
         communityCards.add(PlayingCard(rank: card[0], suit: card[1]));
         nextPhase = 'turn';
         break;
       case 'turn':
-        // Deal river (1 card)
+        // Burn one card, then deal river (1 card)
+        deck.removeLast(); // Burn card
         final cardStr = deck.removeLast().split('|');
         communityCards.add(PlayingCard(rank: cardStr[0], suit: cardStr[1]));
         nextPhase = 'river';
@@ -602,26 +721,26 @@ class GameService {
         // Showdown - determine winner using proper hand evaluation
         nextPhase = 'showdown';
         final activePlayers = updatedPlayers.where((p) => !p.hasFolded).toList();
-        
+
         // Evaluate hands and determine winners
         final winnerIndices = HandEvaluator.determineWinners(activePlayers, communityCards);
-        
+
         // If no valid hands (shouldn't happen), fall back to first active player
         if (winnerIndices.isEmpty) {
           winnerIndices.add(0);
         }
-        
+
         // Get winning hand description for display
         final firstWinner = activePlayers[winnerIndices.first];
         final winningHand = HandEvaluator.evaluateBestHand(firstWinner.cards, communityCards);
-        
+
         // Split pot among winners
         final potPerWinner = pot ~/ winnerIndices.length;
         final remainder = pot % winnerIndices.length;
-        
+
         final finalPlayers = List<GamePlayer>.from(updatedPlayers);
         final winnerUids = <String>[];
-        
+
         for (var i = 0; i < winnerIndices.length; i++) {
           final winner = activePlayers[winnerIndices[i]];
           final winnerIdx = finalPlayers.indexWhere((p) => p.uid == winner.uid);
@@ -634,7 +753,7 @@ class GameService {
             winnerUids.add(winner.uid);
           }
         }
-        
+
         await http.patch(
           Uri.parse('$_databaseUrl/game_rooms/$roomId.json?auth=$token'),
           body: jsonEncode({
@@ -657,10 +776,7 @@ class GameService {
     }
 
     // Find first active player to act in new betting round
-    final firstToActIdx = _getFirstToActIndex(
-      room.copyWith(phase: nextPhase),
-      updatedPlayers,
-    );
+    final firstToActIdx = _getFirstToActIndex(room.copyWith(phase: nextPhase), updatedPlayers);
 
     await http.patch(
       Uri.parse('$_databaseUrl/game_rooms/$roomId.json?auth=$token'),
@@ -695,12 +811,9 @@ class GameService {
     }
 
     // Reset player states and make them ready
-    final resetPlayers = activePlayers.map((p) => p.copyWith(
-      cards: [],
-      hasFolded: false,
-      currentBet: 0,
-      isReady: true,
-    )).toList();
+    final resetPlayers = activePlayers
+        .map((p) => p.copyWith(cards: [], hasFolded: false, currentBet: 0, isReady: true))
+        .toList();
 
     // Move dealer button
     final newDealerIndex = (room.dealerIndex + 1) % resetPlayers.length;
@@ -718,6 +831,8 @@ class GameService {
         'deck': [],
         'currentTurnPlayerId': null,
         'winnerId': null,
+        'bbHasOption': true, // Reset BB option for new hand
+        'lastRaiseAmount': 0,
       }),
     );
   }

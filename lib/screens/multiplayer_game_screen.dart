@@ -867,22 +867,30 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> {
               ],
             ),
           ),
-          // Cards (face down or revealed)
-          Row(
+          // Cards (face down or revealed) with action indicator
+          Stack(
+            alignment: Alignment.center,
             children: [
-              _buildCard(
-                room.status == 'finished' && opponent.cards.isNotEmpty
-                    ? opponent.cards[0]
-                    : null,
-                faceDown: room.status != 'finished',
+              Row(
+                children: [
+                  _buildCard(
+                    room.status == 'finished' && opponent.cards.isNotEmpty
+                        ? opponent.cards[0]
+                        : null,
+                    faceDown: room.status != 'finished',
+                  ),
+                  const SizedBox(width: 4),
+                  _buildCard(
+                    room.status == 'finished' && opponent.cards.length > 1
+                        ? opponent.cards[1]
+                        : null,
+                    faceDown: room.status != 'finished',
+                  ),
+                ],
               ),
-              const SizedBox(width: 4),
-              _buildCard(
-                room.status == 'finished' && opponent.cards.length > 1
-                    ? opponent.cards[1]
-                    : null,
-                faceDown: room.status != 'finished',
-              ),
+              // Action indicator overlay
+              if (opponent.lastAction != null)
+                _buildActionIndicator(opponent.lastAction!),
             ],
           ),
         ],
@@ -984,6 +992,23 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> {
   }
 
   Widget _buildActionButtons(GameRoom room, GamePlayer player, bool isMyTurn) {
+    // If player is all-in, show status instead of buttons
+    if (player.chips == 0) {
+      return Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16),
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        child: Text(
+          'ALL IN!',
+          style: TextStyle(
+            color: const Color(0xFFD4AF37),
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+          textAlign: TextAlign.center,
+        ),
+      );
+    }
+    
     final callAmount = room.currentBet - player.currentBet;
     final canCheck = room.currentBet == player.currentBet;
 
@@ -1066,8 +1091,10 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> {
   }
 
   void _showRaiseDialog(GameRoom room, GamePlayer player) {
-    final minRaise = room.currentBet * 2;
+    // Minimum raise is current bet + last raise amount (or big blind if first raise)
+    final minRaise = room.currentBet + (room.lastRaiseAmount > 0 ? room.lastRaiseAmount : room.bigBlind);
     var raiseAmount = minRaise;
+    final maxRaise = player.chips + player.currentBet;
 
     showDialog(
       context: context,
@@ -1082,9 +1109,9 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Slider(
-                value: raiseAmount.toDouble(),
+                value: raiseAmount.toDouble().clamp(minRaise.toDouble(), maxRaise.toDouble()),
                 min: minRaise.toDouble(),
-                max: (player.chips + player.currentBet).toDouble(),
+                max: maxRaise.toDouble(),
                 activeColor: const Color(0xFFD4AF37),
                 onChanged: (value) {
                   setDialogState(() => raiseAmount = value.toInt());
@@ -1096,6 +1123,14 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> {
                   color: Color(0xFFD4AF37),
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Min: $minRaise | Max: $maxRaise (All-in)',
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.5),
+                  fontSize: 12,
                 ),
               ),
             ],
@@ -1158,6 +1193,17 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> {
               fontWeight: FontWeight.bold,
             ),
           ),
+          if (room.winningHandName != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Winning Hand: ${room.winningHandName}',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.8),
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
           const SizedBox(height: 16),
           if (isHost)
             ElevatedButton(
@@ -1263,6 +1309,55 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildActionIndicator(String action) {
+    Color bgColor;
+    Color textColor = Colors.white;
+    
+    switch (action) {
+      case 'FOLD':
+        bgColor = Colors.red.shade700;
+        break;
+      case 'CHECK':
+        bgColor = Colors.blue.shade600;
+        break;
+      case 'CALL':
+        bgColor = Colors.green.shade600;
+        break;
+      case 'RAISE':
+        bgColor = Colors.orange.shade700;
+        break;
+      case 'ALL-IN':
+        bgColor = Colors.purple.shade700;
+        break;
+      default:
+        bgColor = Colors.grey.shade700;
+    }
+    
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(8),
+        boxShadow: [
+          BoxShadow(
+            color: bgColor.withValues(alpha: 0.5),
+            blurRadius: 8,
+            spreadRadius: 2,
+          ),
+        ],
+      ),
+      child: Text(
+        action,
+        style: TextStyle(
+          color: textColor,
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 1.0,
+        ),
       ),
     );
   }

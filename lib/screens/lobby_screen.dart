@@ -40,12 +40,7 @@ class SitAndGoBuyIn {
   final int prizePool;
   final Color color;
 
-  const SitAndGoBuyIn({
-    required this.name,
-    required this.buyIn,
-    required this.prizePool,
-    required this.color,
-  });
+  const SitAndGoBuyIn({required this.name, required this.buyIn, required this.prizePool, required this.color});
 }
 
 class LobbyScreen extends StatefulWidget {
@@ -66,22 +61,8 @@ class _LobbyScreenState extends State<LobbyScreen> {
 
   // Stake levels for Cash Games
   static const List<StakeLevel> _cashGameStakes = [
-    StakeLevel(
-      name: 'Micro',
-      smallBlind: 10,
-      bigBlind: 20,
-      minBuyIn: 200,
-      maxBuyIn: 2000,
-      color: Color(0xFF4CAF50),
-    ),
-    StakeLevel(
-      name: 'Low',
-      smallBlind: 25,
-      bigBlind: 50,
-      minBuyIn: 500,
-      maxBuyIn: 5000,
-      color: Color(0xFF2196F3),
-    ),
+    StakeLevel(name: 'Micro', smallBlind: 10, bigBlind: 20, minBuyIn: 200, maxBuyIn: 2000, color: Color(0xFF4CAF50)),
+    StakeLevel(name: 'Low', smallBlind: 25, bigBlind: 50, minBuyIn: 500, maxBuyIn: 5000, color: Color(0xFF2196F3)),
     StakeLevel(
       name: 'Medium',
       smallBlind: 100,
@@ -110,22 +91,8 @@ class _LobbyScreenState extends State<LobbyScreen> {
 
   // Stake levels for Heads-Up Duel
   static const List<StakeLevel> _headsUpStakes = [
-    StakeLevel(
-      name: 'Bronze',
-      smallBlind: 10,
-      bigBlind: 20,
-      minBuyIn: 500,
-      maxBuyIn: 500,
-      color: Color(0xFFCD7F32),
-    ),
-    StakeLevel(
-      name: 'Silver',
-      smallBlind: 50,
-      bigBlind: 100,
-      minBuyIn: 2500,
-      maxBuyIn: 2500,
-      color: Color(0xFFC0C0C0),
-    ),
+    StakeLevel(name: 'Bronze', smallBlind: 10, bigBlind: 20, minBuyIn: 500, maxBuyIn: 500, color: Color(0xFFCD7F32)),
+    StakeLevel(name: 'Silver', smallBlind: 50, bigBlind: 100, minBuyIn: 2500, maxBuyIn: 2500, color: Color(0xFFC0C0C0)),
     StakeLevel(
       name: 'Gold',
       smallBlind: 250,
@@ -214,12 +181,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
     try {
       final room = await _gameService.createRoom(isPrivate: true);
       if (mounted) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => MultiplayerGameScreen(roomId: room.id),
-          ),
-        );
+        Navigator.push(context, MaterialPageRoute(builder: (context) => MultiplayerGameScreen(roomId: room.id)));
       }
     } catch (e) {
       setState(() => _error = 'Failed to create room');
@@ -251,12 +213,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
     try {
       await _gameService.joinRoom(roomId);
       if (mounted) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => MultiplayerGameScreen(roomId: roomId),
-          ),
-        );
+        Navigator.push(context, MaterialPageRoute(builder: (context) => MultiplayerGameScreen(roomId: roomId)));
       }
     } catch (e) {
       setState(() => _error = 'Room not found or full');
@@ -282,31 +239,28 @@ class _LobbyScreenState extends State<LobbyScreen> {
 
     try {
       // Try to find an available room at this stake level
-      final rooms = await _gameService.getAvailableRooms().first.timeout(
-            const Duration(seconds: 10),
-            onTimeout: () => <GameRoom>[],
-          );
+      final rooms = await _gameService.fetchAvailableCashRooms();
 
-      if (rooms.isNotEmpty) {
-        await _gameService.joinRoom(rooms.first.id);
+      // Prioritize rooms that already have players (non-empty lobbies)
+      final nonEmptyRooms = rooms.where((r) => r.players.isNotEmpty).toList();
+      // Sort by number of players descending to fill rooms first
+      nonEmptyRooms.sort((a, b) => b.players.length.compareTo(a.players.length));
+
+      final roomToJoin = nonEmptyRooms.isNotEmpty ? nonEmptyRooms.first : (rooms.isNotEmpty ? rooms.first : null);
+
+      if (roomToJoin != null) {
+        await _gameService.joinRoom(roomToJoin.id);
         if (mounted) {
           Navigator.push(
             context,
-            MaterialPageRoute(
-              builder: (context) => MultiplayerGameScreen(roomId: rooms.first.id),
-            ),
+            MaterialPageRoute(builder: (context) => MultiplayerGameScreen(roomId: roomToJoin.id)),
           );
         }
       } else {
         // No rooms available, create one
         final room = await _gameService.createRoom();
         if (mounted) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => MultiplayerGameScreen(roomId: room.id),
-            ),
-          );
+          Navigator.push(context, MaterialPageRoute(builder: (context) => MultiplayerGameScreen(roomId: room.id)));
         }
       }
     } catch (e) {
@@ -332,30 +286,26 @@ class _LobbyScreenState extends State<LobbyScreen> {
     });
 
     try {
-      final rooms = await _gameService.getAvailableRooms().first.timeout(
-            const Duration(seconds: 10),
-            onTimeout: () => <GameRoom>[],
-          );
+      final rooms = await _gameService.fetchAvailableCashRooms();
 
-      if (rooms.isNotEmpty) {
-        await _gameService.joinRoom(rooms.first.id);
+      // Prioritize rooms that already have players (non-empty lobbies)
+      final nonEmptyRooms = rooms.where((r) => r.players.isNotEmpty).toList();
+      nonEmptyRooms.sort((a, b) => b.players.length.compareTo(a.players.length));
+
+      final roomToJoin = nonEmptyRooms.isNotEmpty ? nonEmptyRooms.first : (rooms.isNotEmpty ? rooms.first : null);
+
+      if (roomToJoin != null) {
+        await _gameService.joinRoom(roomToJoin.id);
         if (mounted) {
           Navigator.push(
             context,
-            MaterialPageRoute(
-              builder: (context) => MultiplayerGameScreen(roomId: rooms.first.id),
-            ),
+            MaterialPageRoute(builder: (context) => MultiplayerGameScreen(roomId: roomToJoin.id)),
           );
         }
       } else {
         final room = await _gameService.createRoom();
         if (mounted) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => MultiplayerGameScreen(roomId: room.id),
-            ),
-          );
+          Navigator.push(context, MaterialPageRoute(builder: (context) => MultiplayerGameScreen(roomId: room.id)));
         }
       }
     } catch (e) {
@@ -381,30 +331,26 @@ class _LobbyScreenState extends State<LobbyScreen> {
     });
 
     try {
-      final rooms = await _gameService.getAvailableSitAndGoRooms().first.timeout(
-            const Duration(seconds: 10),
-            onTimeout: () => <GameRoom>[],
-          );
+      final rooms = await _gameService.fetchAvailableSitAndGoRooms();
 
-      if (rooms.isNotEmpty) {
-        await _gameService.joinRoom(rooms.first.id);
+      // Prioritize rooms that already have players (non-empty lobbies)
+      final nonEmptyRooms = rooms.where((r) => r.players.isNotEmpty).toList();
+      nonEmptyRooms.sort((a, b) => b.players.length.compareTo(a.players.length));
+
+      final roomToJoin = nonEmptyRooms.isNotEmpty ? nonEmptyRooms.first : (rooms.isNotEmpty ? rooms.first : null);
+
+      if (roomToJoin != null) {
+        await _gameService.joinRoom(roomToJoin.id);
         if (mounted) {
           Navigator.push(
             context,
-            MaterialPageRoute(
-              builder: (context) => MultiplayerGameScreen(roomId: rooms.first.id),
-            ),
+            MaterialPageRoute(builder: (context) => MultiplayerGameScreen(roomId: roomToJoin.id)),
           );
         }
       } else {
         final room = await _gameService.createSitAndGoRoom();
         if (mounted) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => MultiplayerGameScreen(roomId: room.id),
-            ),
-          );
+          Navigator.push(context, MaterialPageRoute(builder: (context) => MultiplayerGameScreen(roomId: room.id)));
         }
       }
     } catch (e) {
@@ -422,14 +368,10 @@ class _LobbyScreenState extends State<LobbyScreen> {
       context: context,
       builder: (context) => Dialog(
         backgroundColor: const Color(0xFF1A1A1A),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         child: Container(
           width: 340,
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(context).size.height * 0.7,
-          ),
+          constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.7),
           padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -442,11 +384,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
                   const Expanded(
                     child: Text(
                       'Cash Games',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w700,
-                      ),
+                      style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w700),
                     ),
                   ),
                   IconButton(
@@ -458,13 +396,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
                 ],
               ),
               const SizedBox(height: 4),
-              Text(
-                'Select your stakes',
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.5),
-                  fontSize: 14,
-                ),
-              ),
+              Text('Select your stakes', style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 14)),
               const SizedBox(height: 16),
               Flexible(
                 child: ListView.separated(
@@ -495,14 +427,10 @@ class _LobbyScreenState extends State<LobbyScreen> {
       context: context,
       builder: (context) => Dialog(
         backgroundColor: const Color(0xFF1A1A1A),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         child: Container(
           width: 340,
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(context).size.height * 0.7,
-          ),
+          constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.7),
           padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -515,11 +443,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
                   const Expanded(
                     child: Text(
                       'Heads-Up Duel',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w700,
-                      ),
+                      style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w700),
                     ),
                   ),
                   IconButton(
@@ -531,13 +455,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
                 ],
               ),
               const SizedBox(height: 4),
-              Text(
-                '1v1 winner takes all',
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.5),
-                  fontSize: 14,
-                ),
-              ),
+              Text('1v1 winner takes all', style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 14)),
               const SizedBox(height: 16),
               Flexible(
                 child: ListView.separated(
@@ -568,14 +486,10 @@ class _LobbyScreenState extends State<LobbyScreen> {
       context: context,
       builder: (context) => Dialog(
         backgroundColor: const Color(0xFF1A1A1A),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         child: Container(
           width: 340,
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(context).size.height * 0.7,
-          ),
+          constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.7),
           padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -588,11 +502,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
                   const Expanded(
                     child: Text(
                       'Sit & Go',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w700,
-                      ),
+                      style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w700),
                     ),
                   ),
                   IconButton(
@@ -606,10 +516,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
               const SizedBox(height: 4),
               Text(
                 '6 players • Winner takes all',
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.5),
-                  fontSize: 14,
-                ),
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 14),
               ),
               const SizedBox(height: 16),
               Flexible(
@@ -640,17 +547,10 @@ class _LobbyScreenState extends State<LobbyScreen> {
     showModalBottomSheet(
       context: context,
       backgroundColor: const Color(0xFF1A1A1A),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       isScrollControlled: true,
       builder: (context) => Padding(
-        padding: EdgeInsets.only(
-          left: 24,
-          right: 24,
-          top: 24,
-          bottom: MediaQuery.of(context).viewInsets.bottom + 24,
-        ),
+        padding: EdgeInsets.only(left: 24, right: 24, top: 24, bottom: MediaQuery.of(context).viewInsets.bottom + 24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -665,46 +565,25 @@ class _LobbyScreenState extends State<LobbyScreen> {
             const SizedBox(height: 24),
             const Text(
               'Join Room',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 22,
-                fontWeight: FontWeight.w700,
-              ),
+              style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 8),
             Text(
               'Enter the room code from your friend',
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.5),
-                fontSize: 14,
-              ),
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 14),
             ),
             const SizedBox(height: 24),
             TextField(
               controller: _roomCodeController,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 20,
-                letterSpacing: 4,
-                fontWeight: FontWeight.w600,
-              ),
+              style: const TextStyle(color: Colors.white, fontSize: 20, letterSpacing: 4, fontWeight: FontWeight.w600),
               textAlign: TextAlign.center,
               decoration: InputDecoration(
                 hintText: 'XXXXXX',
-                hintStyle: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.2),
-                  letterSpacing: 4,
-                ),
+                hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.2), letterSpacing: 4),
                 filled: true,
                 fillColor: Colors.white.withValues(alpha: 0.06),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: BorderSide.none,
-                ),
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 18,
-                ),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
               ),
               textCapitalization: TextCapitalization.characters,
             ),
@@ -720,17 +599,9 @@ class _LobbyScreenState extends State<LobbyScreen> {
                   backgroundColor: const Color(0xFF2196F3),
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                 ),
-                child: const Text(
-                  'Join',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
+                child: const Text('Join', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
               ),
             ),
           ],
@@ -776,9 +647,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
       context: context,
       builder: (context) => Dialog(
         backgroundColor: const Color(0xFF1A1A1A),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         child: Container(
           width: 340,
           padding: const EdgeInsets.all(24),
@@ -792,14 +661,10 @@ class _LobbyScreenState extends State<LobbyScreen> {
                     width: 52,
                     height: 52,
                     decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFFD4AF37), Color(0xFFB8860B)],
-                      ),
+                      gradient: const LinearGradient(colors: [Color(0xFFD4AF37), Color(0xFFB8860B)]),
                       borderRadius: BorderRadius.circular(14),
                     ),
-                    child: const Center(
-                      child: Text('🏆', style: TextStyle(fontSize: 26)),
-                    ),
+                    child: const Center(child: Text('🏆', style: TextStyle(fontSize: 26))),
                   ),
                   const SizedBox(width: 14),
                   Expanded(
@@ -808,19 +673,12 @@ class _LobbyScreenState extends State<LobbyScreen> {
                       children: [
                         Text(
                           t['title']!,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 20,
-                            fontWeight: FontWeight.w700,
-                          ),
+                          style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700),
                         ),
                         const SizedBox(height: 4),
                         Text(
                           t['structure']!,
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.5),
-                            fontSize: 13,
-                          ),
+                          style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13),
                         ),
                       ],
                     ),
@@ -848,14 +706,9 @@ class _LobbyScreenState extends State<LobbyScreen> {
                       style: OutlinedButton.styleFrom(
                         side: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
                         padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
-                      child: const Text(
-                        'Cancel',
-                        style: TextStyle(color: Colors.white),
-                      ),
+                      child: const Text('Cancel', style: TextStyle(color: Colors.white)),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -874,16 +727,11 @@ class _LobbyScreenState extends State<LobbyScreen> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF4CAF50),
                         padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
                       child: const Text(
                         'Register',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
-                        ),
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
                       ),
                     ),
                   ),
@@ -902,20 +750,10 @@ class _LobbyScreenState extends State<LobbyScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            label,
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.5),
-              fontSize: 14,
-            ),
-          ),
+          Text(label, style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 14)),
           Text(
             value,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-            ),
+            style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600),
           ),
         ],
       ),
@@ -927,9 +765,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
       context: context,
       builder: (context) => Dialog(
         backgroundColor: const Color(0xFF1A1A1A),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         child: Container(
           width: 340,
           padding: const EdgeInsets.all(24),
@@ -940,33 +776,21 @@ class _LobbyScreenState extends State<LobbyScreen> {
                 width: 72,
                 height: 72,
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF2196F3), Color(0xFF1976D2)],
-                  ),
+                  gradient: const LinearGradient(colors: [Color(0xFF2196F3), Color(0xFF1976D2)]),
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: const Center(
-                  child: Text('👁️', style: TextStyle(fontSize: 36)),
-                ),
+                child: const Center(child: Text('👁️', style: TextStyle(fontSize: 36))),
               ),
               const SizedBox(height: 20),
               const Text(
                 'Spectate Mode',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
-                ),
+                style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 8),
               Text(
                 'Watch the game without participating.\nCards will be hidden until showdown.',
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.6),
-                  fontSize: 14,
-                  height: 1.5,
-                ),
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 14, height: 1.5),
               ),
               const SizedBox(height: 24),
               Row(
@@ -977,14 +801,9 @@ class _LobbyScreenState extends State<LobbyScreen> {
                       style: OutlinedButton.styleFrom(
                         side: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
                         padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
-                      child: const Text(
-                        'Cancel',
-                        style: TextStyle(color: Colors.white),
-                      ),
+                      child: const Text('Cancel', style: TextStyle(color: Colors.white)),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -994,25 +813,17 @@ class _LobbyScreenState extends State<LobbyScreen> {
                       onPressed: () {
                         Navigator.pop(context);
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Joining as spectator...'),
-                            backgroundColor: Color(0xFF2196F3),
-                          ),
+                          const SnackBar(content: Text('Joining as spectator...'), backgroundColor: Color(0xFF2196F3)),
                         );
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF2196F3),
                         padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
                       child: const Text(
                         'Watch Game',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
-                        ),
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
                       ),
                     ),
                   ),
@@ -1050,22 +861,14 @@ class _LobbyScreenState extends State<LobbyScreen> {
                                 color: Colors.white.withValues(alpha: 0.06),
                                 borderRadius: BorderRadius.circular(14),
                               ),
-                              child: const Icon(
-                                Icons.arrow_back,
-                                color: Colors.white,
-                                size: 20,
-                              ),
+                              child: const Icon(Icons.arrow_back, color: Colors.white, size: 20),
                             ),
                           ),
                           const SizedBox(width: 16),
                           const Expanded(
                             child: Text(
                               'Multiplayer',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 24,
-                                fontWeight: FontWeight.w700,
-                              ),
+                              style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w700),
                             ),
                           ),
                           Container(
@@ -1079,19 +882,12 @@ class _LobbyScreenState extends State<LobbyScreen> {
                                 Container(
                                   width: 8,
                                   height: 8,
-                                  decoration: const BoxDecoration(
-                                    color: Color(0xFF4CAF50),
-                                    shape: BoxShape.circle,
-                                  ),
+                                  decoration: const BoxDecoration(color: Color(0xFF4CAF50), shape: BoxShape.circle),
                                 ),
                                 const SizedBox(width: 6),
                                 const Text(
                                   '24 online',
-                                  style: TextStyle(
-                                    color: Color(0xFF4CAF50),
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                  ),
+                                  style: TextStyle(color: Color(0xFF4CAF50), fontSize: 12, fontWeight: FontWeight.w600),
                                 ),
                               ],
                             ),
@@ -1148,9 +944,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
                                       color: Colors.white.withValues(alpha: 0.2),
                                       borderRadius: BorderRadius.circular(16),
                                     ),
-                                    child: const Center(
-                                      child: Text('💰', style: TextStyle(fontSize: 28)),
-                                    ),
+                                    child: const Center(child: Text('💰', style: TextStyle(fontSize: 28))),
                                   ),
                                   const SizedBox(width: 18),
                                   Expanded(
@@ -1168,10 +962,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
                                         const SizedBox(height: 4),
                                         Text(
                                           'Choose your stakes',
-                                          style: TextStyle(
-                                            color: Colors.white.withValues(alpha: 0.8),
-                                            fontSize: 14,
-                                          ),
+                                          style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 14),
                                         ),
                                       ],
                                     ),
@@ -1214,15 +1005,6 @@ class _LobbyScreenState extends State<LobbyScreen> {
                     sliver: SliverList(
                       delegate: SliverChildListDelegate([
                         _GameModeCard(
-                          emoji: '⚔️',
-                          title: 'Heads-Up Duel',
-                          subtitle: '1v1 winner takes all',
-                          tag: '2 Players',
-                          tagColor: const Color(0xFF2196F3),
-                          onTap: _showHeadsUpDialog,
-                        ),
-                        const SizedBox(height: 10),
-                        _GameModeCard(
                           emoji: '🏆',
                           title: 'Sit & Go',
                           subtitle: '6 players tournament',
@@ -1262,31 +1044,13 @@ class _LobbyScreenState extends State<LobbyScreen> {
                     sliver: SliverList(
                       delegate: SliverChildListDelegate([
                         _TournamentCard(
-                          title: 'Daily Freeroll',
-                          prize: '10,000',
-                          players: '24/100',
-                          startsIn: '15 min',
-                          buyIn: 'FREE',
-                          isFeatured: true,
-                          onTap: () => _showTournamentDetails(context, 'daily_freeroll'),
-                        ),
-                        const SizedBox(height: 10),
-                        _TournamentCard(
-                          title: 'High Roller',
-                          prize: '500,000',
-                          players: '8/20',
-                          startsIn: '1 hr',
-                          buyIn: '50,000',
-                          onTap: () => _showTournamentDetails(context, 'high_roller'),
-                        ),
-                        const SizedBox(height: 10),
-                        _TournamentCard(
                           title: 'Weekend Major',
                           prize: '1,000,000',
                           players: '156/500',
                           startsIn: 'Sat 8PM',
                           buyIn: '10,000',
                           isWeekend: true,
+                          isFeatured: true,
                           onTap: () => _showTournamentDetails(context, 'weekend_major'),
                         ),
                       ]),
@@ -1303,27 +1067,18 @@ class _LobbyScreenState extends State<LobbyScreen> {
                           decoration: BoxDecoration(
                             color: const Color(0xFFFF4444).withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(14),
-                            border: Border.all(
-                              color: const Color(0xFFFF4444).withValues(alpha: 0.3),
-                            ),
+                            border: Border.all(color: const Color(0xFFFF4444).withValues(alpha: 0.3)),
                           ),
                           child: Row(
                             children: [
                               const Icon(Icons.error_outline, color: Color(0xFFFF4444), size: 20),
                               const SizedBox(width: 12),
                               Expanded(
-                                child: Text(
-                                  _error!,
-                                  style: const TextStyle(color: Color(0xFFFF4444), fontSize: 14),
-                                ),
+                                child: Text(_error!, style: const TextStyle(color: Color(0xFFFF4444), fontSize: 14)),
                               ),
                               GestureDetector(
                                 onTap: () => setState(() => _error = null),
-                                child: Icon(
-                                  Icons.close,
-                                  color: Colors.white.withValues(alpha: 0.5),
-                                  size: 18,
-                                ),
+                                child: Icon(Icons.close, color: Colors.white.withValues(alpha: 0.5), size: 18),
                               ),
                             ],
                           ),
@@ -1332,9 +1087,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
                     ),
 
                   // Bottom spacing
-                  const SliverToBoxAdapter(
-                    child: SizedBox(height: 40),
-                  ),
+                  const SliverToBoxAdapter(child: SizedBox(height: 40)),
                 ],
               ),
             ),
@@ -1346,25 +1099,15 @@ class _LobbyScreenState extends State<LobbyScreen> {
                 child: Center(
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1A1A1A),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
+                    decoration: BoxDecoration(color: const Color(0xFF1A1A1A), borderRadius: BorderRadius.circular(20)),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const CircularProgressIndicator(
-                          color: Color(0xFFD4AF37),
-                          strokeWidth: 3,
-                        ),
+                        const CircularProgressIndicator(color: Color(0xFFD4AF37), strokeWidth: 3),
                         const SizedBox(height: 20),
                         Text(
                           _loadingAction ?? 'Loading...',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                          ),
+                          style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
                         ),
                       ],
                     ),
@@ -1401,12 +1144,7 @@ class _StakeLevelCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              stake.color.withValues(alpha: 0.15),
-              stake.color.withValues(alpha: 0.05),
-            ],
-          ),
+          gradient: LinearGradient(colors: [stake.color.withValues(alpha: 0.15), stake.color.withValues(alpha: 0.05)]),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: stake.color.withValues(alpha: 0.3)),
         ),
@@ -1422,11 +1160,7 @@ class _StakeLevelCard extends StatelessWidget {
               child: Center(
                 child: Text(
                   stake.name[0],
-                  style: TextStyle(
-                    color: stake.color,
-                    fontSize: 22,
-                    fontWeight: FontWeight.w800,
-                  ),
+                  style: TextStyle(color: stake.color, fontSize: 22, fontWeight: FontWeight.w800),
                 ),
               ),
             ),
@@ -1437,19 +1171,12 @@ class _StakeLevelCard extends StatelessWidget {
                 children: [
                   Text(
                     stake.name,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 17,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     'Blinds: ${stake.blindsDisplay}',
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.5),
-                      fontSize: 13,
-                    ),
+                    style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13),
                   ),
                 ],
               ),
@@ -1468,11 +1195,7 @@ class _StakeLevelCard extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   stake.buyInDisplay,
-                  style: TextStyle(
-                    color: stake.color,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                  ),
+                  style: TextStyle(color: stake.color, fontSize: 13, fontWeight: FontWeight.w700),
                 ),
               ],
             ),
@@ -1502,12 +1225,7 @@ class _HeadsUpCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              stake.color.withValues(alpha: 0.15),
-              stake.color.withValues(alpha: 0.05),
-            ],
-          ),
+          gradient: LinearGradient(colors: [stake.color.withValues(alpha: 0.15), stake.color.withValues(alpha: 0.05)]),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: stake.color.withValues(alpha: 0.3)),
         ),
@@ -1520,9 +1238,7 @@ class _HeadsUpCard extends StatelessWidget {
                 color: stake.color.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(14),
               ),
-              child: const Center(
-                child: Text('⚔️', style: TextStyle(fontSize: 24)),
-              ),
+              child: const Center(child: Text('⚔️', style: TextStyle(fontSize: 24))),
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -1531,36 +1247,22 @@ class _HeadsUpCard extends StatelessWidget {
                 children: [
                   Text(
                     stake.name,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 17,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     'Blinds: ${stake.blindsDisplay}',
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.5),
-                      fontSize: 13,
-                    ),
+                    style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13),
                   ),
                 ],
               ),
             ),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              decoration: BoxDecoration(
-                color: stake.color,
-                borderRadius: BorderRadius.circular(10),
-              ),
+              decoration: BoxDecoration(color: stake.color, borderRadius: BorderRadius.circular(10)),
               child: Text(
                 StakeLevel._formatNumber(stake.minBuyIn),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                ),
+                style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700),
               ),
             ),
             const SizedBox(width: 10),
@@ -1595,12 +1297,7 @@ class _SitAndGoCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              buyIn.color.withValues(alpha: 0.15),
-              buyIn.color.withValues(alpha: 0.05),
-            ],
-          ),
+          gradient: LinearGradient(colors: [buyIn.color.withValues(alpha: 0.15), buyIn.color.withValues(alpha: 0.05)]),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: buyIn.color.withValues(alpha: 0.3)),
         ),
@@ -1613,9 +1310,7 @@ class _SitAndGoCard extends StatelessWidget {
                 color: buyIn.color.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(14),
               ),
-              child: const Center(
-                child: Text('🏆', style: TextStyle(fontSize: 24)),
-              ),
+              child: const Center(child: Text('🏆', style: TextStyle(fontSize: 24))),
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -1624,11 +1319,7 @@ class _SitAndGoCard extends StatelessWidget {
                 children: [
                   Text(
                     buyIn.name,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 17,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 4),
                   Row(
@@ -1637,10 +1328,7 @@ class _SitAndGoCard extends StatelessWidget {
                       const SizedBox(width: 4),
                       Text(
                         'Prize: ${_formatNumber(buyIn.prizePool)}',
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.5),
-                          fontSize: 13,
-                        ),
+                        style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13),
                       ),
                     ],
                   ),
@@ -1655,11 +1343,7 @@ class _SitAndGoCard extends StatelessWidget {
               ),
               child: Text(
                 buyIn.buyIn == 0 ? 'FREE' : _formatNumber(buyIn.buyIn),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                ),
+                style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700),
               ),
             ),
             const SizedBox(width: 10),
@@ -1721,20 +1405,10 @@ class _GameModeCard extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 17,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 4),
-                  Text(
-                    subtitle,
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.5),
-                      fontSize: 13,
-                    ),
-                  ),
+                  Text(subtitle, style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13)),
                 ],
               ),
             ),
@@ -1746,11 +1420,7 @@ class _GameModeCard extends StatelessWidget {
               ),
               child: Text(
                 tag,
-                style: TextStyle(
-                  color: tagColor,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                ),
+                style: TextStyle(color: tagColor, fontSize: 11, fontWeight: FontWeight.w700),
               ),
             ),
             const SizedBox(width: 10),
@@ -1801,20 +1471,20 @@ class _TournamentCard extends StatelessWidget {
                   end: Alignment.bottomRight,
                 )
               : isWeekend
-                  ? const LinearGradient(
-                      colors: [Color(0xFF3A1A3A), Color(0xFF20102A)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    )
-                  : null,
+              ? const LinearGradient(
+                  colors: [Color(0xFF3A1A3A), Color(0xFF20102A)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                )
+              : null,
           color: isFeatured || isWeekend ? null : Colors.white.withValues(alpha: 0.04),
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
             color: isFeatured
                 ? const Color(0xFF4CAF50).withValues(alpha: 0.3)
                 : isWeekend
-                    ? const Color(0xFF9C27B0).withValues(alpha: 0.3)
-                    : Colors.white.withValues(alpha: 0.06),
+                ? const Color(0xFF9C27B0).withValues(alpha: 0.3)
+                : Colors.white.withValues(alpha: 0.06),
           ),
         ),
         child: Column(
@@ -1829,13 +1499,17 @@ class _TournamentCard extends StatelessWidget {
                     color: isFeatured
                         ? const Color(0xFF4CAF50).withValues(alpha: 0.2)
                         : isWeekend
-                            ? const Color(0xFF9C27B0).withValues(alpha: 0.2)
-                            : const Color(0xFFD4AF37).withValues(alpha: 0.15),
+                        ? const Color(0xFF9C27B0).withValues(alpha: 0.2)
+                        : const Color(0xFFD4AF37).withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Center(
                     child: Text(
-                      isFeatured ? '🎁' : isWeekend ? '👑' : '🏆',
+                      isFeatured
+                          ? '🎁'
+                          : isWeekend
+                          ? '👑'
+                          : '🏆',
                       style: const TextStyle(fontSize: 24),
                     ),
                   ),
@@ -1849,11 +1523,7 @@ class _TournamentCard extends StatelessWidget {
                         children: [
                           Text(
                             title,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
+                            style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
                           ),
                           if (isFeatured) ...[
                             const SizedBox(width: 8),
@@ -1865,11 +1535,7 @@ class _TournamentCard extends StatelessWidget {
                               ),
                               child: const Text(
                                 'FREE',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w700,
-                                ),
+                                style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w700),
                               ),
                             ),
                           ],
@@ -1878,10 +1544,7 @@ class _TournamentCard extends StatelessWidget {
                       const SizedBox(height: 4),
                       Text(
                         '$players players • Starts in $startsIn',
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.5),
-                          fontSize: 12,
-                        ),
+                        style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12),
                       ),
                     ],
                   ),
@@ -1895,22 +1558,12 @@ class _TournamentCard extends StatelessWidget {
                         const SizedBox(width: 4),
                         Text(
                           prize,
-                          style: const TextStyle(
-                            color: Color(0xFFD4AF37),
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                          ),
+                          style: const TextStyle(color: Color(0xFFD4AF37), fontSize: 16, fontWeight: FontWeight.w700),
                         ),
                       ],
                     ),
                     const SizedBox(height: 4),
-                    Text(
-                      'Buy-in: $buyIn',
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.4),
-                        fontSize: 11,
-                      ),
-                    ),
+                    Text('Buy-in: $buyIn', style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 11)),
                   ],
                 ),
               ],
@@ -1937,8 +1590,8 @@ class _SpectateCard extends StatelessWidget {
     required this.playerName,
     required this.stakes,
     required this.viewers,
-    this.isLive = false,
     required this.onTap,
+    this.isLive = false,
   });
 
   @override
@@ -1960,14 +1613,10 @@ class _SpectateCard extends StatelessWidget {
                   width: 48,
                   height: 48,
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF2196F3), Color(0xFF1976D2)],
-                    ),
+                    gradient: const LinearGradient(colors: [Color(0xFF2196F3), Color(0xFF1976D2)]),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Center(
-                    child: Text('👁️', style: TextStyle(fontSize: 22)),
-                  ),
+                  child: const Center(child: Text('👁️', style: TextStyle(fontSize: 22))),
                 ),
                 if (isLive)
                   Positioned(
@@ -1994,11 +1643,7 @@ class _SpectateCard extends StatelessWidget {
                     children: [
                       Text(
                         playerName,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                        ),
+                        style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600),
                       ),
                       if (isLive) ...[
                         const SizedBox(width: 8),
@@ -2010,24 +1655,14 @@ class _SpectateCard extends StatelessWidget {
                           ),
                           child: const Text(
                             'LIVE',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 9,
-                              fontWeight: FontWeight.w700,
-                            ),
+                            style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w700),
                           ),
                         ),
                       ],
                     ],
                   ),
                   const SizedBox(height: 4),
-                  Text(
-                    'Stakes: $stakes',
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.5),
-                      fontSize: 12,
-                    ),
-                  ),
+                  Text('Stakes: $stakes', style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12)),
                 ],
               ),
             ),
@@ -2035,13 +1670,7 @@ class _SpectateCard extends StatelessWidget {
               children: [
                 Icon(Icons.visibility, color: Colors.white.withValues(alpha: 0.4), size: 16),
                 const SizedBox(width: 4),
-                Text(
-                  '$viewers',
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.5),
-                    fontSize: 13,
-                  ),
-                ),
+                Text('$viewers', style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13)),
               ],
             ),
             const SizedBox(width: 10),

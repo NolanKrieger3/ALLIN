@@ -616,7 +616,7 @@ class _AddFriendDialogState extends State<AddFriendDialog> {
   final TextEditingController _searchController = TextEditingController();
   List<Friend> _searchResults = [];
   bool _isSearching = false;
-  Set<String> _pendingRequests = {};
+  final Set<String> _pendingRequests = {};
 
   @override
   void dispose() {
@@ -869,7 +869,7 @@ class _FriendsListDialogState extends State<FriendsListDialog> {
   final FriendsService _friendsService = FriendsService();
   List<Friend> _friends = [];
   bool _isLoading = true;
-  Set<String> _invitedFriends = {};
+  final Set<String> _invitedFriends = {};
 
   bool get _isInviteMode => widget.roomCode != null;
 

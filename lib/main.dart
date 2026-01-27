@@ -9,9 +9,7 @@ import 'services/user_preferences.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await UserPreferences.init();
   runApp(const MyApp());
 }
@@ -26,18 +24,16 @@ class MyApp extends StatelessWidget {
       child: Consumer<AppState>(
         builder: (context, appState, _) {
           return MaterialApp(
-            title: 'ALLIN',
+            title: 'ALLIN_HOTRELOAD_5555',
             debugShowCheckedModeBanner: false,
-            
+
             // Theming
             theme: AppTheme.lightTheme,
             darkTheme: AppTheme.darkTheme,
             themeMode: appState.themeMode,
-            
+
             // Routing - check if username is set
-            initialRoute: UserPreferences.hasSetUsername 
-                ? AppRoutes.home 
-                : '/username-setup',
+            initialRoute: UserPreferences.hasSetUsername ? AppRoutes.home : '/username-setup',
             routes: AppRoutes.routes,
             onGenerateRoute: AppRoutes.onGenerateRoute,
           );
