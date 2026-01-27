@@ -88,6 +88,10 @@ class _HomeTabState extends State<_HomeTab> {
   StreamSubscription? _friendsSub;
   StreamSubscription? _notificationsSub;
   StreamSubscription? _requestsSub;
+  
+  // Swipeable play card
+  final PageController _playCardController = PageController(initialPage: 0);
+  int _currentPlayMode = 0;
 
   @override
   void initState() {
@@ -125,6 +129,7 @@ class _HomeTabState extends State<_HomeTab> {
     _friendsSub?.cancel();
     _notificationsSub?.cancel();
     _requestsSub?.cancel();
+    _playCardController.dispose();
     super.dispose();
   }
 
@@ -432,209 +437,266 @@ class _HomeTabState extends State<_HomeTab> {
     return SafeArea(
       child: CustomScrollView(
         slivers: [
-          // Minimal Header
+          // Header - Balance (clickable to shop)
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
-              child: Row(
-                children: [
-                  // Avatar
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(12),
+              padding: const EdgeInsets.fromLTRB(24, 32, 24, 0),
+              child: GestureDetector(
+                onTap: () {
+                  final homeState = context.findAncestorStateOfType<_HomeScreenState>();
+                  homeState?.setState(() => homeState._currentIndex = 0);
+                },
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Balance',
+                      style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 14),
                     ),
-                    child: const Center(child: Text('👤', style: TextStyle(fontSize: 18))),
+                    const SizedBox(height: 8),
+                    Text(
+                      _chipBalance.toString().replaceAllMapped(
+                        RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+                        (Match m) => '${m[1]},',
+                      ),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 48,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -1,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          // ALL IN Logo
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 40, 24, 0),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text('♠', style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 24)),
+                      const SizedBox(width: 8),
+                      Text('♥', style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 24)),
+                      const SizedBox(width: 8),
+                      Text('♣', style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 24)),
+                      const SizedBox(width: 8),
+                      Text('♦', style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 24)),
+                    ],
                   ),
-                  const SizedBox(width: 12),
-                  // Greeting
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                  const SizedBox(height: 12),
+                  const Text(
+                    'ALL IN',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 32,
+                      fontWeight: FontWeight.w300,
+                      letterSpacing: 8,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // Swipeable Play Card
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 40, 24, 0),
+              child: Column(
+                children: [
+                  SizedBox(
+                    height: 160,
+                    child: PageView(
+                      controller: _playCardController,
+                      onPageChanged: (index) => setState(() => _currentPlayMode = index),
                       children: [
-                        Text(
-                          'Welcome back',
-                          style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 12),
+                        // Play Now - Main mode
+                        _buildPlayModeCard(
+                          title: 'Play Now',
+                          subtitle: 'Jump into a game',
+                          icon: Icons.play_arrow_rounded,
+                          gradient: const [Color(0xFF3B82F6), Color(0xFF2563EB)],
+                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LobbyScreen())),
                         ),
-                        const Text(
-                          'Player123',
-                          style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
+                        // AI Mode
+                        _buildPlayModeCard(
+                          title: 'AI Mode',
+                          subtitle: 'Practice vs bots',
+                          icon: Icons.smart_toy_rounded,
+                          gradient: const [Color(0xFF22C55E), Color(0xFF16A34A)],
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const GameScreen(gameMode: 'Practice')),
+                          ),
+                        ),
+                        // Tournament
+                        _buildPlayModeCard(
+                          title: 'Tournament',
+                          subtitle: 'Compete for prizes',
+                          icon: Icons.emoji_events_rounded,
+                          gradient: const [Color(0xFFF59E0B), Color(0xFFD97706)],
+                          onTap: () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Tournaments coming soon!'),
+                                backgroundColor: Color(0xFF1A1A2E),
+                              ),
+                            );
+                          },
+                        ),
+                        // Private Table - Locked
+                        _buildPlayModeCard(
+                          title: 'Private Table',
+                          subtitle: 'Play with friends',
+                          icon: Icons.lock_rounded,
+                          gradient: const [Color(0xFF6B7280), Color(0xFF4B5563)],
+                          isLocked: true,
+                          onTap: () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Upgrade to Premium to unlock Private Games'),
+                                backgroundColor: Color(0xFF1A1A2E),
+                              ),
+                            );
+                          },
                         ),
                       ],
                     ),
                   ),
-                  // Balance
-                  GestureDetector(
-                    onTap: () {
-                      final homeState = context.findAncestorStateOfType<_HomeScreenState>();
-                      homeState?.setState(() => homeState._currentIndex = 0);
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.05),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Text('🪙', style: TextStyle(fontSize: 14)),
-                          const SizedBox(width: 6),
-                          Text(
-                            UserPreferences.formatChips(_chipBalance),
-                            style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  // Notification Bell
-                  GestureDetector(
-                    onTap: _showNotificationPanel,
-                    child: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.05),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Stack(
-                        children: [
-                          Center(
-                            child: Icon(
-                              Icons.notifications_none_rounded,
-                              color: Colors.white.withValues(alpha: 0.6),
-                              size: 20,
-                            ),
-                          ),
-                          if (_unreadNotifications > 0 || _pendingFriendRequests > 0)
-                            Positioned(
-                              top: 8,
-                              right: 8,
-                              child: Container(
-                                width: 8,
-                                height: 8,
-                                decoration: const BoxDecoration(color: Color(0xFFEF4444), shape: BoxShape.circle),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // Quick Actions - Minimalist cards
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 32, 24, 0),
-              child: Row(
-                children: [
-                  Expanded(
-                    flex: 2,
-                    child: _QuickPlayCard(
-                      title: 'MULTIPLAYER',
-                      subtitle: 'Play Now',
-                      emoji: '🎮',
-                      gradient: const [Color(0xFF3B82F6), Color(0xFF2563EB)],
-                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LobbyScreen())),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _QuickPlayCard(
-                      title: 'PRACTICE',
-                      subtitle: 'vs AI',
-                      emoji: '🤖',
-                      gradient: const [Color(0xFF22C55E), Color(0xFF16A34A)],
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const GameScreen(gameMode: 'Practice')),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // Private Room Section - Simplified
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => _showCreateRoomDialog(context),
-                      child: Container(
-                        padding: const EdgeInsets.all(16),
+                  const SizedBox(height: 16),
+                  // Dots indicator
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(4, (index) {
+                      return Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 4),
+                        width: _currentPlayMode == index ? 24 : 8,
+                        height: 8,
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.03),
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+                          color: _currentPlayMode == index 
+                            ? Colors.white 
+                            : Colors.white.withValues(alpha: 0.3),
+                          borderRadius: BorderRadius.circular(4),
                         ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.add_rounded, color: Colors.white.withValues(alpha: 0.6), size: 20),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Create Room',
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.8),
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => _showJoinRoomDialog(context),
-                      child: Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.03),
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.link_rounded, color: Colors.white.withValues(alpha: 0.6), size: 20),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Join Room',
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.8),
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
+                      );
+                    }),
                   ),
                 ],
               ),
             ),
           ),
 
-          // Club Section - Minimalist
+          // Tutorial Button
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+              child: GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const GameScreen(gameMode: 'Tutorial')),
+                  );
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.03),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.school_rounded, color: Colors.white.withValues(alpha: 0.6), size: 24),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Tutorial',
+                              style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
+                            ),
+                            Text(
+                              'Learn how to play',
+                              style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 12),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Icon(Icons.chevron_right_rounded, color: Colors.white.withValues(alpha: 0.3), size: 24),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          // Friends Button
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
+              child: GestureDetector(
+                onTap: () {
+                  _showNotificationPanel();
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.03),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.people_rounded, color: Colors.white.withValues(alpha: 0.6), size: 24),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Friends',
+                              style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
+                            ),
+                            Text(
+                              'Add and manage friends',
+                              style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 12),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (_pendingFriendRequests > 0)
+                        Container(
+                          margin: const EdgeInsets.only(right: 8),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEF4444),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            '$_pendingFriendRequests',
+                            style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      Icon(Icons.chevron_right_rounded, color: Colors.white.withValues(alpha: 0.3), size: 24),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          // Teams Section
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -649,18 +711,18 @@ class _HomeTabState extends State<_HomeTab> {
                       ),
                       child: Row(
                         children: [
-                          const Text('🎯', style: TextStyle(fontSize: 20)),
+                          Icon(Icons.groups_rounded, color: Colors.white.withValues(alpha: 0.6), size: 24),
                           const SizedBox(width: 12),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 const Text(
-                                  'Club',
-                                  style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500),
+                                  'Teams',
+                                  style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
                                 ),
                                 Text(
-                                  'Join or create a club',
+                                  'Join or create a team',
                                   style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 12),
                                 ),
                               ],
@@ -692,12 +754,12 @@ class _HomeTabState extends State<_HomeTab> {
                           Icon(Icons.groups_outlined, color: Colors.white.withValues(alpha: 0.3), size: 40),
                           const SizedBox(height: 12),
                           const Text(
-                            'No Club Yet',
+                            'No Team Yet',
                             style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
                           ),
                           const SizedBox(height: 6),
                           Text(
-                            'Join a club to compete and earn rewards',
+                            'Join a team to compete and earn rewards',
                             textAlign: TextAlign.center,
                             style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 13),
                           ),
@@ -741,6 +803,102 @@ class _HomeTabState extends State<_HomeTab> {
           // Bottom spacing
           const SliverToBoxAdapter(child: SizedBox(height: 30)),
         ],
+      ),
+    );
+  }
+
+  Widget _buildPlayModeCard({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required List<Color> gradient,
+    required VoidCallback onTap,
+    bool isLocked = false,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: isLocked 
+              ? [Colors.white.withValues(alpha: 0.05), Colors.white.withValues(alpha: 0.02)]
+              : gradient,
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(20),
+          border: isLocked 
+            ? Border.all(color: Colors.white.withValues(alpha: 0.1))
+            : null,
+        ),
+        child: Stack(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Icon(
+                        icon,
+                        color: isLocked ? Colors.white.withValues(alpha: 0.4) : Colors.white,
+                        size: 32,
+                      ),
+                      if (isLocked)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFD700).withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Text(
+                            'PRO',
+                            style: TextStyle(
+                              color: Color(0xFFFFD700),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        )
+                      else
+                        Icon(
+                          Icons.chevron_right_rounded,
+                          color: Colors.white.withValues(alpha: 0.6),
+                          size: 28,
+                        ),
+                    ],
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: TextStyle(
+                          color: isLocked ? Colors.white.withValues(alpha: 0.5) : Colors.white,
+                          fontSize: 22,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle,
+                        style: TextStyle(
+                          color: isLocked 
+                            ? Colors.white.withValues(alpha: 0.3) 
+                            : Colors.white.withValues(alpha: 0.8),
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -910,8 +1068,8 @@ class _ShopTabState extends State<_ShopTab> with SingleTickerProviderStateMixin 
   int _selectedCategory = 0;
 
   final List<Map<String, dynamic>> _categories = [
-    {'icon': '✨', 'name': 'Featured'},
     {'icon': '💎', 'name': 'Currency'},
+    {'icon': '✨', 'name': 'Featured'},
     {'icon': '🎨', 'name': 'Cosmetics'},
     {'icon': '📦', 'name': 'Chests'},
   ];
@@ -988,7 +1146,7 @@ class _ShopTabState extends State<_ShopTab> with SingleTickerProviderStateMixin 
           Expanded(
             child: TabBarView(
               controller: _tabController,
-              children: [_buildFeaturedTab(), _buildCurrencyTab(), _buildCosmeticsTab(), _buildChestsTab()],
+              children: [_buildCurrencyTab(), _buildFeaturedTab(), _buildCosmeticsTab(), _buildChestsTab()],
             ),
           ),
         ],
@@ -4416,7 +4574,7 @@ class _SettingsItem extends StatelessWidget {
             ),
           ),
           if (hasToggle)
-            Switch(value: true, onChanged: (v) {}, activeThumbColor: const Color(0xFF4CAF50))
+            Switch(value: true, onChanged: (v) {}, activeColor: const Color(0xFF4CAF50))
           else
             Icon(Icons.chevron_right, color: Colors.white.withValues(alpha: 0.3), size: 20),
         ],
