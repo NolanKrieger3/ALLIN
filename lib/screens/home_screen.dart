@@ -165,116 +165,143 @@ class _HomeTabState extends State<_HomeTab> {
   }
 
   void _showDevMenu() {
-    final parentContext = context;
     final parentNavigator = Navigator.of(context);
     final parentScaffoldMessenger = ScaffoldMessenger.of(context);
 
-    showModalBottomSheet(
+    showDialog(
       context: context,
-      backgroundColor: const Color(0xFF1A1A1A),
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (sheetContext) => Container(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Developer Options',
-              style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 20),
-            ListTile(
-              leading: const Icon(Icons.swap_horiz, color: Color(0xFFFF9800)),
-              title: const Text('Switch Test Account', style: TextStyle(color: Colors.white)),
-              subtitle: Text(
-                'Current: ${AuthService().currentUser?.email ?? "Anonymous"}',
-                style: const TextStyle(color: Colors.white54),
-              ),
-              onTap: () {
-                Navigator.pop(sheetContext);
-                _showAccountSwitcher();
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.person_add, color: Color(0xFF9C27B0)),
-              title: const Text('Create Test Account', style: TextStyle(color: Colors.white)),
-              subtitle: const Text('Register new test user', style: TextStyle(color: Colors.white54)),
-              onTap: () {
-                Navigator.pop(sheetContext);
-                _showCreateTestAccount();
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.add_box, color: Color(0xFF4CAF50)),
-              title: const Text('Add Test Chips', style: TextStyle(color: Colors.white)),
-              subtitle: const Text('+10,000 chips', style: TextStyle(color: Colors.white54)),
-              onTap: () async {
-                Navigator.pop(sheetContext);
-                await _addTestChips();
-                parentScaffoldMessenger.showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      'Added 10,000 chips! New balance: ${UserPreferences.formatChips(UserPreferences.chips)}',
-                    ),
+      builder: (dialogContext) => Dialog(
+        backgroundColor: const Color(0xFF141414),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Container(
+          width: 340,
+          constraints: const BoxConstraints(maxHeight: 480),
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header
+              Row(
+                children: [
+                  Icon(Icons.bug_report, color: Colors.white.withValues(alpha: 0.6), size: 24),
+                  const SizedBox(width: 12),
+                  const Text(
+                    'Developer Menu',
+                    style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600),
                   ),
-                );
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.meeting_room, color: Color(0xFF2196F3)),
-              title: const Text('Create Test Room', style: TextStyle(color: Colors.white)),
-              subtitle: const Text('Quick room for testing', style: TextStyle(color: Colors.white54)),
-              onTap: () async {
-                Navigator.pop(sheetContext);
-                try {
-                  final room = await GameService().createRoom(isPrivate: true);
-                  if (mounted) {
-                    parentNavigator.push(MaterialPageRoute(builder: (_) => MultiplayerGameScreen(roomId: room.id)));
-                  }
-                } catch (e) {
-                  if (mounted) {
-                    parentScaffoldMessenger.showSnackBar(SnackBar(content: Text('Error: $e')));
-                  }
-                }
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.login, color: Color(0xFF00BCD4)),
-              title: const Text('Sign In Anonymously', style: TextStyle(color: Colors.white)),
-              subtitle: const Text('Quick anonymous login', style: TextStyle(color: Colors.white54)),
-              onTap: () async {
-                Navigator.pop(sheetContext);
-                try {
-                  await AuthService().signInAnonymously();
-                  if (mounted) {
-                    parentScaffoldMessenger.showSnackBar(const SnackBar(content: Text('Signed in anonymously!')));
-                  }
-                } catch (e) {
-                  if (mounted) {
-                    parentScaffoldMessenger.showSnackBar(SnackBar(content: Text('Error: $e')));
-                  }
-                }
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.logout, color: Color(0xFFFF4444)),
-              title: const Text('Sign Out', style: TextStyle(color: Colors.white)),
-              onTap: () async {
-                Navigator.pop(sheetContext);
-                try {
-                  await AuthService().signOut();
-                  if (mounted) {
-                    parentScaffoldMessenger.showSnackBar(const SnackBar(content: Text('Signed out!')));
-                  }
-                } catch (e) {
-                  if (mounted) {
-                    parentScaffoldMessenger.showSnackBar(SnackBar(content: Text('Error: $e')));
-                  }
-                }
-              },
-            ),
-          ],
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Current: ${AuthService().currentUser?.email ?? AuthService().currentUser?.uid.substring(0, 8) ?? "Not signed in"}',
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 12),
+              ),
+              const SizedBox(height: 16),
+              // Scrollable options
+              Flexible(
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      _DevMenuItem(
+                        icon: Icons.swap_horiz,
+                        color: const Color(0xFFFF9800),
+                        title: 'Switch Test Account',
+                        onTap: () {
+                          Navigator.pop(dialogContext);
+                          _showAccountSwitcher();
+                        },
+                      ),
+                      _DevMenuItem(
+                        icon: Icons.person_add,
+                        color: const Color(0xFF9C27B0),
+                        title: 'Create Test Account',
+                        onTap: () {
+                          Navigator.pop(dialogContext);
+                          _showCreateTestAccount();
+                        },
+                      ),
+                      _DevMenuItem(
+                        icon: Icons.add_box,
+                        color: const Color(0xFF4CAF50),
+                        title: 'Add 10K Chips',
+                        onTap: () async {
+                          Navigator.pop(dialogContext);
+                          await _addTestChips();
+                          parentScaffoldMessenger.showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'Added 10,000 chips! Balance: ${UserPreferences.formatChips(UserPreferences.chips)}',
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                      _DevMenuItem(
+                        icon: Icons.meeting_room,
+                        color: const Color(0xFF2196F3),
+                        title: 'Create Test Room',
+                        onTap: () async {
+                          Navigator.pop(dialogContext);
+                          try {
+                            final room = await GameService().createRoom(isPrivate: true);
+                            if (mounted) {
+                              parentNavigator.push(
+                                MaterialPageRoute(builder: (_) => MultiplayerGameScreen(roomId: room.id)),
+                              );
+                            }
+                          } catch (e) {
+                            if (mounted) parentScaffoldMessenger.showSnackBar(SnackBar(content: Text('Error: $e')));
+                          }
+                        },
+                      ),
+                      _DevMenuItem(
+                        icon: Icons.person_off,
+                        color: const Color(0xFFE91E63),
+                        title: 'New Anonymous Session',
+                        onTap: () async {
+                          Navigator.pop(dialogContext);
+                          try {
+                            await AuthService().signOut();
+                            final cred = await AuthService().signInAnonymously();
+                            if (mounted) {
+                              final newId = cred.user?.uid.substring(0, 8) ?? '???';
+                              parentScaffoldMessenger.showSnackBar(SnackBar(content: Text('New session: $newId...')));
+                            }
+                          } catch (e) {
+                            if (mounted) parentScaffoldMessenger.showSnackBar(SnackBar(content: Text('Error: $e')));
+                          }
+                        },
+                      ),
+                      _DevMenuItem(
+                        icon: Icons.logout,
+                        color: const Color(0xFFFF4444),
+                        title: 'Sign Out',
+                        onTap: () async {
+                          Navigator.pop(dialogContext);
+                          try {
+                            await AuthService().signOut();
+                            if (mounted)
+                              parentScaffoldMessenger.showSnackBar(const SnackBar(content: Text('Signed out!')));
+                          } catch (e) {
+                            if (mounted) parentScaffoldMessenger.showSnackBar(SnackBar(content: Text('Error: $e')));
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              // Close button
+              SizedBox(
+                width: double.infinity,
+                child: TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: Text('Close', style: TextStyle(color: Colors.white.withValues(alpha: 0.5))),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1061,13 +1088,20 @@ class _ShopTabState extends State<_ShopTab> with SingleTickerProviderStateMixin 
                   child: Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.03),
+                      gradient: LinearGradient(
+                        colors: [
+                          const Color(0xFFD4AF37).withValues(alpha: 0.15),
+                          const Color(0xFFD4AF37).withValues(alpha: 0.05),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+                      border: Border.all(color: const Color(0xFFD4AF37).withValues(alpha: 0.2)),
                     ),
                     child: Column(
                       children: [
-                        const Text('🃏', style: TextStyle(fontSize: 28)),
+                        Text(UserPreferences.todaysLuckyHand.emoji, style: const TextStyle(fontSize: 28)),
                         const SizedBox(height: 8),
                         const Text(
                           'Lucky Hand',
@@ -1075,8 +1109,9 @@ class _ShopTabState extends State<_ShopTab> with SingleTickerProviderStateMixin 
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'Free',
-                          style: TextStyle(color: const Color(0xFF22C55E), fontSize: 12, fontWeight: FontWeight.w500),
+                          UserPreferences.todaysLuckyHand.name,
+                          style: const TextStyle(color: Color(0xFFD4AF37), fontSize: 11, fontWeight: FontWeight.w600),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),
@@ -1524,6 +1559,49 @@ class _BalanceChip extends StatelessWidget {
             style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w500),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// Dev menu item widget
+class _DevMenuItem extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final String title;
+  final VoidCallback onTap;
+
+  const _DevMenuItem({required this.icon, required this.color, required this.title, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+        margin: const EdgeInsets.only(bottom: 8),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.03),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: color, size: 20),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                title,
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.85),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+            Icon(Icons.chevron_right, color: Colors.white.withValues(alpha: 0.3), size: 18),
+          ],
+        ),
       ),
     );
   }
@@ -2489,136 +2567,141 @@ class _ProfileTabState extends State<_ProfileTab> {
   void _showDevMenu(BuildContext context) {
     final parentScaffoldMessenger = ScaffoldMessenger.of(context);
     final parentNavigator = Navigator.of(context);
-    showModalBottomSheet(
+
+    showDialog(
       context: context,
-      backgroundColor: const Color(0xFF121212),
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (sheetContext) => Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Developer Menu',
-              style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 16, fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 16),
-            ListTile(
-              leading: Icon(Icons.swap_horiz, color: Colors.white.withValues(alpha: 0.5), size: 20),
-              title: Text(
-                'Switch Test Account',
-                style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 14),
-              ),
-              subtitle: Text(
-                'Current: ${AuthService().currentUser?.email ?? "Anonymous"}',
-                style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 12),
-              ),
-              onTap: () {
-                Navigator.pop(sheetContext);
-                _showAccountSwitcher(context);
-              },
-            ),
-            ListTile(
-              leading: Icon(Icons.person_add, color: Colors.white.withValues(alpha: 0.5), size: 20),
-              title: Text(
-                'Create Test Account',
-                style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 14),
-              ),
-              subtitle: Text(
-                'Register new test user',
-                style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 12),
-              ),
-              onTap: () {
-                Navigator.pop(sheetContext);
-                _showCreateTestAccount(context);
-              },
-            ),
-            ListTile(
-              leading: Icon(Icons.add_box, color: Colors.white.withValues(alpha: 0.5), size: 20),
-              title: Text('Add Test Chips', style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 14)),
-              subtitle: Text(
-                '+10,000 chips',
-                style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 12),
-              ),
-              onTap: () async {
-                Navigator.pop(sheetContext);
-                await UserPreferences.addChips(10000);
-                parentScaffoldMessenger.showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      'Added 10,000 chips! New balance: ${UserPreferences.formatChips(UserPreferences.chips)}',
-                    ),
+      builder: (dialogContext) => Dialog(
+        backgroundColor: const Color(0xFF141414),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Container(
+          width: 340,
+          constraints: const BoxConstraints(maxHeight: 480),
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header
+              Row(
+                children: [
+                  Icon(Icons.bug_report, color: Colors.white.withValues(alpha: 0.6), size: 24),
+                  const SizedBox(width: 12),
+                  const Text(
+                    'Developer Menu',
+                    style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600),
                   ),
-                );
-              },
-            ),
-            ListTile(
-              leading: Icon(Icons.meeting_room, color: Colors.white.withValues(alpha: 0.5), size: 20),
-              title: Text(
-                'Create Test Room',
-                style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 14),
+                ],
               ),
-              subtitle: Text(
-                'Quick room for testing',
+              const SizedBox(height: 6),
+              Text(
+                'Current: ${AuthService().currentUser?.email ?? AuthService().currentUser?.uid.substring(0, 8) ?? "Not signed in"}',
                 style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 12),
               ),
-              onTap: () async {
-                Navigator.pop(sheetContext);
-                try {
-                  final room = await GameService().createRoom(isPrivate: true);
-                  if (mounted) {
-                    parentNavigator.push(MaterialPageRoute(builder: (_) => MultiplayerGameScreen(roomId: room.id)));
-                  }
-                } catch (e) {
-                  if (mounted) {
-                    parentScaffoldMessenger.showSnackBar(SnackBar(content: Text('Error: $e')));
-                  }
-                }
-              },
-            ),
-            ListTile(
-              leading: Icon(Icons.login, color: Colors.white.withValues(alpha: 0.5), size: 20),
-              title: Text(
-                'Sign In Anonymously',
-                style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 14),
+              const SizedBox(height: 16),
+              // Scrollable options
+              Flexible(
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      _DevMenuItem(
+                        icon: Icons.swap_horiz,
+                        color: const Color(0xFFFF9800),
+                        title: 'Switch Test Account',
+                        onTap: () {
+                          Navigator.pop(dialogContext);
+                          _showAccountSwitcher(context);
+                        },
+                      ),
+                      _DevMenuItem(
+                        icon: Icons.person_add,
+                        color: const Color(0xFF9C27B0),
+                        title: 'Create Test Account',
+                        onTap: () {
+                          Navigator.pop(dialogContext);
+                          _showCreateTestAccount(context);
+                        },
+                      ),
+                      _DevMenuItem(
+                        icon: Icons.add_box,
+                        color: const Color(0xFF4CAF50),
+                        title: 'Add 10K Chips',
+                        onTap: () async {
+                          Navigator.pop(dialogContext);
+                          await UserPreferences.addChips(10000);
+                          parentScaffoldMessenger.showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'Added 10,000 chips! Balance: ${UserPreferences.formatChips(UserPreferences.chips)}',
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                      _DevMenuItem(
+                        icon: Icons.meeting_room,
+                        color: const Color(0xFF2196F3),
+                        title: 'Create Test Room',
+                        onTap: () async {
+                          Navigator.pop(dialogContext);
+                          try {
+                            final room = await GameService().createRoom(isPrivate: true);
+                            if (mounted) {
+                              parentNavigator.push(
+                                MaterialPageRoute(builder: (_) => MultiplayerGameScreen(roomId: room.id)),
+                              );
+                            }
+                          } catch (e) {
+                            if (mounted) parentScaffoldMessenger.showSnackBar(SnackBar(content: Text('Error: $e')));
+                          }
+                        },
+                      ),
+                      _DevMenuItem(
+                        icon: Icons.person_off,
+                        color: const Color(0xFFE91E63),
+                        title: 'New Anonymous Session',
+                        onTap: () async {
+                          Navigator.pop(dialogContext);
+                          try {
+                            await AuthService().signOut();
+                            final cred = await AuthService().signInAnonymously();
+                            if (mounted) {
+                              final newId = cred.user?.uid.substring(0, 8) ?? '???';
+                              parentScaffoldMessenger.showSnackBar(SnackBar(content: Text('New session: $newId...')));
+                            }
+                          } catch (e) {
+                            if (mounted) parentScaffoldMessenger.showSnackBar(SnackBar(content: Text('Error: $e')));
+                          }
+                        },
+                      ),
+                      _DevMenuItem(
+                        icon: Icons.logout,
+                        color: const Color(0xFFFF4444),
+                        title: 'Sign Out',
+                        onTap: () async {
+                          Navigator.pop(dialogContext);
+                          try {
+                            await AuthService().signOut();
+                            if (mounted)
+                              parentScaffoldMessenger.showSnackBar(const SnackBar(content: Text('Signed out!')));
+                          } catch (e) {
+                            if (mounted) parentScaffoldMessenger.showSnackBar(SnackBar(content: Text('Error: $e')));
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                ),
               ),
-              subtitle: Text(
-                'Quick anonymous login',
-                style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 12),
+              const SizedBox(height: 12),
+              // Close button
+              SizedBox(
+                width: double.infinity,
+                child: TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: Text('Close', style: TextStyle(color: Colors.white.withValues(alpha: 0.5))),
+                ),
               ),
-              onTap: () async {
-                Navigator.pop(sheetContext);
-                try {
-                  await AuthService().signInAnonymously();
-                  if (mounted) {
-                    parentScaffoldMessenger.showSnackBar(const SnackBar(content: Text('Signed in anonymously!')));
-                  }
-                } catch (e) {
-                  if (mounted) {
-                    parentScaffoldMessenger.showSnackBar(SnackBar(content: Text('Error: $e')));
-                  }
-                }
-              },
-            ),
-            ListTile(
-              leading: Icon(Icons.logout, color: Colors.white.withValues(alpha: 0.5), size: 20),
-              title: Text('Sign Out', style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 14)),
-              onTap: () async {
-                Navigator.pop(sheetContext);
-                try {
-                  await AuthService().signOut();
-                  if (mounted) {
-                    parentScaffoldMessenger.showSnackBar(const SnackBar(content: Text('Signed out!')));
-                  }
-                } catch (e) {
-                  if (mounted) {
-                    parentScaffoldMessenger.showSnackBar(SnackBar(content: Text('Error: $e')));
-                  }
-                }
-              },
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -6219,106 +6302,19 @@ class _ChipGraphPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
-// Lucky Hand Dialog - A card picking mini-game
-class _LuckyHandDialog extends StatefulWidget {
+// Lucky Hand Dialog - Shows today's lucky hand bonus
+class _LuckyHandDialog extends StatelessWidget {
   const _LuckyHandDialog();
 
   @override
-  State<_LuckyHandDialog> createState() => _LuckyHandDialogState();
-}
-
-class _LuckyHandDialogState extends State<_LuckyHandDialog> with TickerProviderStateMixin {
-  bool _hasPlayed = false;
-  int? _selectedCard;
-  bool _isRevealing = false;
-  int _wonAmount = 0;
-
-  // Card prizes - one card is the jackpot!
-  final List<int> _cardPrizes = [500, 1000, 2500, 5000, 10000];
-  final List<bool> _cardFlipped = [false, false, false, false, false];
-  final List<AnimationController> _flipControllers = [];
-  final List<Animation<double>> _flipAnimations = [];
-
-  @override
-  void initState() {
-    super.initState();
-    // Shuffle prizes
-    _cardPrizes.shuffle(Random());
-
-    // Create flip animations for each card
-    for (int i = 0; i < 5; i++) {
-      final controller = AnimationController(duration: const Duration(milliseconds: 400), vsync: this);
-      _flipControllers.add(controller);
-      _flipAnimations.add(
-        Tween<double>(begin: 0, end: pi).animate(CurvedAnimation(parent: controller, curve: Curves.easeInOut)),
-      );
-    }
-  }
-
-  @override
-  void dispose() {
-    for (var controller in _flipControllers) {
-      controller.dispose();
-    }
-    super.dispose();
-  }
-
-  void _selectCard(int index) {
-    if (_hasPlayed || _isRevealing) return;
-
-    setState(() {
-      _selectedCard = index;
-      _isRevealing = true;
-    });
-
-    // Flip the selected card
-    _flipControllers[index].forward().then((_) {
-      setState(() {
-        _cardFlipped[index] = true;
-        _wonAmount = _cardPrizes[index];
-      });
-
-      // Reveal all other cards after a delay
-      Future.delayed(const Duration(milliseconds: 500), () {
-        if (!mounted) return;
-        for (int i = 0; i < 5; i++) {
-          if (i != index) {
-            Future.delayed(Duration(milliseconds: (i * 100)), () {
-              if (!mounted) return;
-              _flipControllers[i].forward();
-              setState(() => _cardFlipped[i] = true);
-            });
-          }
-        }
-        Future.delayed(const Duration(milliseconds: 600), () {
-          if (mounted) {
-            setState(() {
-              _hasPlayed = true;
-              _isRevealing = false;
-            });
-          }
-        });
-      });
-    });
-  }
-
-  Color _getPrizeColor(int prize) {
-    if (prize >= 10000) return const Color(0xFFD4AF37);
-    if (prize >= 5000) return const Color(0xFF9C27B0);
-    if (prize >= 2500) return const Color(0xFF2196F3);
-    return const Color(0xFF4CAF50);
-  }
-
-  String _formatPrize(int prize) {
-    if (prize >= 1000) return '${prize ~/ 1000}K';
-    return '$prize';
-  }
-
-  @override
   Widget build(BuildContext context) {
+    final luckyHand = UserPreferences.todaysLuckyHand;
+    final winsToday = UserPreferences.luckyHandWinsToday;
+    final totalEarned = winsToday * luckyHand.bonusReward;
+
     return Dialog(
-      backgroundColor: const Color(0xFF1A1A1A),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      backgroundColor: const Color(0xFF121212),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
@@ -6328,164 +6324,162 @@ class _LuckyHandDialogState extends State<_LuckyHandDialog> with TickerProviderS
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Text('🃏', style: TextStyle(fontSize: 28)),
-                const SizedBox(width: 10),
+                Text(luckyHand.emoji, style: const TextStyle(fontSize: 32)),
+                const SizedBox(width: 12),
                 const Text(
                   'Lucky Hand',
-                  style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w700),
+                  style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w600),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             Text(
-              _hasPlayed ? 'You won!' : 'Pick a card to reveal your prize!',
-              style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 14),
+              'Resets daily at midnight',
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 12),
             ),
             const SizedBox(height: 24),
 
-            // Cards row
-            SizedBox(
-              height: 120,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(5, (index) {
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: GestureDetector(
-                      onTap: () => _selectCard(index),
-                      child: AnimatedBuilder(
-                        animation: _flipAnimations[index],
-                        builder: (context, child) {
-                          final angle = _flipAnimations[index].value;
-                          final showFront = angle < pi / 2;
-
-                          return Transform(
-                            alignment: Alignment.center,
-                            transform: Matrix4.identity()
-                              ..setEntry(3, 2, 0.001)
-                              ..rotateY(angle),
-                            child: Container(
-                              width: 50,
-                              height: 75,
-                              decoration: BoxDecoration(
-                                gradient: showFront
-                                    ? const LinearGradient(
-                                        colors: [Color(0xFFD4AF37), Color(0xFFB8860B)],
-                                        begin: Alignment.topLeft,
-                                        end: Alignment.bottomRight,
-                                      )
-                                    : null,
-                                color: showFront ? null : _getPrizeColor(_cardPrizes[index]),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                  color: _selectedCard == index ? Colors.white : Colors.white.withValues(alpha: 0.3),
-                                  width: _selectedCard == index ? 2 : 1,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: (_selectedCard == index ? Colors.white : const Color(0xFFD4AF37)).withValues(
-                                      alpha: 0.3,
-                                    ),
-                                    blurRadius: _selectedCard == index ? 12 : 4,
-                                    spreadRadius: _selectedCard == index ? 2 : 0,
-                                  ),
-                                ],
-                              ),
-                              child: Center(
-                                child: showFront
-                                    ? const Text(
-                                        '?',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 28,
-                                          fontWeight: FontWeight.w800,
-                                        ),
-                                      )
-                                    : Transform(
-                                        alignment: Alignment.center,
-                                        transform: Matrix4.identity()..rotateY(pi),
-                                        child: Column(
-                                          mainAxisAlignment: MainAxisAlignment.center,
-                                          children: [
-                                            const Text('🪙', style: TextStyle(fontSize: 18)),
-                                            Text(
-                                              _formatPrize(_cardPrizes[index]),
-                                              style: const TextStyle(
-                                                color: Colors.white,
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.w800,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  );
-                }),
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // Result or instruction
-            if (_hasPlayed) ...[
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                decoration: BoxDecoration(
-                  color: _getPrizeColor(_wonAmount).withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: _getPrizeColor(_wonAmount).withValues(alpha: 0.5)),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text('🪙', style: TextStyle(fontSize: 24)),
-                    const SizedBox(width: 8),
-                    Text(
-                      '+${_wonAmount.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},')}',
-                      style: TextStyle(color: _getPrizeColor(_wonAmount), fontSize: 28, fontWeight: FontWeight.w800),
-                    ),
+            // Today's Lucky Hand Card
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    const Color(0xFFD4AF37).withValues(alpha: 0.2),
+                    const Color(0xFFD4AF37).withValues(alpha: 0.05),
                   ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 ),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFD4AF37).withValues(alpha: 0.3)),
               ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFD4AF37),
-                    foregroundColor: Colors.black,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              child: Column(
+                children: [
+                  Text(
+                    "TODAY'S LUCKY HAND",
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.5),
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 1.5,
+                    ),
                   ),
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Collect', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
-                ),
-              ),
-            ] else ...[
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF4CAF50).withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.info_outline, color: Color(0xFF4CAF50), size: 18),
-                    const SizedBox(width: 8),
-                    const Text(
-                      'Tap any card to reveal!',
-                      style: TextStyle(color: Color(0xFF4CAF50), fontSize: 13, fontWeight: FontWeight.w600),
+                  const SizedBox(height: 12),
+                  Text(
+                    luckyHand.name,
+                    style: const TextStyle(color: Color(0xFFD4AF37), fontSize: 24, fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    luckyHand.description,
+                    style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 13),
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
                     ),
-                  ],
-                ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text('🪙', style: TextStyle(fontSize: 18)),
+                        const SizedBox(width: 8),
+                        Text(
+                          '+${UserPreferences.formatChips(luckyHand.bonusReward)}',
+                          style: const TextStyle(color: Color(0xFF22C55E), fontSize: 20, fontWeight: FontWeight.w700),
+                        ),
+                        Text(' per win', style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 14)),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
+            const SizedBox(height: 16),
+
+            // Today's Stats
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.03),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  Column(
+                    children: [
+                      Text(
+                        winsToday.toString(),
+                        style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w700),
+                      ),
+                      Text('Wins Today', style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 11)),
+                    ],
+                  ),
+                  Container(width: 1, height: 40, color: Colors.white.withValues(alpha: 0.1)),
+                  Column(
+                    children: [
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text('🪙', style: TextStyle(fontSize: 16)),
+                          const SizedBox(width: 4),
+                          Text(
+                            UserPreferences.formatChips(totalEarned),
+                            style: const TextStyle(color: Color(0xFF22C55E), fontSize: 24, fontWeight: FontWeight.w700),
+                          ),
+                        ],
+                      ),
+                      Text('Earned Today', style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 11)),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // How it works
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFF2196F3).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFF2196F3).withValues(alpha: 0.2)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.info_outline, color: Color(0xFF2196F3), size: 18),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Win any game with a ${luckyHand.name} to earn the bonus!',
+                      style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 12),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Close button
+            SizedBox(
+              width: double.infinity,
+              child: TextButton(
+                onPressed: () => Navigator.pop(context),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                child: Text('Got it!', style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 14)),
+              ),
+            ),
           ],
         ),
       ),

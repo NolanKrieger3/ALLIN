@@ -15,8 +15,24 @@ class GameService {
   /// Get current user ID
   String? get currentUserId => _auth.currentUser?.uid;
 
-  /// Get current user display name from saved preferences
-  String get currentUserName => UserPreferences.username;
+  /// Get current user display name - prioritize Firebase auth info for multiplayer
+  String get currentUserName {
+    final user = _auth.currentUser;
+    if (user != null) {
+      // Use Firebase display name if set
+      if (user.displayName != null && user.displayName!.isNotEmpty) {
+        return user.displayName!;
+      }
+      // Use email prefix for email accounts
+      if (user.email != null && user.email!.isNotEmpty) {
+        return user.email!.split('@').first;
+      }
+      // For anonymous users, use a unique ID-based name
+      return 'Player${user.uid.substring(0, 4).toUpperCase()}';
+    }
+    // Fallback to local preferences
+    return UserPreferences.username;
+  }
 
   /// Get auth token for authenticated requests
   Future<String?> _getAuthToken() async {
@@ -66,6 +82,9 @@ class GameService {
 
     final token = await _getAuthToken();
 
+    // Debug: Print join attempt info
+    print('JOIN ATTEMPT: userId=$userId, name=$currentUserName, roomId=$roomId');
+
     // Get current room data
     final response = await http.get(Uri.parse('$_databaseUrl/game_rooms/$roomId.json?auth=$token'));
 
@@ -76,11 +95,18 @@ class GameService {
     final roomData = jsonDecode(response.body) as Map<String, dynamic>;
     final room = GameRoom.fromJson(roomData, roomId);
 
+    // Debug: Print current players
+    print('ROOM PLAYERS: ${room.players.map((p) => "${p.displayName} (${p.uid})").join(", ")}');
+
     if (room.isFull) throw Exception('Room is full');
     if (room.status != 'waiting') throw Exception('Game already in progress');
-    if (room.players.any((p) => p.uid == userId)) return; // Already in room
+    if (room.players.any((p) => p.uid == userId)) {
+      print('ALREADY IN ROOM: User $userId is already a player');
+      return; // Already in room
+    }
 
     final newPlayer = GamePlayer(uid: userId, displayName: currentUserName, chips: startingChips);
+    print('ADDING PLAYER: ${newPlayer.displayName} (${newPlayer.uid})');
 
     final updatedPlayers = [...room.players, newPlayer];
 
