@@ -26,7 +26,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return MobileWrapper(
       child: Scaffold(
-        backgroundColor: const Color(0xFF0D0D0D),
+        backgroundColor: const Color(0xFF0A0A0A),
         body: IndexedStack(index: _currentIndex, children: const [_ShopTab(), _HomeTab(), _ProfileTab()]),
         bottomNavigationBar: _buildBottomNav(),
       ),
@@ -35,16 +35,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildBottomNav() {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF0D0D0D),
-        border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.06))),
-      ),
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      decoration: const BoxDecoration(color: Color(0xFF0A0A0A)),
       child: SafeArea(
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
-            _buildNavItem(0, Icons.shopping_bag_outlined, Icons.shopping_bag),
+            _buildNavItem(0, Icons.storefront_outlined, Icons.storefront),
             _buildNavItem(1, Icons.home_outlined, Icons.home_rounded),
             _buildNavItem(2, Icons.person_outline_rounded, Icons.person_rounded),
           ],
@@ -58,17 +55,12 @@ class _HomeScreenState extends State<HomeScreen> {
     return GestureDetector(
       onTap: () => setState(() => _currentIndex = index),
       behavior: HitTestBehavior.opaque,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-        decoration: BoxDecoration(
-          color: isActive ? Colors.white.withValues(alpha: 0.1) : Colors.transparent,
-          borderRadius: BorderRadius.circular(16),
-        ),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
         child: Icon(
           isActive ? activeIcon : icon,
-          color: isActive ? Colors.white : Colors.white.withValues(alpha: 0.4),
-          size: 26,
+          color: isActive ? Colors.white : Colors.white.withValues(alpha: 0.35),
+          size: 24,
         ),
       ),
     );
@@ -118,11 +110,11 @@ class _HomeTabState extends State<_HomeTab> {
       if (mounted) setState(() => _pendingFriendRequests = requests.length);
     });
   }
-  
+
   void _loadChipBalance() {
     setState(() => _chipBalance = UserPreferences.chips);
   }
-  
+
   Future<void> _addTestChips() async {
     await UserPreferences.addChips(10000);
     _loadChipBalance();
@@ -220,7 +212,13 @@ class _HomeTabState extends State<_HomeTab> {
               onTap: () async {
                 Navigator.pop(sheetContext);
                 await _addTestChips();
-                parentScaffoldMessenger.showSnackBar(SnackBar(content: Text('Added 10,000 chips! New balance: ${UserPreferences.formatChips(UserPreferences.chips)}')));
+                parentScaffoldMessenger.showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'Added 10,000 chips! New balance: ${UserPreferences.formatChips(UserPreferences.chips)}',
+                    ),
+                  ),
+                );
               },
             ),
             ListTile(
@@ -358,7 +356,7 @@ class _HomeTabState extends State<_HomeTab> {
                 }
               }
             },
-            child: const Text('Create'),
+            child: Text('Create', style: TextStyle(color: Colors.white.withValues(alpha: 0.9))),
           ),
         ],
       ),
@@ -373,8 +371,8 @@ class _HomeTabState extends State<_HomeTab> {
   ) {
     final isCurrentUser = AuthService().currentUser?.email == email;
     return ListTile(
-      title: Text(email, style: const TextStyle(color: Colors.white)),
-      trailing: isCurrentUser ? const Icon(Icons.check_circle, color: Color(0xFF4CAF50)) : null,
+      title: Text(email, style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 14)),
+      trailing: isCurrentUser ? Icon(Icons.check_circle, color: Colors.white.withValues(alpha: 0.5), size: 18) : null,
       onTap: isCurrentUser
           ? null
           : () async {
@@ -407,60 +405,65 @@ class _HomeTabState extends State<_HomeTab> {
     return SafeArea(
       child: CustomScrollView(
         slivers: [
-          // App Bar
+          // Minimal Header
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+              padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
               child: Row(
                 children: [
                   // Avatar
                   Container(
-                    width: 44,
-                    height: 44,
+                    width: 40,
+                    height: 40,
                     decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFFD4AF37), Color(0xFFB8860B)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(14),
+                      color: Colors.white.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Center(child: Text('👤', style: TextStyle(fontSize: 22))),
+                    child: const Center(child: Text('👤', style: TextStyle(fontSize: 18))),
                   ),
                   const SizedBox(width: 12),
                   // Greeting
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Welcome back', style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13)),
-                      const Text(
-                        'Player123',
-                        style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600),
-                      ),
-                    ],
-                  ),
-                  const Spacer(),
-                  // Inline Balance Display
-                  GestureDetector(
-                    onTap: () {
-                      // Navigate to shop tab (index 0)
-                      final homeState = context.findAncestorStateOfType<_HomeScreenState>();
-                      homeState?.setState(() => homeState._currentIndex = 0);
-                    },
-                    child: Row(
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('🪙', style: TextStyle(fontSize: 16)),
-                        const SizedBox(width: 4),
                         Text(
-                          UserPreferences.formatChips(_chipBalance),
-                          style: const TextStyle(color: Color(0xFFD4AF37), fontSize: 15, fontWeight: FontWeight.w600),
+                          'Welcome back',
+                          style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 12),
                         ),
-                        const SizedBox(width: 4),
-                        Icon(Icons.add_circle, color: const Color(0xFFD4AF37).withValues(alpha: 0.7), size: 16),
+                        const Text(
+                          'Player123',
+                          style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
+                        ),
                       ],
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  // Balance
+                  GestureDetector(
+                    onTap: () {
+                      final homeState = context.findAncestorStateOfType<_HomeScreenState>();
+                      homeState?.setState(() => homeState._currentIndex = 0);
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text('🪙', style: TextStyle(fontSize: 14)),
+                          const SizedBox(width: 6),
+                          Text(
+                            UserPreferences.formatChips(_chipBalance),
+                            style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
                   // Notification Bell
                   GestureDetector(
                     onTap: _showNotificationPanel,
@@ -468,36 +471,26 @@ class _HomeTabState extends State<_HomeTab> {
                       width: 40,
                       height: 40,
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.06),
-                        borderRadius: BorderRadius.circular(12),
+                        color: Colors.white.withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(10),
                       ),
                       child: Stack(
                         children: [
                           Center(
                             child: Icon(
-                              Icons.notifications_outlined,
-                              color: Colors.white.withValues(alpha: 0.7),
+                              Icons.notifications_none_rounded,
+                              color: Colors.white.withValues(alpha: 0.6),
                               size: 20,
                             ),
                           ),
                           if (_unreadNotifications > 0 || _pendingFriendRequests > 0)
                             Positioned(
-                              top: 6,
-                              right: 6,
+                              top: 8,
+                              right: 8,
                               child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                                constraints: const BoxConstraints(minWidth: 14, minHeight: 14),
-                                decoration: const BoxDecoration(color: Color(0xFFFF4444), shape: BoxShape.circle),
-                                child: Center(
-                                  child: Text(
-                                    '${_unreadNotifications + _pendingFriendRequests}',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 9,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
+                                width: 8,
+                                height: 8,
+                                decoration: const BoxDecoration(color: Color(0xFFEF4444), shape: BoxShape.circle),
                               ),
                             ),
                         ],
@@ -509,10 +502,10 @@ class _HomeTabState extends State<_HomeTab> {
             ),
           ),
 
-          // Quick Actions
+          // Quick Actions - Minimalist cards
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 28, 20, 0),
+              padding: const EdgeInsets.fromLTRB(24, 32, 24, 0),
               child: Row(
                 children: [
                   Expanded(
@@ -521,7 +514,7 @@ class _HomeTabState extends State<_HomeTab> {
                       title: 'MULTIPLAYER',
                       subtitle: 'Play Now',
                       emoji: '🎮',
-                      gradient: const [Color(0xFF1E88E5), Color(0xFF1565C0)],
+                      gradient: const [Color(0xFF3B82F6), Color(0xFF2563EB)],
                       onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LobbyScreen())),
                     ),
                   ),
@@ -531,7 +524,7 @@ class _HomeTabState extends State<_HomeTab> {
                       title: 'PRACTICE',
                       subtitle: 'vs AI',
                       emoji: '🤖',
-                      gradient: const [Color(0xFF43A047), Color(0xFF2E7D32)],
+                      gradient: const [Color(0xFF22C55E), Color(0xFF16A34A)],
                       onTap: () => Navigator.push(
                         context,
                         MaterialPageRoute(builder: (_) => const GameScreen(gameMode: 'Practice')),
@@ -543,47 +536,34 @@ class _HomeTabState extends State<_HomeTab> {
             ),
           ),
 
-          // Private Room Section
+          // Private Room Section - Simplified
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+              padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
               child: Row(
                 children: [
                   Expanded(
                     child: GestureDetector(
                       onTap: () => _showCreateRoomDialog(context),
                       child: Container(
-                        padding: const EdgeInsets.all(18),
+                        padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              const Color(0xFF4CAF50).withValues(alpha: 0.2),
-                              const Color(0xFF4CAF50).withValues(alpha: 0.1),
-                            ],
-                          ),
-                          borderRadius: BorderRadius.circular(18),
-                          border: Border.all(color: const Color(0xFF4CAF50).withValues(alpha: 0.3)),
+                          color: Colors.white.withValues(alpha: 0.03),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
                         ),
-                        child: Column(
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Container(
-                              width: 48,
-                              height: 48,
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF4CAF50).withValues(alpha: 0.2),
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                              child: const Center(child: Text('➕', style: TextStyle(fontSize: 22))),
-                            ),
-                            const SizedBox(height: 12),
-                            const Text(
-                              'Create Room',
-                              style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600),
-                            ),
-                            const SizedBox(height: 4),
+                            Icon(Icons.add_rounded, color: Colors.white.withValues(alpha: 0.6), size: 20),
+                            const SizedBox(width: 8),
                             Text(
-                              'Host a private game',
-                              style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12),
+                              'Create Room',
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.8),
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
                           ],
                         ),
@@ -595,37 +575,24 @@ class _HomeTabState extends State<_HomeTab> {
                     child: GestureDetector(
                       onTap: () => _showJoinRoomDialog(context),
                       child: Container(
-                        padding: const EdgeInsets.all(18),
+                        padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              const Color(0xFF2196F3).withValues(alpha: 0.2),
-                              const Color(0xFF2196F3).withValues(alpha: 0.1),
-                            ],
-                          ),
-                          borderRadius: BorderRadius.circular(18),
-                          border: Border.all(color: const Color(0xFF2196F3).withValues(alpha: 0.3)),
+                          color: Colors.white.withValues(alpha: 0.03),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
                         ),
-                        child: Column(
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Container(
-                              width: 48,
-                              height: 48,
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF2196F3).withValues(alpha: 0.2),
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                              child: const Center(child: Text('🔗', style: TextStyle(fontSize: 22))),
-                            ),
-                            const SizedBox(height: 12),
-                            const Text(
-                              'Join Room',
-                              style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600),
-                            ),
-                            const SizedBox(height: 4),
+                            Icon(Icons.link_rounded, color: Colors.white.withValues(alpha: 0.6), size: 20),
+                            const SizedBox(width: 8),
                             Text(
-                              'Enter room code',
-                              style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12),
+                              'Join Room',
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.8),
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
                           ],
                         ),
@@ -637,51 +604,37 @@ class _HomeTabState extends State<_HomeTab> {
             ),
           ),
 
-          // Club Section
+          // Club Section - Minimalist
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 28, 20, 0),
+              padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   GestureDetector(
                     onTap: () => setState(() => _clubExpanded = !_clubExpanded),
                     child: Container(
-                      padding: const EdgeInsets.all(18),
+                      padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            const Color(0xFFE91E63).withValues(alpha: 0.15),
-                            const Color(0xFFE91E63).withValues(alpha: 0.05),
-                          ],
-                        ),
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(color: const Color(0xFFE91E63).withValues(alpha: 0.3)),
+                        color: Colors.white.withValues(alpha: 0.03),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
                       ),
                       child: Row(
                         children: [
-                          Container(
-                            width: 48,
-                            height: 48,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFE91E63).withValues(alpha: 0.2),
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: const Center(child: Text('🎯', style: TextStyle(fontSize: 24))),
-                          ),
-                          const SizedBox(width: 14),
+                          const Text('🎯', style: TextStyle(fontSize: 20)),
+                          const SizedBox(width: 12),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 const Text(
                                   'Club',
-                                  style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700),
+                                  style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500),
                                 ),
-                                const SizedBox(height: 4),
                                 Text(
                                   'Join or create a club',
-                                  style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13),
+                                  style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 12),
                                 ),
                               ],
                             ),
@@ -689,58 +642,62 @@ class _HomeTabState extends State<_HomeTab> {
                           AnimatedRotation(
                             turns: _clubExpanded ? 0.5 : 0,
                             duration: const Duration(milliseconds: 200),
-                            child: Icon(Icons.keyboard_arrow_down, color: Colors.white.withValues(alpha: 0.5)),
+                            child: Icon(
+                              Icons.keyboard_arrow_down_rounded,
+                              color: Colors.white.withValues(alpha: 0.4),
+                              size: 20,
+                            ),
                           ),
                         ],
                       ),
                     ),
                   ),
                   if (_clubExpanded) ...[
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 12),
                     Container(
-                      padding: const EdgeInsets.all(18),
+                      padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.04),
-                        borderRadius: BorderRadius.circular(16),
+                        color: Colors.white.withValues(alpha: 0.02),
+                        borderRadius: BorderRadius.circular(12),
                       ),
                       child: Column(
                         children: [
-                          const Text('🎯', style: TextStyle(fontSize: 40)),
+                          Icon(Icons.groups_outlined, color: Colors.white.withValues(alpha: 0.3), size: 40),
                           const SizedBox(height: 12),
                           const Text(
                             'No Club Yet',
-                            style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700),
+                            style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
                           ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 6),
                           Text(
-                            'Join a club to compete in championships\nand earn exclusive rewards!',
+                            'Join a club to compete and earn rewards',
                             textAlign: TextAlign.center,
-                            style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13, height: 1.5),
+                            style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 13),
                           ),
-                          const SizedBox(height: 18),
+                          const SizedBox(height: 16),
                           Row(
                             children: [
                               Expanded(
                                 child: OutlinedButton(
                                   onPressed: () {},
                                   style: OutlinedButton.styleFrom(
-                                    side: const BorderSide(color: Color(0xFFE91E63)),
-                                    padding: const EdgeInsets.symmetric(vertical: 14),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                    side: BorderSide(color: Colors.white.withValues(alpha: 0.15)),
+                                    padding: const EdgeInsets.symmetric(vertical: 12),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                   ),
-                                  child: const Text('Create Club', style: TextStyle(color: Color(0xFFE91E63))),
+                                  child: Text('Create', style: TextStyle(color: Colors.white.withValues(alpha: 0.7))),
                                 ),
                               ),
                               const SizedBox(width: 12),
                               Expanded(
-                                child: ElevatedButton(
+                                child: FilledButton(
                                   onPressed: () {},
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFFE91E63),
-                                    padding: const EdgeInsets.symmetric(vertical: 14),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: Colors.white.withValues(alpha: 0.1),
+                                    padding: const EdgeInsets.symmetric(vertical: 12),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                   ),
-                                  child: const Text('Join Club', style: TextStyle(color: Colors.white)),
+                                  child: const Text('Join', style: TextStyle(color: Colors.white)),
                                 ),
                               ),
                             ],
@@ -765,61 +722,56 @@ class _HomeTabState extends State<_HomeTab> {
     showDialog(
       context: context,
       builder: (context) => Dialog(
-        backgroundColor: const Color(0xFF1A1A1A),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        backgroundColor: const Color(0xFF141414),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: Container(
-          width: 340,
+          width: 320,
           padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                width: 70,
-                height: 70,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF4CAF50).withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: const Center(child: Text('➕', style: TextStyle(fontSize: 36))),
-              ),
-              const SizedBox(height: 20),
+              Icon(Icons.add_rounded, color: Colors.white.withValues(alpha: 0.6), size: 32),
+              const SizedBox(height: 16),
               const Text(
-                'Create Private Room',
-                style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w700),
+                'Create Room',
+                style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w500),
               ),
               const SizedBox(height: 8),
               Text(
-                'Your room code will be generated',
-                style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 14),
+                'A room code will be generated for you',
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 13),
               ),
               const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: () async {
-                  final navigator = Navigator.of(context);
-                  final scaffoldMessenger = ScaffoldMessenger.of(context);
-                  navigator.pop();
-                  try {
-                    final gameService = GameService();
-                    final room = await gameService.createRoom(isPrivate: true);
-                    navigator.push(MaterialPageRoute(builder: (_) => MultiplayerGameScreen(roomId: room.id)));
-                  } catch (e) {
-                    scaffoldMessenger.showSnackBar(SnackBar(content: Text('Failed to create room: $e')));
-                  }
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF4CAF50),
-                  padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                ),
-                child: const Text(
-                  'Create Room',
-                  style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () async {
+                    final navigator = Navigator.of(context);
+                    final scaffoldMessenger = ScaffoldMessenger.of(context);
+                    navigator.pop();
+                    try {
+                      final gameService = GameService();
+                      final room = await gameService.createRoom(isPrivate: true);
+                      navigator.push(MaterialPageRoute(builder: (_) => MultiplayerGameScreen(roomId: room.id)));
+                    } catch (e) {
+                      scaffoldMessenger.showSnackBar(SnackBar(content: Text('Failed to create room: $e')));
+                    }
+                  },
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  child: const Text(
+                    'Create',
+                    style: TextStyle(color: Colors.black, fontWeight: FontWeight.w500),
+                  ),
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: Text('Cancel', style: TextStyle(color: Colors.white.withValues(alpha: 0.5))),
+                child: Text('Cancel', style: TextStyle(color: Colors.white.withValues(alpha: 0.4))),
               ),
             ],
           ),
@@ -834,86 +786,78 @@ class _HomeTabState extends State<_HomeTab> {
     showDialog(
       context: context,
       builder: (context) => Dialog(
-        backgroundColor: const Color(0xFF1A1A1A),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        backgroundColor: const Color(0xFF141414),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: Container(
-          width: 340,
+          width: 320,
           padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                width: 70,
-                height: 70,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF2196F3).withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: const Center(child: Text('🔗', style: TextStyle(fontSize: 36))),
-              ),
-              const SizedBox(height: 20),
+              Icon(Icons.link_rounded, color: Colors.white.withValues(alpha: 0.6), size: 32),
+              const SizedBox(height: 16),
               const Text(
-                'Join Private Room',
-                style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w700),
+                'Join Room',
+                style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w500),
               ),
               const SizedBox(height: 8),
-              Text(
-                'Enter the room code from your friend',
-                style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 14),
-              ),
-              const SizedBox(height: 24),
+              Text('Enter the room code', style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 13)),
+              const SizedBox(height: 20),
               TextField(
                 controller: codeController,
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   color: Colors.white,
-                  fontSize: 24,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 8,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w500,
+                  letterSpacing: 6,
                 ),
                 decoration: InputDecoration(
                   hintText: 'XXXXXX',
-                  hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.2), letterSpacing: 8),
+                  hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.15), letterSpacing: 6),
                   filled: true,
-                  fillColor: Colors.white.withValues(alpha: 0.05),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
-                  contentPadding: const EdgeInsets.symmetric(vertical: 16),
+                  fillColor: Colors.white.withValues(alpha: 0.04),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 14),
                 ),
                 textCapitalization: TextCapitalization.characters,
                 maxLength: 6,
                 buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
               ),
-              const SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: () async {
-                  if (codeController.text.length == 6) {
-                    final roomCode = codeController.text.toUpperCase();
-                    final navigator = Navigator.of(context);
-                    final scaffoldMessenger = ScaffoldMessenger.of(context);
-                    navigator.pop();
-                    try {
-                      final gameService = GameService();
-                      await gameService.joinRoom(roomCode);
-                      navigator.push(MaterialPageRoute(builder: (_) => MultiplayerGameScreen(roomId: roomCode)));
-                    } catch (e) {
-                      scaffoldMessenger.showSnackBar(SnackBar(content: Text('Failed to join room: $e')));
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () async {
+                    if (codeController.text.length == 6) {
+                      final roomCode = codeController.text.toUpperCase();
+                      final navigator = Navigator.of(context);
+                      final scaffoldMessenger = ScaffoldMessenger.of(context);
+                      navigator.pop();
+                      try {
+                        final gameService = GameService();
+                        await gameService.joinRoom(roomCode);
+                        navigator.push(MaterialPageRoute(builder: (_) => MultiplayerGameScreen(roomId: roomCode)));
+                      } catch (e) {
+                        scaffoldMessenger.showSnackBar(SnackBar(content: Text('Failed to join room: $e')));
+                      }
                     }
-                  }
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF2196F3),
-                  padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                ),
-                child: const Text(
-                  'Join Room',
-                  style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700),
+                  },
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  child: const Text(
+                    'Join',
+                    style: TextStyle(color: Colors.black, fontWeight: FontWeight.w500),
+                  ),
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: Text('Cancel', style: TextStyle(color: Colors.white.withValues(alpha: 0.5))),
+                child: Text('Cancel', style: TextStyle(color: Colors.white.withValues(alpha: 0.4))),
               ),
             ],
           ),
@@ -924,7 +868,7 @@ class _HomeTabState extends State<_HomeTab> {
 }
 
 // ============================================================================
-// SHOP TAB
+// SHOP TAB - Minimalist Design
 // ============================================================================
 
 class _ShopTab extends StatefulWidget {
@@ -939,7 +883,7 @@ class _ShopTabState extends State<_ShopTab> with SingleTickerProviderStateMixin 
   int _selectedCategory = 0;
 
   final List<Map<String, dynamic>> _categories = [
-    {'icon': '🎁', 'name': 'Featured'},
+    {'icon': '✨', 'name': 'Featured'},
     {'icon': '💎', 'name': 'Currency'},
     {'icon': '🎨', 'name': 'Cosmetics'},
     {'icon': '📦', 'name': 'Chests'},
@@ -967,63 +911,48 @@ class _ShopTabState extends State<_ShopTab> with SingleTickerProviderStateMixin 
     return SafeArea(
       child: Column(
         children: [
-          // Header with balance
+          // Minimal Header
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text(
                   'Shop',
-                  style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w700),
+                  style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w500),
                 ),
                 Row(
                   children: [
-                    _BalanceChip(emoji: '🪙', amount: '1,000', color: const Color(0xFFD4AF37)),
+                    _BalanceChip(emoji: '🪙', amount: '1,000', color: Colors.white.withValues(alpha: 0.6)),
                     const SizedBox(width: 8),
-                    _BalanceChip(emoji: '💎', amount: '100', color: const Color(0xFF9C27B0)),
+                    _BalanceChip(emoji: '💎', amount: '100', color: Colors.white.withValues(alpha: 0.6)),
                   ],
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
 
-          // Category Tabs
+          // Minimal Category Tabs
           Container(
-            height: 44,
-            margin: const EdgeInsets.symmetric(horizontal: 16),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.05),
-              borderRadius: BorderRadius.circular(12),
-            ),
+            height: 40,
+            margin: const EdgeInsets.symmetric(horizontal: 20),
             child: TabBar(
               controller: _tabController,
               isScrollable: true,
               tabAlignment: TabAlignment.start,
-              indicator: BoxDecoration(color: const Color(0xFF2196F3), borderRadius: BorderRadius.circular(10)),
+              indicator: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
               indicatorSize: TabBarIndicatorSize.tab,
-              indicatorPadding: const EdgeInsets.all(3),
+              indicatorPadding: const EdgeInsets.all(2),
               dividerColor: Colors.transparent,
               labelColor: Colors.white,
-              unselectedLabelColor: Colors.white54,
-              labelPadding: const EdgeInsets.symmetric(horizontal: 16),
-              labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-              tabs: _categories
-                  .map(
-                    (cat) => Tab(
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(cat['icon'], style: const TextStyle(fontSize: 14)),
-                          const SizedBox(width: 4),
-                          Text(cat['name']),
-                        ],
-                      ),
-                    ),
-                  )
-                  .toList(),
+              unselectedLabelColor: Colors.white.withValues(alpha: 0.4),
+              labelPadding: const EdgeInsets.symmetric(horizontal: 14),
+              labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+              tabs: _categories.map((cat) => Tab(child: Text(cat['name']))).toList(),
             ),
           ),
           const SizedBox(height: 16),
@@ -1042,86 +971,55 @@ class _ShopTabState extends State<_ShopTab> with SingleTickerProviderStateMixin 
 
   Widget _buildFeaturedTab() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Daily Bonus Banner
+          // Daily Bonus - Minimalist
           GestureDetector(
             onTap: () => _showDailySpinDialog(context),
             child: Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF4CAF50), Color(0xFF2E7D32)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF4CAF50).withValues(alpha: 0.3),
-                    blurRadius: 20,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
+                color: const Color(0xFF22C55E).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFF22C55E).withValues(alpha: 0.2)),
               ),
               child: Row(
                 children: [
-                  Container(
-                    width: 70,
-                    height: 70,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(18),
-                    ),
-                    child: const Center(child: Text('🎡', style: TextStyle(fontSize: 36))),
-                  ),
-                  const SizedBox(width: 16),
+                  const Text('🎡', style: TextStyle(fontSize: 28)),
+                  const SizedBox(width: 14),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: const Text(
-                            'DAILY BONUS',
-                            style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700),
-                          ),
-                        ),
-                        const SizedBox(height: 6),
                         const Text(
-                          'Free Daily Spin!',
-                          style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w700),
+                          'Daily Spin',
+                          style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500),
                         ),
-                        const SizedBox(height: 4),
                         Text(
-                          'Win chips, gems & more',
-                          style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 14),
+                          'Free chips & gems',
+                          style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 12),
                         ),
                       ],
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(color: const Color(0xFF22C55E), borderRadius: BorderRadius.circular(8)),
                     child: const Text(
-                      'CLAIM',
-                      style: TextStyle(color: Color(0xFF2E7D32), fontWeight: FontWeight.w800, fontSize: 14),
+                      'Claim',
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.w500, fontSize: 13),
                     ),
                   ),
                 ],
               ),
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
 
-          // Premium Wheel
+          // Mini Games Row - Simplified
           Row(
             children: [
               Expanded(
@@ -1130,48 +1028,26 @@ class _ShopTabState extends State<_ShopTab> with SingleTickerProviderStateMixin 
                   child: Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          const Color(0xFF9C27B0).withValues(alpha: 0.5),
-                          const Color(0xFFE91E63).withValues(alpha: 0.4),
-                        ],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: const Color(0xFF9C27B0).withValues(alpha: 0.5)),
+                      color: Colors.white.withValues(alpha: 0.03),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
                     ),
                     child: Column(
                       children: [
-                        const Text('🎰', style: TextStyle(fontSize: 40)),
+                        const Text('🎰', style: TextStyle(fontSize: 28)),
                         const SizedBox(height: 8),
                         const Text(
                           'Gem Wheel',
-                          style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700),
+                          style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500),
                         ),
                         const SizedBox(height: 4),
-                        Text(
-                          'Win up to 100K',
-                          style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 12),
-                        ),
-                        const SizedBox(height: 12),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text('💎', style: TextStyle(fontSize: 14)),
-                              SizedBox(width: 4),
-                              Text(
-                                '50',
-                                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
-                              ),
-                            ],
-                          ),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Text('💎', style: TextStyle(fontSize: 11)),
+                            const SizedBox(width: 4),
+                            Text('50', style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 12)),
+                          ],
                         ),
                       ],
                     ),
@@ -1185,41 +1061,22 @@ class _ShopTabState extends State<_ShopTab> with SingleTickerProviderStateMixin 
                   child: Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          const Color(0xFFD4AF37).withValues(alpha: 0.5),
-                          const Color(0xFFFF9800).withValues(alpha: 0.4),
-                        ],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: const Color(0xFFD4AF37).withValues(alpha: 0.5)),
+                      color: Colors.white.withValues(alpha: 0.03),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
                     ),
                     child: Column(
                       children: [
-                        const Text('🃏', style: TextStyle(fontSize: 40)),
+                        const Text('🃏', style: TextStyle(fontSize: 28)),
                         const SizedBox(height: 8),
                         const Text(
                           'Lucky Hand',
-                          style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700),
+                          style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500),
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'Mystery bonus',
-                          style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 12),
-                        ),
-                        const SizedBox(height: 12),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF4CAF50),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Text(
-                            'FREE',
-                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13),
-                          ),
+                          'Free',
+                          style: TextStyle(color: const Color(0xFF22C55E), fontSize: 12, fontWeight: FontWeight.w500),
                         ),
                       ],
                     ),
@@ -1231,31 +1088,18 @@ class _ShopTabState extends State<_ShopTab> with SingleTickerProviderStateMixin 
           const SizedBox(height: 24),
 
           // Hot Deals section label
-          Row(
-            children: [
-              const Text('🔥', style: TextStyle(fontSize: 18)),
-              const SizedBox(width: 8),
-              const Text(
-                'Hot Deals',
-                style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700),
-              ),
-              const Spacer(),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE91E63).withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Text(
-                  'LIMITED',
-                  style: TextStyle(color: Color(0xFFE91E63), fontSize: 10, fontWeight: FontWeight.w700),
-                ),
-              ),
-            ],
+          Text(
+            'Deals',
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.5),
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              letterSpacing: 1,
+            ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
 
-          // Starter Pack
+          // Starter Pack - Simplified
           _HotDealCard(
             title: 'Starter Pack',
             subtitle: 'Perfect for new players',
@@ -1263,9 +1107,9 @@ class _ShopTabState extends State<_ShopTab> with SingleTickerProviderStateMixin 
             items: ['10,000 Chips', '50 Gems', 'Gold Card Back'],
             price: '\$2.99',
             originalPrice: '\$5.99',
-            gradient: [const Color(0xFF2196F3), const Color(0xFF1565C0)],
+            gradient: [Colors.white.withValues(alpha: 0.05), Colors.white.withValues(alpha: 0.02)],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
 
           // VIP Bundle
           _HotDealCard(
@@ -1275,7 +1119,7 @@ class _ShopTabState extends State<_ShopTab> with SingleTickerProviderStateMixin 
             items: ['100,000 Chips', '500 Gems', 'Royal Set'],
             price: '\$19.99',
             originalPrice: '\$49.99',
-            gradient: [const Color(0xFFD4AF37), const Color(0xFFB8860B)],
+            gradient: [Colors.white.withValues(alpha: 0.05), Colors.white.withValues(alpha: 0.02)],
             isBest: true,
           ),
           const SizedBox(height: 30),
@@ -1286,17 +1130,30 @@ class _ShopTabState extends State<_ShopTab> with SingleTickerProviderStateMixin 
 
   Widget _buildCurrencyTab() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Gems Section
-          const _SectionLabel(emoji: '💎', title: 'Gems'),
+          Text(
+            'Gems',
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.5),
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              letterSpacing: 1,
+            ),
+          ),
           const SizedBox(height: 12),
           Row(
             children: [
               Expanded(
-                child: _CurrencyCard(emoji: '💎', amount: '100', price: '\$0.99', color: const Color(0xFF9C27B0)),
+                child: _CurrencyCard(
+                  emoji: '💎',
+                  amount: '100',
+                  price: '\$0.99',
+                  color: Colors.white.withValues(alpha: 0.6),
+                ),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -1304,7 +1161,7 @@ class _ShopTabState extends State<_ShopTab> with SingleTickerProviderStateMixin 
                   emoji: '💎',
                   amount: '500',
                   price: '\$4.99',
-                  color: const Color(0xFF9C27B0),
+                  color: Colors.white.withValues(alpha: 0.6),
                   bonus: '+50',
                 ),
               ),
@@ -1314,7 +1171,7 @@ class _ShopTabState extends State<_ShopTab> with SingleTickerProviderStateMixin 
                   emoji: '💎',
                   amount: '1,200',
                   price: '\$9.99',
-                  color: const Color(0xFF9C27B0),
+                  color: Colors.white.withValues(alpha: 0.6),
                   bonus: '+200',
                   isBest: true,
                 ),
@@ -1329,7 +1186,7 @@ class _ShopTabState extends State<_ShopTab> with SingleTickerProviderStateMixin 
                   emoji: '💎',
                   amount: '2,500',
                   price: '\$19.99',
-                  color: const Color(0xFF9C27B0),
+                  color: Colors.white.withValues(alpha: 0.6),
                   bonus: '+500',
                 ),
               ),
@@ -1339,7 +1196,7 @@ class _ShopTabState extends State<_ShopTab> with SingleTickerProviderStateMixin 
                   emoji: '💎',
                   amount: '6,500',
                   price: '\$49.99',
-                  color: const Color(0xFF9C27B0),
+                  color: Colors.white.withValues(alpha: 0.6),
                   bonus: '+1500',
                 ),
               ),
@@ -1349,21 +1206,34 @@ class _ShopTabState extends State<_ShopTab> with SingleTickerProviderStateMixin 
                   emoji: '💎',
                   amount: '14K',
                   price: '\$99.99',
-                  color: const Color(0xFF9C27B0),
+                  color: Colors.white.withValues(alpha: 0.6),
                   bonus: '+4000',
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 28),
+          const SizedBox(height: 24),
 
           // Chips Section
-          const _SectionLabel(emoji: '🪙', title: 'Chips'),
+          Text(
+            'Chips',
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.5),
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              letterSpacing: 1,
+            ),
+          ),
           const SizedBox(height: 12),
           Row(
             children: [
               Expanded(
-                child: _CurrencyCard(emoji: '🪙', amount: '10K', price: '\$0.99', color: const Color(0xFFD4AF37)),
+                child: _CurrencyCard(
+                  emoji: '🪙',
+                  amount: '10K',
+                  price: '\$0.99',
+                  color: Colors.white.withValues(alpha: 0.6),
+                ),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -1371,7 +1241,7 @@ class _ShopTabState extends State<_ShopTab> with SingleTickerProviderStateMixin 
                   emoji: '🪙',
                   amount: '50K',
                   price: '\$4.99',
-                  color: const Color(0xFFD4AF37),
+                  color: Colors.white.withValues(alpha: 0.6),
                   bonus: '+5K',
                 ),
               ),
@@ -1381,7 +1251,7 @@ class _ShopTabState extends State<_ShopTab> with SingleTickerProviderStateMixin 
                   emoji: '🪙',
                   amount: '150K',
                   price: '\$9.99',
-                  color: const Color(0xFFD4AF37),
+                  color: Colors.white.withValues(alpha: 0.6),
                   bonus: '+25K',
                   isBest: true,
                 ),
@@ -1396,7 +1266,7 @@ class _ShopTabState extends State<_ShopTab> with SingleTickerProviderStateMixin 
                   emoji: '🪙',
                   amount: '500K',
                   price: '\$19.99',
-                  color: const Color(0xFFD4AF37),
+                  color: Colors.white.withValues(alpha: 0.6),
                   bonus: '+100K',
                 ),
               ),
@@ -1406,7 +1276,7 @@ class _ShopTabState extends State<_ShopTab> with SingleTickerProviderStateMixin 
                   emoji: '🪙',
                   amount: '1.5M',
                   price: '\$49.99',
-                  color: const Color(0xFFD4AF37),
+                  color: Colors.white.withValues(alpha: 0.6),
                   bonus: '+350K',
                 ),
               ),
@@ -1416,7 +1286,7 @@ class _ShopTabState extends State<_ShopTab> with SingleTickerProviderStateMixin 
                   emoji: '🪙',
                   amount: '5M',
                   price: '\$99.99',
-                  color: const Color(0xFFD4AF37),
+                  color: Colors.white.withValues(alpha: 0.6),
                   bonus: '+1.5M',
                 ),
               ),
@@ -1430,7 +1300,7 @@ class _ShopTabState extends State<_ShopTab> with SingleTickerProviderStateMixin 
 
   Widget _buildCosmeticsTab() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: const [
@@ -1643,19 +1513,15 @@ class _BalanceChip extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
-      ),
+      decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(8)),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(emoji, style: const TextStyle(fontSize: 14)),
+          Text(emoji, style: const TextStyle(fontSize: 12)),
           const SizedBox(width: 4),
           Text(
             amount,
-            style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+            style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w500),
           ),
         ],
       ),
@@ -1672,20 +1538,19 @@ class _SectionLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Text(emoji, style: const TextStyle(fontSize: 18)),
-        const SizedBox(width: 8),
-        Text(
-          title,
-          style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700),
-        ),
-      ],
+    return Text(
+      title,
+      style: TextStyle(
+        color: Colors.white.withValues(alpha: 0.5),
+        fontSize: 12,
+        fontWeight: FontWeight.w500,
+        letterSpacing: 1,
+      ),
     );
   }
 }
 
-// Currency card widget
+// Currency card widget - Minimalist
 class _CurrencyCard extends StatelessWidget {
   final String emoji;
   final String amount;
@@ -1706,49 +1571,58 @@ class _CurrencyCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 14),
+      padding: const EdgeInsets.symmetric(vertical: 12),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: isBest ? color : color.withValues(alpha: 0.3), width: isBest ? 2 : 1),
+        color: Colors.white.withValues(alpha: 0.03),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: isBest ? Colors.white.withValues(alpha: 0.2) : Colors.white.withValues(alpha: 0.06)),
       ),
       child: Column(
         children: [
           if (isBest)
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               margin: const EdgeInsets.only(bottom: 6),
-              decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(6)),
-              child: const Text(
-                'BEST VALUE',
-                style: TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.w800),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                'BEST',
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 8, fontWeight: FontWeight.w600),
               ),
             )
           else if (bonus != null)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               margin: const EdgeInsets.only(bottom: 6),
-              decoration: BoxDecoration(color: const Color(0xFF4CAF50), borderRadius: BorderRadius.circular(6)),
+              decoration: BoxDecoration(
+                color: const Color(0xFF22C55E).withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(4),
+              ),
               child: Text(
                 bonus!,
-                style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.w700),
+                style: const TextStyle(color: Color(0xFF22C55E), fontSize: 8, fontWeight: FontWeight.w600),
               ),
             )
           else
-            const SizedBox(height: 18),
-          Text(emoji, style: const TextStyle(fontSize: 26)),
+            const SizedBox(height: 16),
+          Text(emoji, style: const TextStyle(fontSize: 22)),
           const SizedBox(height: 4),
           Text(
             amount,
-            style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700),
+            style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500),
           ),
           const SizedBox(height: 8),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8)),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(6),
+            ),
             child: Text(
               price,
-              style: const TextStyle(color: Colors.black, fontSize: 11, fontWeight: FontWeight.w700),
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 10, fontWeight: FontWeight.w500),
             ),
           ),
         ],
@@ -1774,7 +1648,7 @@ class _CosmeticItem extends StatelessWidget {
         width: 90,
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.05),
+          color: Colors.white.withValues(alpha: 0.03),
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
             color: isOwned ? const Color(0xFF4CAF50).withValues(alpha: 0.5) : Colors.white.withValues(alpha: 0.1),
@@ -2252,27 +2126,15 @@ class _HotDealCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [gradient[0].withValues(alpha: 0.3), gradient[1].withValues(alpha: 0.2)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: gradient[0].withValues(alpha: 0.5)),
+        color: Colors.white.withValues(alpha: 0.03),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
       ),
       child: Row(
         children: [
-          Container(
-            width: 60,
-            height: 60,
-            decoration: BoxDecoration(
-              color: gradient[0].withValues(alpha: 0.3),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Center(child: Text(emoji, style: const TextStyle(fontSize: 32))),
-          ),
+          Text(emoji, style: const TextStyle(fontSize: 28)),
           const SizedBox(width: 14),
           Expanded(
             child: Column(
@@ -2282,40 +2144,36 @@ class _HotDealCard extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700),
+                      style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500),
                     ),
                     if (isBest) ...[
                       const SizedBox(width: 8),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFE91E63),
-                          borderRadius: BorderRadius.circular(6),
+                          color: Colors.white.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(4),
                         ),
-                        child: const Text(
+                        child: Text(
                           'BEST',
-                          style: TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.w800),
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.7),
+                            fontSize: 8,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                     ],
                   ],
                 ),
                 const SizedBox(height: 4),
-                Text(subtitle, style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 12)),
-                const SizedBox(height: 6),
                 Wrap(
                   spacing: 4,
                   runSpacing: 2,
                   children: items
                       .map(
-                        (item) => Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(item, style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 9)),
-                        ),
+                        (item) =>
+                            Text(item, style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 11)),
                       )
                       .toList(),
                 ),
@@ -2328,18 +2186,25 @@ class _HotDealCard extends StatelessWidget {
               Text(
                 originalPrice,
                 style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.4),
-                  fontSize: 12,
+                  color: Colors.white.withValues(alpha: 0.3),
+                  fontSize: 11,
                   decoration: TextDecoration.lineThrough,
                 ),
               ),
               const SizedBox(height: 2),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(color: gradient[0], borderRadius: BorderRadius.circular(12)),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
                 child: Text(
                   price,
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14),
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.9),
+                    fontWeight: FontWeight.w500,
+                    fontSize: 13,
+                  ),
                 ),
               ),
             ],
@@ -2350,7 +2215,7 @@ class _HotDealCard extends StatelessWidget {
   }
 }
 
-// Modern chest card widget
+// Modern chest card widget - Simplified
 class _ModernChestCard extends StatelessWidget {
   final String name;
   final String emoji;
@@ -2382,24 +2247,21 @@ class _ModernChestCard extends StatelessWidget {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: gradient[0].withValues(alpha: isBest ? 0.8 : 0.4),
-            width: isBest ? 2 : 1,
-          ),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white.withValues(alpha: isBest ? 0.15 : 0.08), width: 1),
         ),
         child: Row(
           children: [
             Container(
-              width: 70,
-              height: 70,
+              width: 56,
+              height: 56,
               decoration: BoxDecoration(
-                color: gradient[0].withValues(alpha: 0.3),
-                borderRadius: BorderRadius.circular(16),
+                color: Colors.white.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(12),
               ),
-              child: Center(child: Text(emoji, style: const TextStyle(fontSize: 36))),
+              child: Center(child: Text(emoji, style: const TextStyle(fontSize: 28))),
             ),
-            const SizedBox(width: 14),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -2408,37 +2270,45 @@ class _ModernChestCard extends StatelessWidget {
                     children: [
                       Text(
                         name,
-                        style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w700),
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.9),
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 6),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: gradient[0].withValues(alpha: 0.3),
-                          borderRadius: BorderRadius.circular(6),
+                          color: Colors.white.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
                           rarity,
-                          style: TextStyle(color: gradient[0], fontSize: 9, fontWeight: FontWeight.w700),
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.5),
+                            fontSize: 9,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
                   Wrap(
-                    spacing: 6,
+                    spacing: 4,
                     runSpacing: 4,
                     children: rewards
                         .map(
                           (reward) => Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                             decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.08),
-                              borderRadius: BorderRadius.circular(8),
+                              color: Colors.white.withValues(alpha: 0.05),
+                              borderRadius: BorderRadius.circular(6),
                             ),
                             child: Text(
                               reward,
-                              style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 10),
+                              style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 10),
                             ),
                           ),
                         )
@@ -2448,15 +2318,22 @@ class _ModernChestCard extends StatelessWidget {
               ),
             ),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(color: gradient[0], borderRadius: BorderRadius.circular(14)),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
               child: Row(
                 children: [
-                  const Text('💎', style: TextStyle(fontSize: 14)),
+                  Text('💎', style: TextStyle(fontSize: 12)),
                   const SizedBox(width: 4),
                   Text(
                     price.toString(),
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15),
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.9),
+                      fontWeight: FontWeight.w500,
+                      fontSize: 13,
+                    ),
                   ),
                 ],
               ),
@@ -2471,79 +2348,88 @@ class _ModernChestCard extends StatelessWidget {
     showDialog(
       context: context,
       builder: (context) => Dialog(
-        backgroundColor: const Color(0xFF1A1A1A),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        backgroundColor: const Color(0xFF121212),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: Padding(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.all(20),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(emoji, style: const TextStyle(fontSize: 64)),
-              const SizedBox(height: 16),
+              Text(emoji, style: const TextStyle(fontSize: 48)),
+              const SizedBox(height: 12),
               Text(
                 name,
-                style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w700),
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 18, fontWeight: FontWeight.w600),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
                 decoration: BoxDecoration(
-                  color: gradient[0].withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(8),
+                  color: Colors.white.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
                   rarity,
-                  style: TextStyle(color: gradient[0], fontSize: 12, fontWeight: FontWeight.w600),
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.5),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ),
-              const SizedBox(height: 20),
-              Text('Possible Rewards:', style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 13)),
-              const SizedBox(height: 10),
+              const SizedBox(height: 16),
+              Text('Possible Rewards', style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12)),
+              const SizedBox(height: 8),
               ...rewards.map(
                 (r) => Padding(
                   padding: const EdgeInsets.only(bottom: 6),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.check_circle, color: gradient[0], size: 16),
-                      const SizedBox(width: 8),
-                      Text(r, style: const TextStyle(color: Colors.white, fontSize: 14)),
+                      Icon(Icons.check_circle, color: Colors.white.withValues(alpha: 0.5), size: 14),
+                      const SizedBox(width: 6),
+                      Text(r, style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 13)),
                     ],
                   ),
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: () {
                     Navigator.pop(context);
-                    ScaffoldMessenger.of(
-                      context,
-                    ).showSnackBar(SnackBar(content: Text('Opened $name!'), backgroundColor: gradient[0]));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Opened $name!'), backgroundColor: Colors.white.withValues(alpha: 0.2)),
+                    );
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: gradient[0],
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    backgroundColor: Colors.white.withValues(alpha: 0.1),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    elevation: 0,
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Text('💎', style: TextStyle(fontSize: 18)),
-                      const SizedBox(width: 8),
+                      const Text('💎', style: TextStyle(fontSize: 14)),
+                      const SizedBox(width: 6),
                       Text(
                         'Open for $price',
-                        style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700),
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.9),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ],
                   ),
                 ),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: Text('Cancel', style: TextStyle(color: Colors.white.withValues(alpha: 0.5))),
+                child: Text('Cancel', style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 13)),
               ),
             ],
           ),
@@ -2605,25 +2491,28 @@ class _ProfileTabState extends State<_ProfileTab> {
     final parentNavigator = Navigator.of(context);
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF1A1A1A),
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      backgroundColor: const Color(0xFF121212),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
       builder: (sheetContext) => Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(16),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              '🛠️ Developer Menu',
-              style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+            Text(
+              'Developer Menu',
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 16, fontWeight: FontWeight.w600),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
             ListTile(
-              leading: const Icon(Icons.swap_horiz, color: Color(0xFFFF9800)),
-              title: const Text('Switch Test Account', style: TextStyle(color: Colors.white)),
+              leading: Icon(Icons.swap_horiz, color: Colors.white.withValues(alpha: 0.5), size: 20),
+              title: Text(
+                'Switch Test Account',
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 14),
+              ),
               subtitle: Text(
                 'Current: ${AuthService().currentUser?.email ?? "Anonymous"}',
-                style: const TextStyle(color: Colors.white54),
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 12),
               ),
               onTap: () {
                 Navigator.pop(sheetContext);
@@ -2631,28 +2520,49 @@ class _ProfileTabState extends State<_ProfileTab> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.person_add, color: Color(0xFF9C27B0)),
-              title: const Text('Create Test Account', style: TextStyle(color: Colors.white)),
-              subtitle: const Text('Register new test user', style: TextStyle(color: Colors.white54)),
+              leading: Icon(Icons.person_add, color: Colors.white.withValues(alpha: 0.5), size: 20),
+              title: Text(
+                'Create Test Account',
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 14),
+              ),
+              subtitle: Text(
+                'Register new test user',
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 12),
+              ),
               onTap: () {
                 Navigator.pop(sheetContext);
                 _showCreateTestAccount(context);
               },
             ),
             ListTile(
-              leading: const Icon(Icons.add_box, color: Color(0xFF4CAF50)),
-              title: const Text('Add Test Chips', style: TextStyle(color: Colors.white)),
-              subtitle: const Text('+10,000 chips', style: TextStyle(color: Colors.white54)),
+              leading: Icon(Icons.add_box, color: Colors.white.withValues(alpha: 0.5), size: 20),
+              title: Text('Add Test Chips', style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 14)),
+              subtitle: Text(
+                '+10,000 chips',
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 12),
+              ),
               onTap: () async {
                 Navigator.pop(sheetContext);
                 await UserPreferences.addChips(10000);
-                parentScaffoldMessenger.showSnackBar(SnackBar(content: Text('Added 10,000 chips! New balance: ${UserPreferences.formatChips(UserPreferences.chips)}')));
+                parentScaffoldMessenger.showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'Added 10,000 chips! New balance: ${UserPreferences.formatChips(UserPreferences.chips)}',
+                    ),
+                  ),
+                );
               },
             ),
             ListTile(
-              leading: const Icon(Icons.meeting_room, color: Color(0xFF2196F3)),
-              title: const Text('Create Test Room', style: TextStyle(color: Colors.white)),
-              subtitle: const Text('Quick room for testing', style: TextStyle(color: Colors.white54)),
+              leading: Icon(Icons.meeting_room, color: Colors.white.withValues(alpha: 0.5), size: 20),
+              title: Text(
+                'Create Test Room',
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 14),
+              ),
+              subtitle: Text(
+                'Quick room for testing',
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 12),
+              ),
               onTap: () async {
                 Navigator.pop(sheetContext);
                 try {
@@ -2668,9 +2578,15 @@ class _ProfileTabState extends State<_ProfileTab> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.login, color: Color(0xFF00BCD4)),
-              title: const Text('Sign In Anonymously', style: TextStyle(color: Colors.white)),
-              subtitle: const Text('Quick anonymous login', style: TextStyle(color: Colors.white54)),
+              leading: Icon(Icons.login, color: Colors.white.withValues(alpha: 0.5), size: 20),
+              title: Text(
+                'Sign In Anonymously',
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 14),
+              ),
+              subtitle: Text(
+                'Quick anonymous login',
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 12),
+              ),
               onTap: () async {
                 Navigator.pop(sheetContext);
                 try {
@@ -2686,8 +2602,8 @@ class _ProfileTabState extends State<_ProfileTab> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.logout, color: Color(0xFFFF4444)),
-              title: const Text('Sign Out', style: TextStyle(color: Colors.white)),
+              leading: Icon(Icons.logout, color: Colors.white.withValues(alpha: 0.5), size: 20),
+              title: Text('Sign Out', style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 14)),
               onTap: () async {
                 Navigator.pop(sheetContext);
                 try {
@@ -2713,19 +2629,28 @@ class _ProfileTabState extends State<_ProfileTab> {
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1A1A),
-        title: const Text('Switch Test Account', style: TextStyle(color: Colors.white)),
+        backgroundColor: const Color(0xFF121212),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: Text(
+          'Switch Test Account',
+          style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 16, fontWeight: FontWeight.w600),
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('Sign in with email:', style: TextStyle(color: Colors.white70, fontSize: 12)),
+            Text('Sign in with email:', style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 12)),
             const SizedBox(height: 10),
             _buildAccountOption(dialogContext, scaffoldMessenger, 'test1@allin.dev', 'Test123!'),
             _buildAccountOption(dialogContext, scaffoldMessenger, 'test2@allin.dev', 'Test123!'),
             _buildAccountOption(dialogContext, scaffoldMessenger, 'test3@allin.dev', 'Test123!'),
           ],
         ),
-        actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel'))],
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text('Cancel', style: TextStyle(color: Colors.white.withValues(alpha: 0.5))),
+          ),
+        ],
       ),
     );
   }
@@ -2738,27 +2663,31 @@ class _ProfileTabState extends State<_ProfileTab> {
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1A1A),
-        title: const Text('Create Test Account', style: TextStyle(color: Colors.white)),
+        backgroundColor: const Color(0xFF121212),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: Text(
+          'Create Test Account',
+          style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 16, fontWeight: FontWeight.w600),
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
               controller: emailController,
-              style: const TextStyle(color: Colors.white),
-              decoration: const InputDecoration(
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 14),
+              decoration: InputDecoration(
                 hintText: 'Email',
-                hintStyle: TextStyle(color: Colors.white38),
+                hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3)),
               ),
             ),
             const SizedBox(height: 10),
             TextField(
               controller: passwordController,
               obscureText: true,
-              style: const TextStyle(color: Colors.white),
-              decoration: const InputDecoration(
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 14),
+              decoration: InputDecoration(
                 hintText: 'Password (min 6 chars)',
-                hintStyle: TextStyle(color: Colors.white38),
+                hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3)),
               ),
             ),
           ],
@@ -2833,16 +2762,20 @@ class _ProfileTabState extends State<_ProfileTab> {
     return SafeArea(
       child: CustomScrollView(
         slivers: [
-          // Profile Header
+          // Profile Header - Minimalist
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
+                  Text(
                     'Profile',
-                    style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w700),
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.9),
+                      fontSize: 22,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                   Row(
                     children: [
@@ -2850,28 +2783,29 @@ class _ProfileTabState extends State<_ProfileTab> {
                       GestureDetector(
                         onTap: () => _showDevMenu(context),
                         child: Container(
-                          width: 44,
-                          height: 44,
+                          width: 36,
+                          height: 36,
                           margin: const EdgeInsets.only(right: 8),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFFF9800).withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: const Color(0xFFFF9800).withValues(alpha: 0.5)),
+                            color: Colors.white.withValues(alpha: 0.05),
+                            borderRadius: BorderRadius.circular(10),
                           ),
-                          child: const Center(child: Icon(Icons.bug_report, color: Color(0xFFFF9800), size: 22)),
+                          child: Center(
+                            child: Icon(Icons.bug_report, color: Colors.white.withValues(alpha: 0.4), size: 18),
+                          ),
                         ),
                       ),
                       // Settings Button
                       GestureDetector(
                         onTap: () => _showSettings(context),
                         child: Container(
-                          width: 44,
-                          height: 44,
+                          width: 36,
+                          height: 36,
                           decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.06),
-                            borderRadius: BorderRadius.circular(14),
+                            color: Colors.white.withValues(alpha: 0.05),
+                            borderRadius: BorderRadius.circular(10),
                           ),
-                          child: Icon(Icons.settings_outlined, color: Colors.white.withValues(alpha: 0.7), size: 22),
+                          child: Icon(Icons.settings_outlined, color: Colors.white.withValues(alpha: 0.5), size: 18),
                         ),
                       ),
                     ],
@@ -2881,59 +2815,56 @@ class _ProfileTabState extends State<_ProfileTab> {
             ),
           ),
 
-          // Profile Card
+          // Profile Card - Minimalist
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
               child: Container(
-                padding: const EdgeInsets.all(24),
+                padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      const Color(0xFFD4AF37).withValues(alpha: 0.15),
-                      const Color(0xFFD4AF37).withValues(alpha: 0.05),
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: const Color(0xFFD4AF37).withValues(alpha: 0.2)),
+                  color: Colors.white.withValues(alpha: 0.03),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
                 ),
                 child: Column(
                   children: [
                     Container(
-                      width: 80,
-                      height: 80,
+                      width: 56,
+                      height: 56,
                       decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFFD4AF37), Color(0xFFB8860B)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: BorderRadius.circular(24),
+                        color: Colors.white.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(16),
                       ),
-                      child: const Center(child: Text('👤', style: TextStyle(fontSize: 36))),
+                      child: const Center(child: Text('👤', style: TextStyle(fontSize: 26))),
                     ),
-                    const SizedBox(height: 16),
-                    const Text(
+                    const SizedBox(height: 12),
+                    Text(
                       'Player123',
-                      style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w700),
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.9),
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                     const SizedBox(height: 6),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFD4AF37).withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(20),
+                        color: Colors.white.withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(8),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.military_tech, color: Color(0xFF9E9E9E), size: 16),
+                          Icon(Icons.military_tech, color: Colors.white.withValues(alpha: 0.4), size: 14),
                           const SizedBox(width: 4),
-                          const Text(
+                          Text(
                             'Unranked',
-                            style: TextStyle(color: Color(0xFF9E9E9E), fontSize: 13, fontWeight: FontWeight.w600),
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.5),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
                         ],
                       ),
@@ -2944,23 +2875,16 @@ class _ProfileTabState extends State<_ProfileTab> {
             ),
           ),
 
-          // Ranked Season Card
+          // Ranked Season Card - Minimalist
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
               child: Container(
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      const Color(0xFF9C27B0).withValues(alpha: 0.2),
-                      const Color(0xFF673AB7).withValues(alpha: 0.1),
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: const Color(0xFF9C27B0).withValues(alpha: 0.3)),
+                  color: Colors.white.withValues(alpha: 0.03),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -2968,47 +2892,51 @@ class _ProfileTabState extends State<_ProfileTab> {
                     Row(
                       children: [
                         Container(
-                          width: 44,
-                          height: 44,
+                          width: 36,
+                          height: 36,
                           decoration: BoxDecoration(
-                            gradient: const LinearGradient(colors: [Color(0xFF9C27B0), Color(0xFF673AB7)]),
-                            borderRadius: BorderRadius.circular(12),
+                            color: Colors.white.withValues(alpha: 0.05),
+                            borderRadius: BorderRadius.circular(10),
                           ),
-                          child: const Center(child: Text('🏅', style: TextStyle(fontSize: 22))),
+                          child: const Center(child: Text('🏅', style: TextStyle(fontSize: 18))),
                         ),
-                        const SizedBox(width: 14),
+                        const SizedBox(width: 12),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Row(
                                 children: [
-                                  const Text(
+                                  Text(
                                     'Season 1',
-                                    style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFF4CAF50).withValues(alpha: 0.2),
-                                      borderRadius: BorderRadius.circular(8),
+                                    style: TextStyle(
+                                      color: Colors.white.withValues(alpha: 0.9),
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
                                     ),
-                                    child: const Text(
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withValues(alpha: 0.08),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
                                       'ACTIVE',
                                       style: TextStyle(
-                                        color: Color(0xFF4CAF50),
+                                        color: Colors.white.withValues(alpha: 0.5),
                                         fontSize: 9,
-                                        fontWeight: FontWeight.w700,
+                                        fontWeight: FontWeight.w500,
                                       ),
                                     ),
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: 4),
+                              const SizedBox(height: 3),
                               Text(
                                 '28 days remaining',
-                                style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12),
+                                style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 11),
                               ),
                             ],
                           ),
@@ -3016,61 +2944,65 @@ class _ProfileTabState extends State<_ProfileTab> {
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
-                            const Text(
+                            Text(
                               'Bronze III',
-                              style: TextStyle(color: Color(0xFFCD7F32), fontSize: 14, fontWeight: FontWeight.w700),
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.7),
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
                             const SizedBox(height: 2),
                             Text(
                               '0 / 100 RP',
-                              style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 11),
+                              style: TextStyle(color: Colors.white.withValues(alpha: 0.3), fontSize: 10),
                             ),
                           ],
                         ),
                       ],
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 12),
                     // Rank tiers
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
                       children: [
-                        _RankTier(name: 'Bronze', color: const Color(0xFFCD7F32), isActive: true),
-                        _RankTier(name: 'Silver', color: const Color(0xFFC0C0C0), isActive: false),
-                        _RankTier(name: 'Gold', color: const Color(0xFFFFD700), isActive: false),
-                        _RankTier(name: 'Platinum', color: const Color(0xFFE5E4E2), isActive: false),
-                        _RankTier(name: 'Diamond', color: const Color(0xFF00BCD4), isActive: false),
-                        _RankTier(name: 'Champion', color: const Color(0xFFFF6B35), isActive: false),
-                        _RankTier(name: 'Legend', color: const Color(0xFF9C27B0), isActive: false),
+                        _RankTier(name: 'Bronze', color: Colors.white.withValues(alpha: 0.5), isActive: true),
+                        _RankTier(name: 'Silver', color: Colors.white.withValues(alpha: 0.3), isActive: false),
+                        _RankTier(name: 'Gold', color: Colors.white.withValues(alpha: 0.3), isActive: false),
+                        _RankTier(name: 'Platinum', color: Colors.white.withValues(alpha: 0.3), isActive: false),
+                        _RankTier(name: 'Diamond', color: Colors.white.withValues(alpha: 0.3), isActive: false),
+                        _RankTier(name: 'Champion', color: Colors.white.withValues(alpha: 0.3), isActive: false),
+                        _RankTier(name: 'Legend', color: Colors.white.withValues(alpha: 0.3), isActive: false),
                       ],
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 12),
                     // Progress bar
                     Stack(
                       children: [
                         Container(
-                          height: 8,
+                          height: 4,
                           decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(4),
+                            color: Colors.white.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(2),
                           ),
                         ),
                         Container(
-                          height: 8,
+                          height: 4,
                           width: 0, // 0% progress
                           decoration: BoxDecoration(
-                            gradient: const LinearGradient(colors: [Color(0xFFCD7F32), Color(0xFFB87333)]),
-                            borderRadius: BorderRadius.circular(4),
+                            color: Colors.white.withValues(alpha: 0.3),
+                            borderRadius: BorderRadius.circular(2),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 10),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(
-                          'Win ranked games to earn RP and climb!',
-                          style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12),
+                          'Win ranked games to earn RP and climb',
+                          style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 11),
                         ),
                       ],
                     ),
@@ -3080,10 +3012,10 @@ class _ProfileTabState extends State<_ProfileTab> {
             ),
           ),
 
-          // Friends Online
+          // Friends Online - Minimalist
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 28, 20, 0),
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -3091,54 +3023,58 @@ class _ProfileTabState extends State<_ProfileTab> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        'FRIENDS',
+                        'Friends',
                         style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.4),
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 1.5,
+                          color: Colors.white.withValues(alpha: 0.5),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                       GestureDetector(
                         onTap: _showFriendsListDialog,
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF4CAF50).withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(10),
+                            color: Colors.white.withValues(alpha: 0.05),
+                            borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
                             '${_friends.where((f) => f.isOnline).length} online',
-                            style: const TextStyle(color: Color(0xFF4CAF50), fontSize: 11, fontWeight: FontWeight.w600),
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.5),
+                              fontSize: 10,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 10),
                   Container(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.04),
-                      borderRadius: BorderRadius.circular(16),
+                      color: Colors.white.withValues(alpha: 0.03),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
                     ),
                     child: Column(
                       children: [
                         if (_friends.isEmpty)
                           Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 20),
+                            padding: const EdgeInsets.symmetric(vertical: 16),
                             child: Column(
                               children: [
-                                Icon(Icons.people_outline, color: Colors.white.withValues(alpha: 0.3), size: 40),
-                                const SizedBox(height: 8),
+                                Icon(Icons.people_outline, color: Colors.white.withValues(alpha: 0.2), size: 32),
+                                const SizedBox(height: 6),
                                 Text(
                                   'No friends yet',
-                                  style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13),
+                                  style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 12),
                                 ),
-                                const SizedBox(height: 4),
+                                const SizedBox(height: 2),
                                 Text(
-                                  'Add friends to play together!',
-                                  style: TextStyle(color: Colors.white.withValues(alpha: 0.3), fontSize: 12),
+                                  'Add friends to play together',
+                                  style: TextStyle(color: Colors.white.withValues(alpha: 0.25), fontSize: 11),
                                 ),
                               ],
                             ),
@@ -3158,33 +3094,33 @@ class _ProfileTabState extends State<_ProfileTab> {
                                 )
                                 .toList(),
                           ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 12),
                         Row(
                           children: [
                             Expanded(
                               child: OutlinedButton.icon(
                                 onPressed: _showAddFriendDialog,
-                                icon: const Icon(Icons.person_add_outlined, size: 18),
-                                label: const Text('Add Friend'),
+                                icon: const Icon(Icons.person_add_outlined, size: 16),
+                                label: Text('Add Friend', style: TextStyle(fontSize: 12)),
                                 style: OutlinedButton.styleFrom(
-                                  foregroundColor: Colors.white,
-                                  side: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                  foregroundColor: Colors.white.withValues(alpha: 0.7),
+                                  side: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+                                  padding: const EdgeInsets.symmetric(vertical: 10),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: 10),
                             Expanded(
                               child: OutlinedButton.icon(
                                 onPressed: _showFriendsListDialog,
-                                icon: const Icon(Icons.people_outline, size: 18),
-                                label: const Text('View All'),
+                                icon: const Icon(Icons.people_outline, size: 16),
+                                label: Text('View All', style: TextStyle(fontSize: 12)),
                                 style: OutlinedButton.styleFrom(
-                                  foregroundColor: Colors.white,
-                                  side: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                  foregroundColor: Colors.white.withValues(alpha: 0.7),
+                                  side: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+                                  padding: const EdgeInsets.symmetric(vertical: 10),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                                 ),
                               ),
                             ),
@@ -3201,48 +3137,47 @@ class _ProfileTabState extends State<_ProfileTab> {
           // Statistics Dropdown
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 28, 20, 0),
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   GestureDetector(
                     onTap: () => setState(() => _statisticsExpanded = !_statisticsExpanded),
                     child: Container(
-                      padding: const EdgeInsets.all(18),
+                      padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            const Color(0xFF2196F3).withValues(alpha: 0.15),
-                            const Color(0xFF2196F3).withValues(alpha: 0.05),
-                          ],
-                        ),
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(color: const Color(0xFF2196F3).withValues(alpha: 0.3)),
+                        color: Colors.white.withValues(alpha: 0.03),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
                       ),
                       child: Row(
                         children: [
                           Container(
-                            width: 48,
-                            height: 48,
+                            width: 36,
+                            height: 36,
                             decoration: BoxDecoration(
-                              color: const Color(0xFF2196F3).withValues(alpha: 0.2),
-                              borderRadius: BorderRadius.circular(14),
+                              color: Colors.white.withValues(alpha: 0.05),
+                              borderRadius: BorderRadius.circular(10),
                             ),
-                            child: const Center(child: Text('📊', style: TextStyle(fontSize: 24))),
+                            child: const Center(child: Text('📊', style: TextStyle(fontSize: 18))),
                           ),
-                          const SizedBox(width: 14),
+                          const SizedBox(width: 12),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text(
+                                Text(
                                   'Statistics',
-                                  style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700),
+                                  style: TextStyle(
+                                    color: Colors.white.withValues(alpha: 0.9),
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
-                                const SizedBox(height: 4),
+                                const SizedBox(height: 2),
                                 Text(
                                   '0 games played',
-                                  style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13),
+                                  style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 11),
                                 ),
                               ],
                             ),
@@ -3252,8 +3187,8 @@ class _ProfileTabState extends State<_ProfileTab> {
                             duration: const Duration(milliseconds: 200),
                             child: Icon(
                               Icons.keyboard_arrow_down,
-                              color: Colors.white.withValues(alpha: 0.5),
-                              size: 28,
+                              color: Colors.white.withValues(alpha: 0.4),
+                              size: 22,
                             ),
                           ),
                         ],
@@ -3269,7 +3204,7 @@ class _ProfileTabState extends State<_ProfileTab> {
           if (_statisticsExpanded)
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
                 child: Column(
                   children: [
                     Row(
@@ -3277,71 +3212,72 @@ class _ProfileTabState extends State<_ProfileTab> {
                         const Expanded(
                           child: _StatCard(value: '0', label: 'Games'),
                         ),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: 8),
                         const Expanded(
                           child: _StatCard(value: '0', label: 'Wins'),
                         ),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: 8),
                         const Expanded(
                           child: _StatCard(value: '0%', label: 'Win Rate'),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 8),
                     Row(
                       children: [
                         const Expanded(
                           child: _StatCard(value: '0', label: 'Best Streak'),
                         ),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: 8),
                         const Expanded(
                           child: _StatCard(value: '0', label: 'Earnings'),
                         ),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: 8),
                         const Expanded(
                           child: _StatCard(value: 'Lv.1', label: 'Level'),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 8),
                     Row(
                       children: [
                         const Expanded(
                           child: _StatCard(value: '-', label: 'Rank'),
                         ),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: 8),
                         const Expanded(
                           child: _StatCard(value: '1,000', label: 'ELO'),
                         ),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: 8),
                         const Expanded(
                           child: _StatCard(value: '0', label: 'Trophies'),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 8),
                     Row(
                       children: [
                         const Expanded(
                           child: _StatCard(value: '0', label: 'Duels Won'),
                         ),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: 8),
                         const Expanded(
                           child: _StatCard(value: '0', label: 'Tournaments'),
                         ),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: 8),
                         const Expanded(
                           child: _StatCard(value: '0', label: 'Hands'),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 16),
                     // Profit/Loss Graph
                     Container(
-                      padding: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.04),
-                        borderRadius: BorderRadius.circular(16),
+                        color: Colors.white.withValues(alpha: 0.03),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -3349,40 +3285,48 @@ class _ProfileTabState extends State<_ProfileTab> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              const Text(
+                              Text(
                                 'Chip Balance History',
-                                style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600),
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.8),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                ),
                               ),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF4CAF50).withValues(alpha: 0.2),
-                                  borderRadius: BorderRadius.circular(8),
+                                  color: Colors.white.withValues(alpha: 0.05),
+                                  borderRadius: BorderRadius.circular(4),
                                 ),
-                                child: const Text(
+                                child: Text(
                                   '7 Days',
-                                  style: TextStyle(color: Color(0xFF4CAF50), fontSize: 10, fontWeight: FontWeight.w600),
+                                  style: TextStyle(
+                                    color: Colors.white.withValues(alpha: 0.5),
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w500,
+                                  ),
                                 ),
                               ),
                             ],
                           ),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 12),
                           // Simple line graph representation
                           SizedBox(
-                            height: 100,
-                            child: CustomPaint(size: const Size(double.infinity, 100), painter: _ChipGraphPainter()),
+                            height: 80,
+                            child: CustomPaint(size: const Size(double.infinity, 80), painter: _ChipGraphPainter()),
                           ),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 8),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text('Mon', style: TextStyle(color: Colors.white.withValues(alpha: 0.3), fontSize: 10)),
-                              Text('Tue', style: TextStyle(color: Colors.white.withValues(alpha: 0.3), fontSize: 10)),
-                              Text('Wed', style: TextStyle(color: Colors.white.withValues(alpha: 0.3), fontSize: 10)),
-                              Text('Thu', style: TextStyle(color: Colors.white.withValues(alpha: 0.3), fontSize: 10)),
-                              Text('Fri', style: TextStyle(color: Colors.white.withValues(alpha: 0.3), fontSize: 10)),
-                              Text('Sat', style: TextStyle(color: Colors.white.withValues(alpha: 0.3), fontSize: 10)),
-                              Text('Sun', style: TextStyle(color: Colors.white.withValues(alpha: 0.3), fontSize: 10)),
+                              Text('Mon', style: TextStyle(color: Colors.white.withValues(alpha: 0.25), fontSize: 9)),
+                              Text('Tue', style: TextStyle(color: Colors.white.withValues(alpha: 0.25), fontSize: 9)),
+                              Text('Wed', style: TextStyle(color: Colors.white.withValues(alpha: 0.25), fontSize: 9)),
+                              Text('Thu', style: TextStyle(color: Colors.white.withValues(alpha: 0.25), fontSize: 9)),
+                              Text('Fri', style: TextStyle(color: Colors.white.withValues(alpha: 0.25), fontSize: 9)),
+                              Text('Sat', style: TextStyle(color: Colors.white.withValues(alpha: 0.25), fontSize: 9)),
+                              Text('Sun', style: TextStyle(color: Colors.white.withValues(alpha: 0.25), fontSize: 9)),
                             ],
                           ),
                         ],
@@ -3393,51 +3337,50 @@ class _ProfileTabState extends State<_ProfileTab> {
               ),
             ),
 
-          // Achievements Dropdown
+          // Achievements Dropdown - Minimalist
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 28, 20, 0),
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   GestureDetector(
                     onTap: () => setState(() => _achievementsExpanded = !_achievementsExpanded),
                     child: Container(
-                      padding: const EdgeInsets.all(18),
+                      padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            const Color(0xFFD4AF37).withValues(alpha: 0.15),
-                            const Color(0xFFD4AF37).withValues(alpha: 0.05),
-                          ],
-                        ),
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(color: const Color(0xFFD4AF37).withValues(alpha: 0.3)),
+                        color: Colors.white.withValues(alpha: 0.03),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
                       ),
                       child: Row(
                         children: [
                           Container(
-                            width: 48,
-                            height: 48,
+                            width: 36,
+                            height: 36,
                             decoration: BoxDecoration(
-                              color: const Color(0xFFD4AF37).withValues(alpha: 0.2),
-                              borderRadius: BorderRadius.circular(14),
+                              color: Colors.white.withValues(alpha: 0.05),
+                              borderRadius: BorderRadius.circular(10),
                             ),
-                            child: const Center(child: Text('🏆', style: TextStyle(fontSize: 24))),
+                            child: const Center(child: Text('🏆', style: TextStyle(fontSize: 18))),
                           ),
-                          const SizedBox(width: 14),
+                          const SizedBox(width: 12),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text(
+                                Text(
                                   'Achievements',
-                                  style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700),
+                                  style: TextStyle(
+                                    color: Colors.white.withValues(alpha: 0.9),
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
-                                const SizedBox(height: 4),
+                                const SizedBox(height: 2),
                                 Text(
                                   '0 / 100 Unlocked',
-                                  style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13),
+                                  style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 11),
                                 ),
                               ],
                             ),
@@ -3447,8 +3390,8 @@ class _ProfileTabState extends State<_ProfileTab> {
                             duration: const Duration(milliseconds: 200),
                             child: Icon(
                               Icons.keyboard_arrow_down,
-                              color: Colors.white.withValues(alpha: 0.5),
-                              size: 28,
+                              color: Colors.white.withValues(alpha: 0.4),
+                              size: 22,
                             ),
                           ),
                         ],
@@ -3463,12 +3406,12 @@ class _ProfileTabState extends State<_ProfileTab> {
           // Achievement Grid (Expandable)
           if (_achievementsExpanded)
             SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
               sliver: SliverGrid(
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 4,
-                  mainAxisSpacing: 10,
-                  crossAxisSpacing: 10,
+                  mainAxisSpacing: 8,
+                  crossAxisSpacing: 8,
                   childAspectRatio: 0.75,
                 ),
                 delegate: SliverChildBuilderDelegate(
@@ -3478,10 +3421,10 @@ class _ProfileTabState extends State<_ProfileTab> {
               ),
             ),
 
-          // Season Pass
+          // Season Pass - Minimalist
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 28, 20, 30),
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -3489,39 +3432,37 @@ class _ProfileTabState extends State<_ProfileTab> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        'SEASON PASS',
+                        'Season Pass',
                         style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.4),
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 1.5,
+                          color: Colors.white.withValues(alpha: 0.5),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFD4AF37).withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(10),
+                          color: Colors.white.withValues(alpha: 0.05),
+                          borderRadius: BorderRadius.circular(4),
                         ),
-                        child: const Text(
+                        child: Text(
                           'FREE',
-                          style: TextStyle(color: Color(0xFFD4AF37), fontSize: 10, fontWeight: FontWeight.w700),
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.5),
+                            fontSize: 9,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 10),
                   Container(
-                    padding: const EdgeInsets.all(20),
+                    padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          const Color(0xFF4CAF50).withValues(alpha: 0.15),
-                          const Color(0xFF4CAF50).withValues(alpha: 0.05),
-                        ],
-                      ),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: const Color(0xFF4CAF50).withValues(alpha: 0.2)),
+                      color: Colors.white.withValues(alpha: 0.03),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
                     ),
                     child: Column(
                       children: [
@@ -3530,31 +3471,35 @@ class _ProfileTabState extends State<_ProfileTab> {
                           children: [
                             Row(
                               children: [
-                                const Text('🏆', style: TextStyle(fontSize: 24)),
-                                const SizedBox(width: 10),
-                                const Text(
+                                const Text('🏆', style: TextStyle(fontSize: 18)),
+                                const SizedBox(width: 8),
+                                Text(
                                   'Tier 1',
-                                  style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700),
+                                  style: TextStyle(
+                                    color: Colors.white.withValues(alpha: 0.9),
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                               ],
                             ),
                             Text(
                               '0 / 1000 XP',
-                              style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 13),
+                              style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 11),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 14),
+                        const SizedBox(height: 10),
                         ClipRRect(
-                          borderRadius: BorderRadius.circular(6),
+                          borderRadius: BorderRadius.circular(3),
                           child: LinearProgressIndicator(
                             value: 0.0,
-                            backgroundColor: Colors.white.withValues(alpha: 0.1),
-                            valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF4CAF50)),
-                            minHeight: 8,
+                            backgroundColor: Colors.white.withValues(alpha: 0.08),
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white.withValues(alpha: 0.3)),
+                            minHeight: 4,
                           ),
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 12),
                         // Tier rewards preview
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -3566,15 +3511,15 @@ class _ProfileTabState extends State<_ProfileTab> {
                             _TierReward(emoji: '👑', label: 'Tier 5', isFree: false),
                           ],
                         ),
-                        const SizedBox(height: 16),
-                        // Premium Pass Button - integrated into Season Pass
+                        const SizedBox(height: 12),
+                        // Premium Pass Button
                         GestureDetector(
                           onTap: () => _showPremiumPassDialog(context),
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                             decoration: BoxDecoration(
-                              gradient: const LinearGradient(colors: [Color(0xFFD4AF37), Color(0xFFB8860B)]),
-                              borderRadius: BorderRadius.circular(14),
+                              color: Colors.white.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(10),
                             ),
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -3582,50 +3527,50 @@ class _ProfileTabState extends State<_ProfileTab> {
                                 Row(
                                   children: [
                                     Container(
-                                      width: 36,
-                                      height: 36,
+                                      width: 28,
+                                      height: 28,
                                       decoration: BoxDecoration(
-                                        color: Colors.white.withValues(alpha: 0.2),
-                                        borderRadius: BorderRadius.circular(10),
+                                        color: Colors.white.withValues(alpha: 0.08),
+                                        borderRadius: BorderRadius.circular(8),
                                       ),
-                                      child: const Center(child: Text('👑', style: TextStyle(fontSize: 18))),
+                                      child: const Center(child: Text('👑', style: TextStyle(fontSize: 14))),
                                     ),
-                                    const SizedBox(width: 12),
+                                    const SizedBox(width: 10),
                                     Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        const Text(
+                                        Text(
                                           'Premium Pass',
                                           style: TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w700,
+                                            color: Colors.white.withValues(alpha: 0.9),
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
                                           ),
                                         ),
                                         Text(
-                                          'Unlock exclusive rewards & 2x XP!',
-                                          style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 11),
+                                          'Unlock exclusive rewards & 2x XP',
+                                          style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 10),
                                         ),
                                       ],
                                     ),
                                   ],
                                 ),
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                   decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(10),
+                                    color: Colors.white.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(6),
                                   ),
                                   child: Row(
                                     children: [
-                                      const Text('💎', style: TextStyle(fontSize: 12)),
-                                      const SizedBox(width: 4),
-                                      const Text(
+                                      const Text('💎', style: TextStyle(fontSize: 11)),
+                                      const SizedBox(width: 3),
+                                      Text(
                                         '500',
                                         style: TextStyle(
-                                          color: Color(0xFFB8860B),
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w700,
+                                          color: Colors.white.withValues(alpha: 0.8),
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w500,
                                         ),
                                       ),
                                     ],
@@ -3643,51 +3588,50 @@ class _ProfileTabState extends State<_ProfileTab> {
             ),
           ),
 
-          // Referral Section
+          // Referral Section - Minimalist
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 28, 20, 0),
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   GestureDetector(
                     onTap: () => setState(() => _referralExpanded = !_referralExpanded),
                     child: Container(
-                      padding: const EdgeInsets.all(18),
+                      padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            const Color(0xFF4CAF50).withValues(alpha: 0.15),
-                            const Color(0xFF4CAF50).withValues(alpha: 0.05),
-                          ],
-                        ),
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(color: const Color(0xFF4CAF50).withValues(alpha: 0.3)),
+                        color: Colors.white.withValues(alpha: 0.03),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
                       ),
                       child: Row(
                         children: [
                           Container(
-                            width: 48,
-                            height: 48,
+                            width: 36,
+                            height: 36,
                             decoration: BoxDecoration(
-                              color: const Color(0xFF4CAF50).withValues(alpha: 0.2),
-                              borderRadius: BorderRadius.circular(14),
+                              color: Colors.white.withValues(alpha: 0.05),
+                              borderRadius: BorderRadius.circular(10),
                             ),
-                            child: const Center(child: Text('🎁', style: TextStyle(fontSize: 24))),
+                            child: const Center(child: Text('🎁', style: TextStyle(fontSize: 18))),
                           ),
-                          const SizedBox(width: 14),
+                          const SizedBox(width: 12),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text(
+                                Text(
                                   'Invite Friends',
-                                  style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700),
+                                  style: TextStyle(
+                                    color: Colors.white.withValues(alpha: 0.9),
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
-                                const SizedBox(height: 4),
+                                const SizedBox(height: 2),
                                 Text(
                                   'Earn rewards for referrals',
-                                  style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13),
+                                  style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 11),
                                 ),
                               ],
                             ),
@@ -3695,19 +3639,24 @@ class _ProfileTabState extends State<_ProfileTab> {
                           AnimatedRotation(
                             turns: _referralExpanded ? 0.5 : 0,
                             duration: const Duration(milliseconds: 200),
-                            child: Icon(Icons.keyboard_arrow_down, color: Colors.white.withValues(alpha: 0.5)),
+                            child: Icon(
+                              Icons.keyboard_arrow_down,
+                              color: Colors.white.withValues(alpha: 0.4),
+                              size: 22,
+                            ),
                           ),
                         ],
                       ),
                     ),
                   ),
                   if (_referralExpanded) ...[
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 10),
                     Container(
-                      padding: const EdgeInsets.all(18),
+                      padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.04),
-                        borderRadius: BorderRadius.circular(16),
+                        color: Colors.white.withValues(alpha: 0.03),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
                       ),
                       child: Column(
                         children: [
@@ -3716,44 +3665,48 @@ class _ProfileTabState extends State<_ProfileTab> {
                             children: [
                               Text(
                                 'Your Referral Code',
-                                style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13),
+                                style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 11),
                               ),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF4CAF50).withValues(alpha: 0.2),
-                                  borderRadius: BorderRadius.circular(8),
+                                  color: Colors.white.withValues(alpha: 0.05),
+                                  borderRadius: BorderRadius.circular(4),
                                 ),
-                                child: const Text(
+                                child: Text(
                                   '0 invited',
-                                  style: TextStyle(color: Color(0xFF4CAF50), fontSize: 11, fontWeight: FontWeight.w600),
+                                  style: TextStyle(
+                                    color: Colors.white.withValues(alpha: 0.5),
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w500,
+                                  ),
                                 ),
                               ),
                             ],
                           ),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 10),
                           Container(
-                            padding: const EdgeInsets.all(14),
+                            padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.06),
-                              borderRadius: BorderRadius.circular(12),
+                              color: Colors.white.withValues(alpha: 0.04),
+                              borderRadius: BorderRadius.circular(8),
                             ),
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                const Text(
+                                Text(
                                   'ALLIN-ABC123',
                                   style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w700,
-                                    letterSpacing: 2,
+                                    color: Colors.white.withValues(alpha: 0.8),
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    letterSpacing: 1.5,
                                   ),
                                 ),
-                                const SizedBox(width: 12),
+                                const SizedBox(width: 10),
                                 GestureDetector(
                                   onTap: () {},
-                                  child: Icon(Icons.copy, color: Colors.white.withValues(alpha: 0.5), size: 20),
+                                  child: Icon(Icons.copy, color: Colors.white.withValues(alpha: 0.4), size: 18),
                                 ),
                               ],
                             ),
@@ -4194,28 +4147,28 @@ class _QuickPlayCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.all(18),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          gradient: LinearGradient(colors: gradient, begin: Alignment.topLeft, end: Alignment.bottomRight),
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [BoxShadow(color: gradient[0].withValues(alpha: 0.3), blurRadius: 12, offset: const Offset(0, 4))],
+          color: gradient[0].withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: gradient[0].withValues(alpha: 0.25)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(emoji, style: const TextStyle(fontSize: 32)),
-            const SizedBox(height: 12),
+            Text(emoji, style: const TextStyle(fontSize: 24)),
+            const SizedBox(height: 10),
             Text(
               title,
               style: const TextStyle(
                 color: Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.w800,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
                 letterSpacing: 0.5,
               ),
             ),
             const SizedBox(height: 2),
-            Text(subtitle, style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 13)),
+            Text(subtitle, style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12)),
           ],
         ),
       ),
@@ -4284,16 +4237,20 @@ class _StatCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 18),
-      decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.04), borderRadius: BorderRadius.circular(14)),
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.03),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+      ),
       child: Column(
         children: [
           Text(
             value,
-            style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700),
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 16, fontWeight: FontWeight.w600),
           ),
-          const SizedBox(height: 4),
-          Text(label, style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 11)),
+          const SizedBox(height: 2),
+          Text(label, style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 10)),
         ],
       ),
     );
@@ -4313,16 +4270,20 @@ class _FriendAvatar extends StatelessWidget {
         Stack(
           children: [
             Container(
-              width: 48,
-              height: 48,
+              width: 40,
+              height: 40,
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(14),
+                color: Colors.white.withValues(alpha: 0.06),
+                borderRadius: BorderRadius.circular(12),
               ),
               child: Center(
                 child: Text(
                   name[0],
-                  style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600),
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.7),
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ),
             ),
@@ -5078,82 +5039,78 @@ class _AchievementCard extends StatelessWidget {
     showDialog(
       context: context,
       builder: (context) => Dialog(
-        backgroundColor: const Color(0xFF1A1A1A),
+        backgroundColor: const Color(0xFF121212),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(14),
           side: BorderSide(
-            color: isUnlocked ? const Color(0xFFD4AF37).withValues(alpha: 0.5) : Colors.white.withValues(alpha: 0.1),
-            width: 2,
+            color: isUnlocked ? Colors.white.withValues(alpha: 0.15) : Colors.white.withValues(alpha: 0.08),
+            width: 1,
           ),
         ),
         child: Padding(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.all(20),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                width: 70,
-                height: 70,
+                width: 56,
+                height: 56,
                 decoration: BoxDecoration(
-                  color: isUnlocked
-                      ? const Color(0xFFD4AF37).withValues(alpha: 0.2)
-                      : Colors.white.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(16),
+                  color: isUnlocked ? Colors.white.withValues(alpha: 0.1) : Colors.white.withValues(alpha: 0.05),
+                  borderRadius: BorderRadius.circular(14),
                   border: Border.all(
-                    color: isUnlocked
-                        ? const Color(0xFFD4AF37).withValues(alpha: 0.5)
-                        : Colors.white.withValues(alpha: 0.1),
-                    width: 2,
+                    color: isUnlocked ? Colors.white.withValues(alpha: 0.15) : Colors.white.withValues(alpha: 0.08),
+                    width: 1,
                   ),
                 ),
                 child: Center(
-                  child: Text(emoji, style: TextStyle(fontSize: 36, color: isUnlocked ? null : Colors.grey)),
+                  child: Text(emoji, style: TextStyle(fontSize: 26, color: isUnlocked ? null : Colors.grey)),
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
               Text(
                 title,
                 style: TextStyle(
-                  color: isUnlocked ? const Color(0xFFD4AF37) : Colors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
+                  color: isUnlocked ? Colors.white.withValues(alpha: 0.9) : Colors.white.withValues(alpha: 0.7),
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
                 ),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.05),
-                  borderRadius: BorderRadius.circular(12),
+                  color: Colors.white.withValues(alpha: 0.04),
+                  borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
                   description,
-                  style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 14),
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 12),
                   textAlign: TextAlign.center,
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
               if (isUnlocked)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF4CAF50).withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: const Color(0xFF4CAF50).withValues(alpha: 0.5)),
+                    color: Colors.white.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
                   ),
-                  child: const Row(
+                  child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.check_circle, color: Color(0xFF4CAF50), size: 16),
-                      SizedBox(width: 6),
+                      Icon(Icons.check_circle, color: Colors.white.withValues(alpha: 0.6), size: 14),
+                      SizedBox(width: 4),
                       Text(
                         'UNLOCKED',
                         style: TextStyle(
-                          color: Color(0xFF4CAF50),
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 1,
+                          color: Colors.white.withValues(alpha: 0.6),
+                          fontSize: 10,
+                          fontWeight: FontWeight.w500,
+                          letterSpacing: 0.5,
                         ),
                       ),
                     ],
@@ -5164,18 +5121,18 @@ class _AchievementCard extends StatelessWidget {
                   children: [
                     Text(
                       '${(progress * 100).toInt()}% Complete',
-                      style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12),
+                      style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 10),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 6),
                     SizedBox(
-                      width: 150,
+                      width: 120,
                       child: ClipRRect(
-                        borderRadius: BorderRadius.circular(4),
+                        borderRadius: BorderRadius.circular(2),
                         child: LinearProgressIndicator(
                           value: progress,
-                          backgroundColor: Colors.white.withValues(alpha: 0.1),
-                          valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFFD4AF37)),
-                          minHeight: 6,
+                          backgroundColor: Colors.white.withValues(alpha: 0.08),
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white.withValues(alpha: 0.4)),
+                          minHeight: 4,
                         ),
                       ),
                     ),
@@ -5183,39 +5140,43 @@ class _AchievementCard extends StatelessWidget {
                 )
               else
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.05),
-                    borderRadius: BorderRadius.circular(20),
+                    color: Colors.white.withValues(alpha: 0.04),
+                    borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.lock_outline, color: Colors.white.withValues(alpha: 0.4), size: 16),
-                      const SizedBox(width: 6),
+                      Icon(Icons.lock_outline, color: Colors.white.withValues(alpha: 0.3), size: 14),
+                      const SizedBox(width: 4),
                       Text(
                         'LOCKED',
                         style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.4),
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 1,
+                          color: Colors.white.withValues(alpha: 0.3),
+                          fontSize: 10,
+                          fontWeight: FontWeight.w500,
+                          letterSpacing: 0.5,
                         ),
                       ),
                     ],
                   ),
                 ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
               TextButton(
                 onPressed: () => Navigator.pop(context),
                 style: TextButton.styleFrom(
-                  backgroundColor: Colors.white.withValues(alpha: 0.1),
-                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  backgroundColor: Colors.white.withValues(alpha: 0.08),
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
-                child: const Text(
+                child: Text(
                   'Close',
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.7),
+                    fontWeight: FontWeight.w500,
+                    fontSize: 13,
+                  ),
                 ),
               ),
             ],
@@ -5230,13 +5191,13 @@ class _AchievementCard extends StatelessWidget {
     return GestureDetector(
       onTap: () => _showAchievementDialog(context),
       child: Container(
-        padding: const EdgeInsets.all(8),
+        padding: const EdgeInsets.all(6),
         decoration: BoxDecoration(
-          color: isUnlocked ? const Color(0xFFD4AF37).withValues(alpha: 0.1) : Colors.white.withValues(alpha: 0.04),
-          borderRadius: BorderRadius.circular(14),
+          color: isUnlocked ? Colors.white.withValues(alpha: 0.06) : Colors.white.withValues(alpha: 0.03),
+          borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: isUnlocked ? const Color(0xFFD4AF37).withValues(alpha: 0.4) : Colors.white.withValues(alpha: 0.08),
-            width: 1.5,
+            color: isUnlocked ? Colors.white.withValues(alpha: 0.12) : Colors.white.withValues(alpha: 0.06),
+            width: 1,
           ),
         ),
         child: Column(
@@ -5246,16 +5207,14 @@ class _AchievementCard extends StatelessWidget {
               alignment: Alignment.center,
               children: [
                 Container(
-                  width: 36,
-                  height: 36,
+                  width: 32,
+                  height: 32,
                   decoration: BoxDecoration(
-                    color: isUnlocked
-                        ? const Color(0xFFD4AF37).withValues(alpha: 0.2)
-                        : Colors.white.withValues(alpha: 0.06),
-                    borderRadius: BorderRadius.circular(10),
+                    color: isUnlocked ? Colors.white.withValues(alpha: 0.08) : Colors.white.withValues(alpha: 0.04),
+                    borderRadius: BorderRadius.circular(8),
                   ),
                   child: Center(
-                    child: Text(emoji, style: TextStyle(fontSize: 18, color: isUnlocked ? null : Colors.grey)),
+                    child: Text(emoji, style: TextStyle(fontSize: 16, color: isUnlocked ? null : Colors.grey)),
                   ),
                 ),
                 if (isUnlocked)
@@ -5263,25 +5222,25 @@ class _AchievementCard extends StatelessWidget {
                     right: -2,
                     bottom: -2,
                     child: Container(
-                      width: 14,
-                      height: 14,
+                      width: 12,
+                      height: 12,
                       decoration: BoxDecoration(
-                        color: const Color(0xFF4CAF50),
+                        color: Colors.white.withValues(alpha: 0.3),
                         shape: BoxShape.circle,
-                        border: Border.all(color: const Color(0xFF1A1A1A), width: 2),
+                        border: Border.all(color: const Color(0xFF0A0A0A), width: 1.5),
                       ),
-                      child: const Icon(Icons.check, color: Colors.white, size: 8),
+                      child: const Icon(Icons.check, color: Colors.white, size: 7),
                     ),
                   ),
               ],
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 4),
             Text(
               title,
               style: TextStyle(
-                color: isUnlocked ? Colors.white : Colors.white.withValues(alpha: 0.6),
-                fontSize: 9,
-                fontWeight: FontWeight.w600,
+                color: isUnlocked ? Colors.white.withValues(alpha: 0.8) : Colors.white.withValues(alpha: 0.5),
+                fontSize: 8,
+                fontWeight: FontWeight.w500,
               ),
               textAlign: TextAlign.center,
               maxLines: 2,
@@ -5322,24 +5281,28 @@ class _RankTier extends StatelessWidget {
     return Column(
       children: [
         Container(
-          width: 32,
-          height: 32,
+          width: 28,
+          height: 28,
           decoration: BoxDecoration(
-            color: isActive ? color.withValues(alpha: 0.3) : Colors.white.withValues(alpha: 0.05),
-            borderRadius: BorderRadius.circular(8),
-            border: isActive ? Border.all(color: color, width: 2) : null,
+            color: isActive ? Colors.white.withValues(alpha: 0.1) : Colors.white.withValues(alpha: 0.03),
+            borderRadius: BorderRadius.circular(6),
+            border: isActive ? Border.all(color: Colors.white.withValues(alpha: 0.2), width: 1) : null,
           ),
           child: Center(
-            child: Icon(Icons.military_tech, size: 18, color: isActive ? color : Colors.white.withValues(alpha: 0.2)),
+            child: Icon(
+              Icons.military_tech,
+              size: 14,
+              color: isActive ? Colors.white.withValues(alpha: 0.7) : Colors.white.withValues(alpha: 0.15),
+            ),
           ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 3),
         Text(
           name,
           style: TextStyle(
-            color: isActive ? color : Colors.white.withValues(alpha: 0.3),
-            fontSize: 9,
-            fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+            color: isActive ? Colors.white.withValues(alpha: 0.6) : Colors.white.withValues(alpha: 0.25),
+            fontSize: 8,
+            fontWeight: FontWeight.w500,
           ),
         ),
       ],
@@ -5348,7 +5311,7 @@ class _RankTier extends StatelessWidget {
 }
 
 // ============================================================================
-// CUSTOMIZATION CARD
+// CUSTOMIZATION CARD - Simplified
 // ============================================================================
 
 class _CustomizationCard extends StatelessWidget {
@@ -5367,10 +5330,10 @@ class _CustomizationCard extends StatelessWidget {
           showDialog(
             context: context,
             builder: (context) => Dialog(
-              backgroundColor: const Color(0xFF1A1A1A),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              backgroundColor: const Color(0xFF121212),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
               child: Container(
-                padding: const EdgeInsets.all(24),
+                padding: const EdgeInsets.all(20),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -6126,30 +6089,24 @@ class _TierReward extends StatelessWidget {
     return Column(
       children: [
         Container(
-          width: 44,
-          height: 44,
+          width: 36,
+          height: 36,
           decoration: BoxDecoration(
-            color: isFree
-                ? const Color(0xFF4CAF50).withValues(alpha: 0.2)
-                : const Color(0xFFD4AF37).withValues(alpha: 0.2),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: isFree
-                  ? const Color(0xFF4CAF50).withValues(alpha: 0.5)
-                  : const Color(0xFFD4AF37).withValues(alpha: 0.5),
-            ),
+            color: Colors.white.withValues(alpha: 0.05),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
           ),
-          child: Center(child: Text(emoji, style: const TextStyle(fontSize: 20))),
+          child: Center(child: Text(emoji, style: const TextStyle(fontSize: 16))),
         ),
-        const SizedBox(height: 6),
-        Text(label, style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 10)),
+        const SizedBox(height: 4),
+        Text(label, style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 9)),
         if (!isFree)
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('👑', style: TextStyle(fontSize: 8)),
+              const Text('👑', style: TextStyle(fontSize: 7)),
               const SizedBox(width: 2),
-              Text('Premium', style: TextStyle(color: const Color(0xFFD4AF37).withValues(alpha: 0.8), fontSize: 8)),
+              Text('Premium', style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 7)),
             ],
           ),
       ],
@@ -6158,7 +6115,7 @@ class _TierReward extends StatelessWidget {
 }
 
 // ============================================================================
-// PREMIUM BENEFIT
+// PREMIUM BENEFIT - Simplified
 // ============================================================================
 
 class _PremiumBenefit extends StatelessWidget {
@@ -6170,7 +6127,7 @@ class _PremiumBenefit extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.04), borderRadius: BorderRadius.circular(10)),
       child: Row(
         children: [
