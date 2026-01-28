@@ -840,21 +840,26 @@ class GameService {
       loopCount++;
     }
 
-    // Track if BB option was used (any raise or BB checked/called)
-    var bbOptionUsed = !room.bbHasOption; // Already used if false
+    // Track if BB option was used (only relevant preflop)
+    // Post-flop streets don't have BB option, so it's always "used"
+    var bbOptionUsed = true; // Default to true for post-flop streets
 
-    // If action is check/call and player is BB preflop with option, it's used
-    if (room.phase == 'preflop' && room.bbHasOption) {
-      final numPlayers = updatedPlayers.length;
-      final isHeadsUp = numPlayers == 2;
-      final bbIndex = isHeadsUp ? (room.dealerIndex + 1) % numPlayers : (room.dealerIndex + 2) % numPlayers;
+    // BB option only applies preflop
+    if (room.phase == 'preflop') {
+      bbOptionUsed = !room.bbHasOption; // Already used if bbHasOption is false
+      
+      if (room.bbHasOption) {
+        final numPlayers = updatedPlayers.length;
+        final isHeadsUp = numPlayers == 2;
+        final bbIndex = isHeadsUp ? (room.dealerIndex + 1) % numPlayers : (room.dealerIndex + 2) % numPlayers;
 
-      if (updatedPlayers[playerIndex].uid == updatedPlayers[bbIndex].uid) {
-        // BB is acting - any action uses the option
-        bbOptionUsed = true;
-      } else if (action == 'raise' || action == 'allin') {
-        // Any raise means BB option becomes a normal call/fold/raise decision
-        bbOptionUsed = true;
+        if (updatedPlayers[playerIndex].uid == updatedPlayers[bbIndex].uid) {
+          // BB is acting - any action uses the option
+          bbOptionUsed = true;
+        } else if (action == 'raise' || action == 'allin') {
+          // Any raise means BB option becomes a normal call/fold/raise decision
+          bbOptionUsed = true;
+        }
       }
     }
 
@@ -1120,6 +1125,7 @@ class GameService {
         'currentBet': 0,
         'lastRaiseAmount': room.bigBlind, // Reset min raise to big blind
         'currentTurnPlayerId': updatedPlayers[firstToActIdx].uid,
+        'bbHasOption': false, // BB option only applies preflop, reset for new streets
       }),
     );
   }
