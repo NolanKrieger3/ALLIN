@@ -254,7 +254,7 @@ class _TeamScreenState extends State<TeamScreen> with SingleTickerProviderStateM
           child: TabBarView(
             controller: _tabController,
             children: [
-              _TeamChatTab(team: _team!),
+              _TeamChatTab(key: ValueKey(_team!.id), team: _team!),
               _TeamMembersTab(team: _team!, teamService: _teamService, onRefresh: _loadTeam),
               _TeamSettingsTab(
                   team: _team!,
@@ -296,6 +296,9 @@ class _TeamScreenState extends State<TeamScreen> with SingleTickerProviderStateM
   }
 
   Widget _buildTeamHeader() {
+    final currentUserId = _teamService.currentUserId ?? '';
+    final isCaptain = _team!.isCaptain(currentUserId);
+
     return Row(
       children: [
         GestureDetector(
@@ -312,51 +315,1120 @@ class _TeamScreenState extends State<TeamScreen> with SingleTickerProviderStateM
           ),
         ),
         const SizedBox(width: 16),
-        // Team emblem - improved with gradient
-        Container(
-          width: 52,
-          height: 52,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                const Color(0xFF00D46A).withValues(alpha: 0.25),
-                const Color(0xFF00D46A).withValues(alpha: 0.08),
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+        // Team emblem - tappable to show info popup
+        GestureDetector(
+          onTap: () => _showTeamInfoPopup(isCaptain),
+          child: Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  const Color(0xFF00D46A).withValues(alpha: 0.25),
+                  const Color(0xFF00D46A).withValues(alpha: 0.08),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFF00D46A).withValues(alpha: 0.3)),
             ),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFF00D46A).withValues(alpha: 0.3)),
-          ),
-          child: Center(
-            child: Text(_team!.emblem, style: const TextStyle(fontSize: 26)),
+            child: Center(
+              child: Text(_team!.emblem, style: const TextStyle(fontSize: 26)),
+            ),
           ),
         ),
         const SizedBox(width: 14),
         Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                _team!.name,
-                style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 2),
-              Row(
-                children: [
-                  Icon(Icons.people_outline_rounded, color: Colors.white.withValues(alpha: 0.4), size: 14),
-                  const SizedBox(width: 4),
-                  Text(
-                    '${_team!.memberCount} members',
-                    style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12),
-                  ),
-                ],
-              ),
-            ],
+          child: GestureDetector(
+            onTap: () => _showTeamInfoPopup(isCaptain),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _team!.name,
+                  style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 2),
+                Row(
+                  children: [
+                    Icon(Icons.people_outline_rounded, color: Colors.white.withValues(alpha: 0.4), size: 14),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${_team!.memberCount} members',
+                      style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+        // Info button
+        GestureDetector(
+          onTap: () => _showTeamInfoPopup(isCaptain),
+          child: Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+            ),
+            child: Icon(Icons.info_outline_rounded, color: Colors.white.withValues(alpha: 0.7), size: 20),
           ),
         ),
       ],
     );
+  }
+
+  void _showTeamInfoPopup(bool isCaptain) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => Container(
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0F0F0F),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header with team emblem
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    const Color(0xFF00D46A).withValues(alpha: 0.15),
+                    Colors.transparent,
+                  ],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: Column(
+                children: [
+                  // Drag handle
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  // Team emblem
+                  Container(
+                    width: 72,
+                    height: 72,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          const Color(0xFF00D46A).withValues(alpha: 0.3),
+                          const Color(0xFF00D46A).withValues(alpha: 0.1),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: const Color(0xFF00D46A).withValues(alpha: 0.4)),
+                    ),
+                    child: Center(
+                      child: Text(_team!.emblem, style: const TextStyle(fontSize: 36)),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    _team!.name,
+                    style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+                  ),
+                  if (_team!.description.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      _team!.description,
+                      style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 14),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            // Info rows
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              child: Column(
+                children: [
+                  _buildInfoRow(Icons.people_outline_rounded, 'Members', '${_team!.memberCount}/${_team!.maxMembers}'),
+                  _buildInfoRow(Icons.calendar_today_rounded, 'Created', _formatDateShort(_team!.createdAt)),
+                  _buildInfoRow(Icons.tag_rounded, 'Team ID', _team!.id.substring(0, 8)),
+                ],
+              ),
+            ),
+            // Action buttons
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+              child: Column(
+                children: [
+                  // Kick Members button (captain only, when there are other members)
+                  if (isCaptain && _team!.memberCount > 1) ...[
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        _showKickMemberSheet();
+                      },
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.06),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                        ),
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.person_remove_rounded, color: Colors.white70, size: 18),
+                            SizedBox(width: 8),
+                            Text(
+                              'Kick Members',
+                              style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600, fontSize: 15),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                  ],
+                  // Leave Team button (for non-captains, or captain with other members)
+                  if (!isCaptain || _team!.memberCount > 1)
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        _confirmLeaveTeam();
+                      },
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEF4444).withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.3)),
+                        ),
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.logout_rounded, color: Color(0xFFEF4444), size: 18),
+                            SizedBox(width: 8),
+                            Text(
+                              'Leave Team',
+                              style: TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.w600, fontSize: 15),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  // Disband Team button (captain only, when alone)
+                  if (isCaptain && _team!.memberCount == 1)
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        _confirmDisbandTeam();
+                      },
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEF4444).withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.3)),
+                        ),
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 18),
+                            SizedBox(width: 8),
+                            Text(
+                              'Disband Team',
+                              style: TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.w600, fontSize: 15),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          Icon(icon, color: Colors.white.withValues(alpha: 0.4), size: 18),
+          const SizedBox(width: 12),
+          Text(label, style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 14)),
+          const Spacer(),
+          Text(value, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500)),
+        ],
+      ),
+    );
+  }
+
+  String _formatDateShort(DateTime date) {
+    return '${date.month}/${date.day}/${date.year}';
+  }
+
+  Future<void> _confirmLeaveTeam() async {
+    final currentUserId = _teamService.currentUserId ?? '';
+    final isCaptain = _team!.isCaptain(currentUserId);
+
+    // If captain with other members, show transfer leadership prompt
+    if (isCaptain && _team!.memberCount > 1) {
+      final result = await showModalBottomSheet<String>(
+        context: context,
+        backgroundColor: Colors.transparent,
+        builder: (ctx) => Container(
+          margin: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+          decoration: BoxDecoration(
+            color: const Color(0xFF0F0F0F),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      const Color(0xFFFFD700).withValues(alpha: 0.15),
+                      Colors.transparent,
+                    ],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                  ),
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                ),
+                child: Column(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                const Color(0xFFFFD700).withValues(alpha: 0.25),
+                                const Color(0xFFFFD700).withValues(alpha: 0.1),
+                              ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: const Color(0xFFFFD700).withValues(alpha: 0.3)),
+                          ),
+                          child: const Icon(Icons.swap_horiz_rounded, color: Color(0xFFFFD700), size: 24),
+                        ),
+                        const SizedBox(width: 14),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Transfer Leadership',
+                                style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                              ),
+                              SizedBox(height: 2),
+                              Text(
+                                'You must transfer captain role first',
+                                style: TextStyle(color: Colors.white54, fontSize: 13),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.04),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+                  ),
+                  child: const Text(
+                    'As captain, you need to transfer leadership to another member before leaving. Go to the Members tab to transfer captaincy.',
+                    style: TextStyle(color: Colors.white70, fontSize: 14, height: 1.5),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                child: GestureDetector(
+                  onTap: () => Navigator.pop(ctx, 'members'),
+                  child: Container(
+                    width: double.infinity,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFFFD700), Color(0xFFFFC000)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(14),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFFFD700).withValues(alpha: 0.3),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.people_rounded, color: Colors.black, size: 18),
+                        SizedBox(width: 8),
+                        Text(
+                          'Go to Members',
+                          style: TextStyle(color: Colors.black, fontSize: 15, fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+
+      if (result == 'members' && mounted) {
+        // Switch to members tab (index 1)
+        _tabController.animateTo(1);
+      }
+      return;
+    }
+
+    final confirm = await showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0F0F0F),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    const Color(0xFFEF4444).withValues(alpha: 0.15),
+                    Colors.transparent,
+                  ],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: Column(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              const Color(0xFFEF4444).withValues(alpha: 0.25),
+                              const Color(0xFFEF4444).withValues(alpha: 0.1),
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.3)),
+                        ),
+                        child: const Icon(Icons.logout_rounded, color: Color(0xFFEF4444), size: 24),
+                      ),
+                      const SizedBox(width: 14),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Leave Team',
+                              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              'This action cannot be undone',
+                              style: TextStyle(color: Colors.white54, fontSize: 13),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.04),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+                ),
+                child: Text(
+                  'Are you sure you want to leave ${_team!.name}?',
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 14, height: 1.5),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => Navigator.pop(ctx, false),
+                      child: Container(
+                        height: 52,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.06),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                        ),
+                        child: const Center(
+                          child: Text(
+                            'Cancel',
+                            style: TextStyle(color: Colors.white70, fontSize: 15, fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => Navigator.pop(ctx, true),
+                      child: Container(
+                        height: 52,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFFEF4444), Color(0xFFDC2626)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(14),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFFEF4444).withValues(alpha: 0.3),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.logout_rounded, color: Colors.white, size: 18),
+                            SizedBox(width: 8),
+                            Text(
+                              'Leave',
+                              style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirm == true) {
+      try {
+        await _teamService.leaveTeam(_team!.id);
+        if (mounted) {
+          setState(() => _team = null);
+          _teamSub?.cancel();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Left team'), backgroundColor: Color(0xFF00D46A)),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _confirmDisbandTeam() async {
+    final confirm = await showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0F0F0F),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    const Color(0xFFEF4444).withValues(alpha: 0.15),
+                    Colors.transparent,
+                  ],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: Column(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              const Color(0xFFEF4444).withValues(alpha: 0.25),
+                              const Color(0xFFEF4444).withValues(alpha: 0.1),
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.3)),
+                        ),
+                        child: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 24),
+                      ),
+                      const SizedBox(width: 14),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Disband Team',
+                              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              'This will delete the team permanently',
+                              style: TextStyle(color: Colors.white54, fontSize: 13),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.04),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+                ),
+                child: Text(
+                  'Are you sure you want to disband ${_team!.name}? All members will be removed and the team will be deleted.',
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 14, height: 1.5),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => Navigator.pop(ctx, false),
+                      child: Container(
+                        height: 52,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.06),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                        ),
+                        child: const Center(
+                          child: Text(
+                            'Cancel',
+                            style: TextStyle(color: Colors.white70, fontSize: 15, fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => Navigator.pop(ctx, true),
+                      child: Container(
+                        height: 52,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFFEF4444), Color(0xFFDC2626)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(14),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFFEF4444).withValues(alpha: 0.3),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.delete_outline_rounded, color: Colors.white, size: 18),
+                            SizedBox(width: 8),
+                            Text(
+                              'Disband',
+                              style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirm == true) {
+      try {
+        await _teamService.disbandTeam(_team!.id);
+        if (mounted) {
+          setState(() => _team = null);
+          _teamSub?.cancel();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Team disbanded'), backgroundColor: Color(0xFF00D46A)),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+          );
+        }
+      }
+    }
+  }
+
+  void _showKickMemberSheet() {
+    final currentUserId = _teamService.currentUserId ?? '';
+    // Filter out the captain (self)
+    final kickableMembers = _team!.members.where((m) => m.odeid != currentUserId).toList();
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => Container(
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(ctx).size.height * 0.6,
+        ),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0F0F0F),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    const Color(0xFFEF4444).withValues(alpha: 0.15),
+                    Colors.transparent,
+                  ],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: Column(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              const Color(0xFFEF4444).withValues(alpha: 0.25),
+                              const Color(0xFFEF4444).withValues(alpha: 0.1),
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.3)),
+                        ),
+                        child: const Icon(Icons.person_remove_rounded, color: Color(0xFFEF4444), size: 24),
+                      ),
+                      const SizedBox(width: 14),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Kick Members',
+                              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              'Tap a member to remove them',
+                              style: TextStyle(color: Colors.white54, fontSize: 13),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            // Member list
+            Flexible(
+              child: ListView.builder(
+                shrinkWrap: true,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                itemCount: kickableMembers.length,
+                itemBuilder: (context, index) {
+                  final member = kickableMembers[index];
+                  return GestureDetector(
+                    onTap: () => _confirmKickMember(ctx, member),
+                    child: Container(
+                      margin: const EdgeInsets.symmetric(vertical: 4),
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+                      ),
+                      child: Row(
+                        children: [
+                          Text(member.rankIcon, style: const TextStyle(fontSize: 18)),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  member.displayName,
+                                  style:
+                                      const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500),
+                                ),
+                                Text(
+                                  member.rankDisplayName,
+                                  style: TextStyle(
+                                    color: member.rank == 'officer'
+                                        ? const Color(0xFF3B82F6)
+                                        : Colors.white.withValues(alpha: 0.4),
+                                    fontSize: 11,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Icon(Icons.chevron_right_rounded, color: Colors.white24, size: 20),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _confirmKickMember(BuildContext parentContext, TeamMember member) async {
+    final confirm = await showModalBottomSheet<bool>(
+      context: parentContext,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0F0F0F),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    const Color(0xFFEF4444).withValues(alpha: 0.15),
+                    Colors.transparent,
+                  ],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: Column(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              const Color(0xFFEF4444).withValues(alpha: 0.25),
+                              const Color(0xFFEF4444).withValues(alpha: 0.1),
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.3)),
+                        ),
+                        child: const Icon(Icons.person_remove_rounded, color: Color(0xFFEF4444), size: 24),
+                      ),
+                      const SizedBox(width: 14),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Kick Member',
+                              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              'This action cannot be undone',
+                              style: TextStyle(color: Colors.white54, fontSize: 13),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.04),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+                ),
+                child: Text(
+                  'Remove ${member.displayName} from the team?',
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 14),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => Navigator.pop(ctx, false),
+                      child: Container(
+                        height: 52,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.06),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                        ),
+                        child: const Center(
+                          child: Text(
+                            'Cancel',
+                            style: TextStyle(color: Colors.white70, fontSize: 15, fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => Navigator.pop(ctx, true),
+                      child: Container(
+                        height: 52,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFFEF4444), Color(0xFFDC2626)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(14),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFFEF4444).withValues(alpha: 0.3),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.person_remove_rounded, color: Colors.white, size: 18),
+                            SizedBox(width: 8),
+                            Text(
+                              'Kick',
+                              style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirm == true) {
+      try {
+        await _teamService.kickMember(_team!.id, member.odeid);
+        if (mounted) {
+          Navigator.pop(parentContext); // Close the kick member list sheet
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('${member.displayName} has been kicked'), backgroundColor: const Color(0xFF00D46A)),
+          );
+          _loadTeam(); // Refresh team data
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+          );
+        }
+      }
+    }
   }
 
   void _showCreateTeamDialog() {
@@ -373,195 +1445,262 @@ class _TeamScreenState extends State<TeamScreen> with SingleTickerProviderStateM
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => Container(
           margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-          padding: const EdgeInsets.all(24),
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.85,
+          ),
           decoration: BoxDecoration(
             color: const Color(0xFF0F0F0F),
             borderRadius: BorderRadius.circular(24),
             border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Handle bar
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-              // Header
-              Row(
-                children: [
-                  Container(
-                    width: 48,
-                    height: 48,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Handle bar
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
                     decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF00D46A), Color(0xFF00A855)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: const Icon(Icons.group_add_rounded, color: Colors.white, size: 24),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Create Team',
-                          style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
-                        ),
-                        Text(
-                          'Cost: 1,000,000 chips',
-                          style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: canAfford
-                          ? const Color(0xFF00D46A).withValues(alpha: 0.15)
-                          : const Color(0xFFEF4444).withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      UserPreferences.formatChips(UserPreferences.chips),
-                      style: TextStyle(
-                        color: canAfford ? const Color(0xFF00D46A) : const Color(0xFFEF4444),
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 28),
-              // Team Name Field
-              _buildStyledTextField(
-                controller: nameController,
-                hint: 'Team Name',
-                icon: Icons.shield_outlined,
-                maxLength: 20,
-              ),
-              const SizedBox(height: 16),
-              // Description Field
-              _buildStyledTextField(
-                controller: descController,
-                hint: 'Description (optional)',
-                icon: Icons.notes_rounded,
-                maxLength: 200,
-                maxLines: 2,
-              ),
-              const SizedBox(height: 24),
-              // Emblem Selection
-              Text(
-                'Choose Emblem',
-                style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 14, fontWeight: FontWeight.w500),
-              ),
-              const SizedBox(height: 12),
-              SizedBox(
-                height: 180,
-                child: GridView.builder(
-                  shrinkWrap: true,
-                  physics: const BouncingScrollPhysics(),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 5,
-                    mainAxisSpacing: 10,
-                    crossAxisSpacing: 10,
-                  ),
-                  itemCount: TeamEmblem.emblems.length,
-                  itemBuilder: (context, index) => GestureDetector(
-                    onTap: () => setDialogState(() => selectedEmblem = index),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      decoration: BoxDecoration(
-                        color: selectedEmblem == index
-                            ? const Color(0xFF00D46A).withValues(alpha: 0.25)
-                            : const Color(0xFF2A2A2A),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color:
-                              selectedEmblem == index ? const Color(0xFF00D46A) : Colors.white.withValues(alpha: 0.12),
-                          width: selectedEmblem == index ? 2 : 1,
-                        ),
-                      ),
-                      child: Center(
-                        child: Text(
-                          TeamEmblem.emblems[index],
-                          style: TextStyle(
-                            fontSize: selectedEmblem == index ? 26 : 22,
-                            color: TeamEmblem.getEmblemColor(index),
-                          ),
-                        ),
-                      ),
+                      color: Colors.white.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(2),
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 20),
-              // Team Privacy Toggle
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.04),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-                ),
-                child: Row(
+                const SizedBox(height: 20),
+                // Header
+                Row(
                   children: [
-                    Icon(
-                      isOpenTeam ? Icons.lock_open_rounded : Icons.lock_rounded,
-                      color: isOpenTeam ? const Color(0xFF00D46A) : Colors.white.withValues(alpha: 0.5),
-                      size: 20,
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF00D46A), Color(0xFF00A855)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: const Icon(Icons.group_add_rounded, color: Colors.white, size: 24),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 16),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            isOpenTeam ? 'Open Team' : 'Invite Only',
-                            style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500),
+                          const Text(
+                            'Create Team',
+                            style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
                           ),
-                          const SizedBox(height: 2),
                           Text(
-                            isOpenTeam ? 'Anyone can join' : 'Only invited players can join',
-                            style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 11),
+                            'Cost: 1,000,000 chips',
+                            style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13),
                           ),
                         ],
                       ),
                     ),
-                    GestureDetector(
-                      onTap: () => setDialogState(() => isOpenTeam = !isOpenTeam),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: canAfford
+                            ? const Color(0xFF00D46A).withValues(alpha: 0.15)
+                            : const Color(0xFFEF4444).withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        UserPreferences.formatChips(UserPreferences.chips),
+                        style: TextStyle(
+                          color: canAfford ? const Color(0xFF00D46A) : const Color(0xFFEF4444),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 28),
+                // Team Name Field
+                _buildStyledTextField(
+                  controller: nameController,
+                  hint: 'Team Name',
+                  icon: Icons.shield_outlined,
+                  maxLength: 20,
+                ),
+                const SizedBox(height: 16),
+                // Description Field
+                _buildStyledTextField(
+                  controller: descController,
+                  hint: 'Description (optional)',
+                  icon: Icons.notes_rounded,
+                  maxLength: 200,
+                  maxLines: 2,
+                ),
+                const SizedBox(height: 24),
+                // Emblem Selection
+                Text(
+                  'Choose Emblem',
+                  style:
+                      TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 14, fontWeight: FontWeight.w500),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  height: 180,
+                  child: GridView.builder(
+                    shrinkWrap: true,
+                    physics: const BouncingScrollPhysics(),
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 5,
+                      mainAxisSpacing: 10,
+                      crossAxisSpacing: 10,
+                    ),
+                    itemCount: TeamEmblem.emblems.length,
+                    itemBuilder: (context, index) => GestureDetector(
+                      onTap: () => setDialogState(() => selectedEmblem = index),
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 200),
-                        width: 48,
-                        height: 28,
-                        padding: const EdgeInsets.all(3),
                         decoration: BoxDecoration(
-                          color: isOpenTeam ? const Color(0xFF00D46A) : Colors.white.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(14),
+                          color: selectedEmblem == index
+                              ? const Color(0xFF00D46A).withValues(alpha: 0.25)
+                              : const Color(0xFF2A2A2A),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: selectedEmblem == index
+                                ? const Color(0xFF00D46A)
+                                : Colors.white.withValues(alpha: 0.12),
+                            width: selectedEmblem == index ? 2 : 1,
+                          ),
                         ),
-                        child: AnimatedAlign(
+                        child: Center(
+                          child: Text(
+                            TeamEmblem.emblems[index],
+                            style: TextStyle(
+                              fontSize: selectedEmblem == index ? 26 : 22,
+                              color: TeamEmblem.getEmblemColor(index),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                // Team Privacy Toggle
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.04),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        isOpenTeam ? Icons.lock_open_rounded : Icons.lock_rounded,
+                        color: isOpenTeam ? const Color(0xFF00D46A) : Colors.white.withValues(alpha: 0.5),
+                        size: 20,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              isOpenTeam ? 'Open Team' : 'Invite Only',
+                              style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              isOpenTeam ? 'Anyone can join' : 'Only invited players can join',
+                              style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 11),
+                            ),
+                          ],
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: () => setDialogState(() => isOpenTeam = !isOpenTeam),
+                        child: AnimatedContainer(
                           duration: const Duration(milliseconds: 200),
-                          alignment: isOpenTeam ? Alignment.centerRight : Alignment.centerLeft,
-                          child: Container(
-                            width: 22,
-                            height: 22,
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(11),
+                          width: 48,
+                          height: 28,
+                          padding: const EdgeInsets.all(3),
+                          decoration: BoxDecoration(
+                            color: isOpenTeam ? const Color(0xFF00D46A) : Colors.white.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: AnimatedAlign(
+                            duration: const Duration(milliseconds: 200),
+                            alignment: isOpenTeam ? Alignment.centerRight : Alignment.centerLeft,
+                            child: Container(
+                              width: 22,
+                              height: 22,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(11),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+                // Action Buttons
+                Row(
+                  children: [
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => Navigator.pop(context),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.05),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: const Center(
+                            child: Text(
+                              'Cancel',
+                              style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      flex: 2,
+                      child: GestureDetector(
+                        onTap: canAfford
+                            ? () async {
+                                Navigator.pop(context);
+                                await _createTeam(nameController.text, descController.text, selectedEmblem, isOpenTeam);
+                              }
+                            : null,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          decoration: BoxDecoration(
+                            gradient: canAfford
+                                ? const LinearGradient(
+                                    colors: [Color(0xFF00D46A), Color(0xFF00A855)],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  )
+                                : null,
+                            color: canAfford ? null : Colors.white.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Center(
+                            child: Text(
+                              canAfford ? 'Create Team' : 'Not Enough Chips',
+                              style: TextStyle(
+                                color: canAfford ? Colors.black : Colors.white.withValues(alpha: 0.4),
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ),
                         ),
@@ -569,69 +1708,9 @@ class _TeamScreenState extends State<TeamScreen> with SingleTickerProviderStateM
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(height: 24),
-              // Action Buttons
-              Row(
-                children: [
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => Navigator.pop(context),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.05),
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: const Center(
-                          child: Text(
-                            'Cancel',
-                            style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    flex: 2,
-                    child: GestureDetector(
-                      onTap: canAfford
-                          ? () async {
-                              Navigator.pop(context);
-                              await _createTeam(nameController.text, descController.text, selectedEmblem, isOpenTeam);
-                            }
-                          : null,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        decoration: BoxDecoration(
-                          gradient: canAfford
-                              ? const LinearGradient(
-                                  colors: [Color(0xFF00D46A), Color(0xFF00A855)],
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                )
-                              : null,
-                          color: canAfford ? null : Colors.white.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: Center(
-                          child: Text(
-                            canAfford ? 'Create Team' : 'Not Enough Chips',
-                            style: TextStyle(
-                              color: canAfford ? Colors.black : Colors.white.withValues(alpha: 0.4),
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              SizedBox(height: MediaQuery.of(context).viewInsets.bottom),
-            ],
+                SizedBox(height: MediaQuery.of(context).viewInsets.bottom),
+              ],
+            ),
           ),
         ),
       ),
@@ -699,9 +1778,8 @@ class _TeamScreenState extends State<TeamScreen> with SingleTickerProviderStateM
       isScrollControlled: true,
       builder: (context) => _BrowseTeamsSheet(
         teamService: _teamService,
-        onJoin: () {
-          Navigator.pop(context);
-          _loadTeam();
+        onJoin: () async {
+          await _loadTeam();
         },
       ),
     );
@@ -715,7 +1793,7 @@ class _TeamScreenState extends State<TeamScreen> with SingleTickerProviderStateM
 class _TeamChatTab extends StatefulWidget {
   final Team team;
 
-  const _TeamChatTab({required this.team});
+  const _TeamChatTab({super.key, required this.team});
 
   @override
   State<_TeamChatTab> createState() => _TeamChatTabState();
@@ -2137,7 +3215,7 @@ class _TeamSettingsTab extends StatelessWidget {
 
 class _BrowseTeamsSheet extends StatefulWidget {
   final TeamService teamService;
-  final VoidCallback onJoin;
+  final Future<void> Function() onJoin;
 
   const _BrowseTeamsSheet({required this.teamService, required this.onJoin});
 
@@ -2191,7 +3269,12 @@ class _BrowseTeamsSheetState extends State<_BrowseTeamsSheet> {
   Future<void> _joinTeam(Team team) async {
     try {
       await widget.teamService.joinTeam(team.id);
-      widget.onJoin();
+      // Close the sheet first for smoother transition
+      if (mounted) {
+        Navigator.pop(context);
+      }
+      // Then reload team data
+      await widget.onJoin();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Joined ${team.name}!'), backgroundColor: const Color(0xFF00D46A)),
@@ -2283,23 +3366,29 @@ class _BrowseTeamsSheetState extends State<_BrowseTeamsSheet> {
                 ),
                 const SizedBox(height: 20),
                 // Search bar
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.04),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-                  ),
-                  child: TextField(
-                    controller: _searchController,
-                    style: const TextStyle(color: Colors.white, fontSize: 15),
-                    onChanged: _search,
-                    decoration: InputDecoration(
-                      hintText: 'Search teams...',
-                      hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3)),
-                      prefixIcon: Icon(Icons.search_rounded, color: Colors.white.withValues(alpha: 0.4), size: 20),
-                      border: InputBorder.none,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                TextField(
+                  controller: _searchController,
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 14),
+                  onChanged: _search,
+                  decoration: InputDecoration(
+                    hintText: 'Search teams...',
+                    hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.25)),
+                    prefixIcon: Icon(Icons.search_rounded, color: Colors.white.withValues(alpha: 0.35), size: 20),
+                    filled: true,
+                    fillColor: Colors.white.withValues(alpha: 0.05),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.06)),
                     ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.06)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.15)),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   ),
                 ),
               ],
@@ -2390,7 +3479,24 @@ class _BrowseTeamsSheetState extends State<_BrowseTeamsSheet> {
                                 ),
                                 const SizedBox(width: 12),
                                 GestureDetector(
-                                  onTap: canJoin ? () => _joinTeam(team) : null,
+                                  onTap: () {
+                                    if (team.isFull) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                            content: Text('This team is full'), backgroundColor: Colors.orange),
+                                      );
+                                    } else if (UserPreferences.chips < TeamService.joinTeamCost) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                              'Need ${TeamService.joinTeamCost} chips to join (you have ${UserPreferences.chips})'),
+                                          backgroundColor: Colors.orange,
+                                        ),
+                                      );
+                                    } else {
+                                      _joinTeam(team);
+                                    }
+                                  },
                                   child: Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                                     decoration: BoxDecoration(

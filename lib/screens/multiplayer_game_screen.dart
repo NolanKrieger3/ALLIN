@@ -41,6 +41,11 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
   String? _lastTurnPlayerId;
   bool _hasAutoFolded = false;
 
+  // Showdown animation
+  bool _showdownAnimationComplete = false;
+  String? _lastShowdownPhase;
+  EvaluatedHand? _winningHand;
+
   @override
   void initState() {
     super.initState();
@@ -142,6 +147,10 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
     try {
       await _gameService.newHand(widget.roomId);
       _hasAutoStarted = false; // Reset so startGame can trigger again
+      // Reset showdown animation state for new hand
+      _showdownAnimationComplete = false;
+      _lastShowdownPhase = null;
+      _winningHand = null;
     } catch (e) {
       print('❌ Failed to start new hand: $e');
     }
@@ -149,6 +158,41 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
     if (mounted) {
       _hasTriggeredNewHand = false;
     }
+  }
+
+  /// Handle showdown animation - triggered when phase becomes showdown
+  void _handleShowdownAnimation(GameRoom room) {
+    // Check if we just entered showdown
+    if (room.phase == 'showdown' && _lastShowdownPhase != 'showdown') {
+      _lastShowdownPhase = 'showdown';
+      _showdownAnimationComplete = false;
+
+      // Calculate the winning hand
+      if (room.winnerId != null) {
+        final winner = room.players.firstWhere(
+          (p) => p.uid == room.winnerId,
+          orElse: () => room.players.first,
+        );
+        if (winner.cards.isNotEmpty && room.communityCards.length >= 3) {
+          _winningHand = HandEvaluator.evaluateBestHand(winner.cards, room.communityCards);
+        }
+      }
+
+      // Start the animation delay
+      Future.delayed(const Duration(seconds: 1), () {
+        if (mounted) {
+          setState(() => _showdownAnimationComplete = true);
+        }
+      });
+    } else if (room.phase != 'showdown') {
+      _lastShowdownPhase = room.phase;
+    }
+  }
+
+  /// Check if a card is part of the winning hand during showdown
+  bool _isCardInWinningHand(PlayingCard card, GameRoom room) {
+    if (!_showdownAnimationComplete || _winningHand == null) return false;
+    return _winningHand!.isCardInWinningHand(card);
   }
 
   /// Attempt auto-start when conditions are met
@@ -890,6 +934,9 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
     final isHost = room.hostId == _gameService.currentUserId;
     final isWaitingForPlayers = room.phase == 'waiting_for_players';
 
+    // Handle showdown animation
+    _handleShowdownAnimation(room);
+
     return Scaffold(
       backgroundColor: Colors.black,
       body: SafeArea(
@@ -908,16 +955,6 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
                     child: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
                   ),
                   const Spacer(),
-                  // Online indicator
-                  Container(
-                    width: 24,
-                    height: 24,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF22C55E).withValues(alpha: 0.2),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.pie_chart, color: Color(0xFF22C55E), size: 14),
-                  ),
                 ],
               ),
             ),
@@ -953,9 +990,11 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
   Widget _buildPlayersRow(GameRoom room, List<GamePlayer> opponents, GamePlayer currentPlayer) {
     // Show ALL players including yourself
     final allPlayers = room.players;
+    final isShowdown = room.phase == 'showdown';
 
-    return Container(
-      height: 130,
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      height: isShowdown ? 180 : 130, // More height during showdown to show cards
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
         children: [
@@ -999,6 +1038,15 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
   Widget _buildPlayerAvatar(GamePlayer player, GameRoom room, {bool isCurrentUser = false}) {
     final isTheirTurn = room.currentTurnPlayerId == player.uid;
     final hasFolded = player.hasFolded;
+    final isShowdown = room.phase == 'showdown';
+    final isWinner = room.winnerId == player.uid;
+    final isLoser = isShowdown && _showdownAnimationComplete && !isWinner && !hasFolded;
+
+    // Calculate this player's hand for card highlighting
+    EvaluatedHand? playerHand;
+    if (isShowdown && player.cards.isNotEmpty && room.communityCards.length >= 3) {
+      playerHand = HandEvaluator.evaluateBestHand(player.cards, room.communityCards);
+    }
 
     // Avatar emojis based on display name first letter
     String getAvatar(String name) {
@@ -1035,142 +1083,288 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
       return avatars[firstChar] ?? '👤';
     }
 
-    // Border color: gold if their turn, blue if current user, none otherwise
+    // Border color: gold if winner at showdown, gold if their turn, blue if current user
     Color? borderColor;
-    if (isTheirTurn) {
+    if (isShowdown && _showdownAnimationComplete && isWinner) {
+      borderColor = const Color(0xFFFFD700); // Gold for winner
+    } else if (isTheirTurn && !isShowdown) {
       borderColor = const Color(0xFFD4AF37);
     } else if (isCurrentUser) {
       borderColor = const Color(0xFF3B82F6);
     }
 
-    return Container(
-      width: 80,
-      margin: const EdgeInsets.only(right: 12),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          // Avatar with timer ring
-          Stack(
-            alignment: Alignment.center,
-            children: [
-              // Timer ring (only show when it's their turn and game is active)
-              if (isTheirTurn && room.status == 'playing' && room.phase != 'showdown')
-                SizedBox(
-                  width: 64,
-                  height: 64,
-                  child: CircularProgressIndicator(
-                    value: _remainingSeconds / room.turnTimeLimit,
-                    strokeWidth: 3,
-                    backgroundColor: Colors.grey.shade800,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      _remainingSeconds <= 5 ? Colors.red : const Color(0xFFD4AF37),
-                    ),
-                  ),
-                ),
-              Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: hasFolded ? Colors.grey.shade800 : Colors.white.withValues(alpha: 0.1),
-                  border: borderColor != null ? Border.all(color: borderColor, width: 3) : null,
-                ),
-                child: Center(
-                  child: Text(
-                    getAvatar(player.displayName),
-                    style: TextStyle(
-                      fontSize: 28,
-                      color: hasFolded ? Colors.grey : null,
-                    ),
-                  ),
-                ),
-              ),
-              // Timer text overlay (when their turn)
-              if (isTheirTurn && room.status == 'playing' && room.phase != 'showdown')
-                Positioned(
-                  bottom: -2,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+    return AnimatedOpacity(
+      duration: const Duration(milliseconds: 300),
+      opacity: isLoser ? 0.5 : 1.0,
+      child: Container(
+        width: 100,
+        margin: const EdgeInsets.only(right: 12),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Avatar with timer ring
+            Stack(
+              alignment: Alignment.center,
+              children: [
+                // Winner glow ring
+                if (isShowdown && _showdownAnimationComplete && isWinner)
+                  Container(
+                    width: 68,
+                    height: 68,
                     decoration: BoxDecoration(
-                      color: _remainingSeconds <= 5 ? Colors.red : const Color(0xFFD4AF37),
-                      borderRadius: BorderRadius.circular(8),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFFFD700).withValues(alpha: 0.6),
+                          blurRadius: 16,
+                          spreadRadius: 4,
+                        ),
+                      ],
                     ),
+                  ),
+                // Timer ring (only show when it's their turn and game is active)
+                if (isTheirTurn && room.status == 'playing' && room.phase != 'showdown')
+                  SizedBox(
+                    width: 64,
+                    height: 64,
+                    child: CircularProgressIndicator(
+                      value: _remainingSeconds / room.turnTimeLimit,
+                      strokeWidth: 3,
+                      backgroundColor: Colors.grey.shade800,
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        _remainingSeconds <= 5 ? Colors.red : const Color(0xFFD4AF37),
+                      ),
+                    ),
+                  ),
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: hasFolded ? Colors.grey.shade800 : Colors.white.withValues(alpha: 0.1),
+                    border: borderColor != null ? Border.all(color: borderColor, width: 3) : null,
+                  ),
+                  child: Center(
                     child: Text(
-                      '${_remainingSeconds}s',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
+                      getAvatar(player.displayName),
+                      style: TextStyle(
+                        fontSize: 28,
+                        color: hasFolded ? Colors.grey : null,
                       ),
                     ),
                   ),
                 ),
-              // Dealer badge
-              if (player.uid == room.players[room.dealerIndex].uid)
-                Positioned(
-                  bottom: 0,
-                  right: 0,
-                  child: Container(
-                    width: 20,
-                    height: 20,
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
+                // Timer text overlay (when their turn)
+                if (isTheirTurn && room.status == 'playing' && room.phase != 'showdown')
+                  Positioned(
+                    bottom: -2,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: _remainingSeconds <= 5 ? Colors.red : const Color(0xFFD4AF37),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        '${_remainingSeconds}s',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
-                    child: const Center(
-                      child: Text('D',
+                  ),
+                // Dealer badge
+                if (player.uid == room.players[room.dealerIndex].uid)
+                  Positioned(
+                    bottom: 0,
+                    right: 0,
+                    child: Container(
+                      width: 20,
+                      height: 20,
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Center(
+                        child: Text('D',
+                            style: TextStyle(
+                              color: Colors.black,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            )),
+                      ),
+                    ),
+                  ),
+                // "You" badge for current user
+                if (isCurrentUser)
+                  Positioned(
+                    top: 0,
+                    right: 0,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF3B82F6),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Text('YOU',
                           style: TextStyle(
-                            color: Colors.black,
-                            fontSize: 12,
+                            color: Colors.white,
+                            fontSize: 8,
                             fontWeight: FontWeight.bold,
                           )),
                     ),
                   ),
-                ),
-              // "You" badge for current user
-              if (isCurrentUser)
-                Positioned(
-                  top: 0,
-                  right: 0,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF3B82F6),
-                      borderRadius: BorderRadius.circular(6),
+                // Winner badge
+                if (isShowdown && _showdownAnimationComplete && isWinner)
+                  Positioned(
+                    top: 0,
+                    left: 0,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFD700),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Text('WIN',
+                          style: TextStyle(
+                            color: Colors.black,
+                            fontSize: 8,
+                            fontWeight: FontWeight.bold,
+                          )),
                     ),
-                    child: const Text('YOU',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 8,
-                          fontWeight: FontWeight.bold,
-                        )),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            // Name
+            Text(
+              player.displayName.length > 8 ? '${player.displayName.substring(0, 8)}' : player.displayName,
+              style: TextStyle(
+                color: hasFolded ? Colors.grey : (isCurrentUser ? const Color(0xFF3B82F6) : Colors.white),
+                fontSize: 11,
+                fontWeight: isCurrentUser ? FontWeight.w700 : FontWeight.w500,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+            // Chips
+            Text(
+              _formatChips(player.chips),
+              style: TextStyle(
+                color: hasFolded ? Colors.grey : Colors.yellow.shade600,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            // Bet (shown below chips if present)
+            if (player.currentBet > 0)
+              Text(
+                'Bet: ${_formatChips(player.currentBet)}',
+                style: TextStyle(
+                  color: hasFolded ? Colors.grey : const Color(0xFF00D46A),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            // Show hole cards during showdown (for all players who haven't folded)
+            if (isShowdown && !hasFolded && player.cards.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _buildMiniCard(
+                      player.cards[0],
+                      isHighlighted: _showdownAnimationComplete &&
+                          isWinner &&
+                          playerHand != null &&
+                          playerHand.isCardInWinningHand(player.cards[0]),
+                      isDimmed: isLoser,
+                    ),
+                    const SizedBox(width: 2),
+                    if (player.cards.length > 1)
+                      _buildMiniCard(
+                        player.cards[1],
+                        isHighlighted: _showdownAnimationComplete &&
+                            isWinner &&
+                            playerHand != null &&
+                            playerHand.isCardInWinningHand(player.cards[1]),
+                        isDimmed: isLoser,
+                      ),
+                  ],
+                ),
+              ),
+            // Show hand name during showdown
+            if (isShowdown && _showdownAnimationComplete && !hasFolded && playerHand != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Text(
+                  _getShortHandName(playerHand.rank),
+                  style: TextStyle(
+                    color: isWinner ? const Color(0xFFFFD700) : Colors.white.withValues(alpha: 0.7),
+                    fontSize: 9,
+                    fontWeight: isWinner ? FontWeight.bold : FontWeight.normal,
                   ),
                 ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          // Name
-          Text(
-            player.displayName.length > 8 ? '${player.displayName.substring(0, 8)}' : player.displayName,
-            style: TextStyle(
-              color: hasFolded ? Colors.grey : (isCurrentUser ? const Color(0xFF3B82F6) : Colors.white),
-              fontSize: 11,
-              fontWeight: isCurrentUser ? FontWeight.w700 : FontWeight.w500,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Build a mini card for showdown display on player avatars
+  Widget _buildMiniCard(PlayingCard card, {bool isHighlighted = false, bool isDimmed = false}) {
+    const width = 28.0;
+    const height = 38.0;
+    final isRed = card.suit == '♥' || card.suit == '♦';
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: isDimmed ? Colors.grey.shade300 : Colors.white,
+        borderRadius: BorderRadius.circular(4),
+        boxShadow: [
+          if (isHighlighted) ...[
+            BoxShadow(
+              color: const Color(0xFFFFD700).withValues(alpha: 0.8),
+              blurRadius: 8,
+              spreadRadius: 1,
             ),
-            overflow: TextOverflow.ellipsis,
-          ),
-          // Chips (with bet inline if present)
-          Text(
-            player.currentBet > 0
-                ? '${_formatChips(player.chips)} (${_formatChips(player.currentBet)})'
-                : _formatChips(player.chips),
-            style: TextStyle(
-              color: hasFolded ? Colors.grey : Colors.yellow.shade600,
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
+          ] else
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isDimmed ? 0.1 : 0.3),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
             ),
-          ),
         ],
+        border: isHighlighted ? Border.all(color: const Color(0xFFFFD700), width: 1.5) : null,
+      ),
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 300),
+        opacity: isDimmed ? 0.5 : 1.0,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              card.rank,
+              style: TextStyle(
+                color: isDimmed ? Colors.grey : (isRed ? Colors.red.shade700 : Colors.black),
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            Text(
+              card.suit,
+              style: TextStyle(
+                color: isDimmed ? Colors.grey : (isRed ? Colors.red.shade700 : Colors.black),
+                fontSize: 10,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1182,6 +1376,8 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
   }
 
   Widget _buildCommunityCardsMinimal(GameRoom room) {
+    final isShowdown = room.phase == 'showdown' && _showdownAnimationComplete;
+
     return Column(
       children: [
         // Community Cards Row
@@ -1191,10 +1387,17 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
             for (var i = 0; i < 5; i++)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: _buildMinimalCard(
-                  i < room.communityCards.length ? room.communityCards[i] : null,
-                  isEmpty: i >= room.communityCards.length,
-                ),
+                child: () {
+                  final card = i < room.communityCards.length ? room.communityCards[i] : null;
+                  final isHighlighted = isShowdown && card != null && _isCardInWinningHand(card, room);
+                  final isDimmed = isShowdown && card != null && !_isCardInWinningHand(card, room);
+                  return _buildMinimalCard(
+                    card,
+                    isEmpty: i >= room.communityCards.length,
+                    isHighlighted: isHighlighted,
+                    isDimmed: isDimmed,
+                  );
+                }(),
               ),
             const SizedBox(width: 16),
             // Pot amount
@@ -1212,7 +1415,8 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
     );
   }
 
-  Widget _buildMinimalCard(PlayingCard? card, {bool isEmpty = false, bool isHoleCard = false}) {
+  Widget _buildMinimalCard(PlayingCard? card,
+      {bool isEmpty = false, bool isHoleCard = false, bool isHighlighted = false, bool isDimmed = false}) {
     const width = 56.0;
     const height = 78.0;
 
@@ -1237,39 +1441,57 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
 
     final isRed = card.suit == '♥' || card.suit == '♦';
 
-    return Container(
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
       width: width,
       height: height,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDimmed ? Colors.grey.shade300 : Colors.white,
         borderRadius: BorderRadius.circular(8),
         boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.3),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
-          ),
+          if (isHighlighted) ...[
+            BoxShadow(
+              color: const Color(0xFFFFD700).withValues(alpha: 0.8),
+              blurRadius: 12,
+              spreadRadius: 2,
+            ),
+            BoxShadow(
+              color: const Color(0xFFFFD700).withValues(alpha: 0.4),
+              blurRadius: 20,
+              spreadRadius: 4,
+            ),
+          ] else
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isDimmed ? 0.1 : 0.3),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
         ],
+        border: isHighlighted ? Border.all(color: const Color(0xFFFFD700), width: 2) : null,
       ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            card.rank,
-            style: TextStyle(
-              color: isRed ? Colors.red.shade700 : Colors.black,
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 300),
+        opacity: isDimmed ? 0.5 : 1.0,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              card.rank,
+              style: TextStyle(
+                color: isDimmed ? Colors.grey : (isRed ? Colors.red.shade700 : Colors.black),
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
             ),
-          ),
-          Text(
-            card.suit,
-            style: TextStyle(
-              color: isRed ? Colors.red.shade700 : Colors.black,
-              fontSize: 22,
+            Text(
+              card.suit,
+              style: TextStyle(
+                color: isDimmed ? Colors.grey : (isRed ? Colors.red.shade700 : Colors.black),
+                fontSize: 22,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

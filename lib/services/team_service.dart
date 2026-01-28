@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/team.dart';
 import 'user_preferences.dart';
+import 'user_service.dart';
 
 /// Service for managing teams via Firebase Realtime Database REST API
 class TeamService {
@@ -103,7 +104,7 @@ class TeamService {
     }
 
     // Deduct chips
-    await UserPreferences.spendChips(createTeamCost);
+    await UserService().spendChips(createTeamCost);
 
     // Save team ID to user's profile
     await _saveUserTeamId(teamId);
@@ -150,7 +151,7 @@ class TeamService {
     );
 
     // Deduct chips
-    await UserPreferences.spendChips(joinTeamCost);
+    await UserService().spendChips(joinTeamCost);
 
     // Save team ID to user's profile
     await _saveUserTeamId(teamId);
@@ -185,6 +186,23 @@ class TeamService {
       body: jsonEncode({'members': updatedMembers.map((m) => m.toJson()).toList()}),
     );
 
+    await _clearUserTeamId();
+  }
+
+  /// Disband a team (captain only)
+  Future<void> disbandTeam(String teamId) async {
+    final userId = currentUserId;
+    if (userId == null) throw Exception('Must be logged in');
+
+    final token = await _getAuthToken();
+    final team = await getTeam(teamId);
+    if (team == null) throw Exception('Team not found');
+    if (!team.isCaptain(userId)) throw Exception('Only the captain can disband the team');
+
+    // Delete the team
+    await http.delete(Uri.parse('$_databaseUrl/teams/$teamId.json?auth=$token'));
+
+    // Clear team ID for all members (in production, you'd want to notify them)
     await _clearUserTeamId();
   }
 
@@ -551,7 +569,7 @@ class TeamService {
     );
 
     // Deduct chips
-    await UserPreferences.spendChips(joinTeamCost);
+    await UserService().spendChips(joinTeamCost);
 
     // Save team ID to user's profile
     await _saveUserTeamId(invite.teamId);

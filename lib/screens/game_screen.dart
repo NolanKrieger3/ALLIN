@@ -79,6 +79,11 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   bool _showBotCards = false;
   String _winnerDescription = '';
 
+  // Showdown animation
+  bool _showdownAnimationComplete = false;
+  int? _winningSeat;
+  Map<int, _EvaluatedHand> _showdownHands = {};
+
   // Fold animation
   late AnimationController _foldAnimationController;
   late Animation<Offset> _foldSlideAnimation;
@@ -176,7 +181,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [1, 2, 3, 4, 5].map((num) {
                   final isSelected = selectedBots == num;
-                  return GestureDetector(
+                  return _AnimatedPressButton(
                     onTap: () {
                       setDialogState(() => selectedBots = num);
                     },
@@ -234,7 +239,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                       diffColor = Colors.grey;
                   }
                   return Expanded(
-                    child: GestureDetector(
+                    child: _AnimatedPressButton(
                       onTap: () {
                         setDialogState(() => selectedDifficulty = diff);
                       },
@@ -463,6 +468,9 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       _gamePhase = 'preflop';
       _showBotCards = false;
       _winnerDescription = '';
+      _showdownAnimationComplete = false;
+      _winningSeat = null;
+      _showdownHands = {};
       _bbHasOption = true;
 
       // First to act preflop is left of BB (UTG)
@@ -940,6 +948,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     setState(() {
       _showBotCards = true;
       _gamePhase = 'showdown';
+      _showdownAnimationComplete = false;
 
       // Evaluate all active hands
       final activePlayers = _getActivePlayers();
@@ -953,6 +962,9 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
           hands[seat] = _evaluateBestHand(bot.cards, _communityCards);
         }
       }
+
+      // Store hands for UI display
+      _showdownHands = hands;
 
       // Find best hand(s)
       int? bestSeat;
@@ -969,17 +981,28 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
         }
       }
 
+      // Set winner for animation (first winner if split pot)
+      _winningSeat = winners.isNotEmpty ? winners[0] : null;
+
       if (winners.length == 1) {
         final winner = winners[0];
         if (winner == 0) {
-          _winnerDescription = 'You win with ${bestHand!.description}!';
+          _winnerDescription = 'You win with ${_getShortHandName(bestHand!.rank)}';
         } else {
-          _winnerDescription = '${_bots[winner - 1].name} wins with ${bestHand!.description}';
+          _winnerDescription = '${_bots[winner - 1].name} wins with ${_getShortHandName(bestHand!.rank)}';
         }
       } else {
-        _winnerDescription = 'Split pot! ${winners.length} players tie with ${bestHand!.description}';
+        _winnerDescription = 'Split pot! ${winners.length} players tie with ${_getShortHandName(bestHand!.rank)}';
       }
 
+      // Start animation delay - show all hands for 1 second before highlighting winner
+      Future.delayed(const Duration(seconds: 1), () {
+        if (mounted) {
+          setState(() => _showdownAnimationComplete = true);
+        }
+      });
+
+      // End hand after 3 seconds total
       Future.delayed(const Duration(seconds: 3), () {
         if (mounted) {
           if (winners.length == 1) {
@@ -1010,14 +1033,6 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       _pot = 0;
     });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(_winnerDescription),
-        backgroundColor: Colors.orange.shade800,
-        duration: const Duration(seconds: 2),
-      ),
-    );
-
     Future.delayed(const Duration(seconds: 2), () {
       if (mounted) {
         _checkGameOver();
@@ -1034,25 +1049,6 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       }
       _pot = 0;
     });
-
-    // Show result and start new hand
-    String message;
-    if (winnerSeat == 0) {
-      message = 'You win!';
-    } else {
-      message = '${_bots[winnerSeat - 1].name} wins!';
-    }
-    if (_winnerDescription.isNotEmpty) {
-      message = _winnerDescription;
-    }
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: winnerSeat == 0 ? Colors.green.shade800 : Colors.red.shade800,
-        duration: const Duration(seconds: 2),
-      ),
-    );
 
     Future.delayed(const Duration(seconds: 2), () {
       if (mounted) {
@@ -1143,7 +1139,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                 // Back button
                 Align(
                   alignment: Alignment.centerLeft,
-                  child: GestureDetector(
+                  child: _AnimatedPressButton(
                     onTap: () => Navigator.pop(context),
                     child: Container(
                       width: 44,
@@ -1256,7 +1252,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: ['Easy', 'Medium', 'Hard'].map((diff) {
                     final isSelected = _difficulty == diff;
-                    return GestureDetector(
+                    return _AnimatedPressButton(
                       onTap: () {
                         setState(() => _difficulty = diff);
                       },
@@ -1285,7 +1281,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                 const Spacer(flex: 2),
 
                 // Play button
-                GestureDetector(
+                _AnimatedPressButton(
                   onTap: () {
                     setState(() {
                       _gameStarted = true;
@@ -1364,7 +1360,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         children: [
-          GestureDetector(
+          _AnimatedPressButton(
             onTap: () => Navigator.pop(context),
             child: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
           ),
@@ -1385,6 +1381,8 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildPlayersRow() {
+    final isShowdown = _gamePhase == 'showdown';
+
     // Build list with only bots (opponents) - player is shown at bottom
     final allParticipants = <_Participant>[
       ...List.generate(
@@ -1397,11 +1395,14 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                 isCurrentTurn: _currentActorIndex == i + 1 && _gamePhase != 'showdown',
                 isPlayer: false,
                 isDealer: _dealerPosition == i + 1,
+                cards: _bots[i].cards,
+                seatIndex: i + 1,
               )),
     ];
 
-    return Container(
-      height: 110,
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      height: isShowdown ? 170 : 110, // More height during showdown to show cards
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Center(
         child: SingleChildScrollView(
@@ -1416,6 +1417,11 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildParticipantAvatar(_Participant p) {
+    final isShowdown = _gamePhase == 'showdown';
+    final isWinner = _winningSeat == p.seatIndex;
+    final isLoser = isShowdown && _showdownAnimationComplete && !isWinner && !p.hasFolded;
+    final participantHand = _showdownHands[p.seatIndex];
+
     // Avatar emoji based on name
     String getAvatar(String name) {
       if (name == 'You') return '👤';
@@ -1424,100 +1430,292 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       return avatars[(index - 1) % avatars.length];
     }
 
+    // Border color: gold if winner at showdown, gold if their turn
     Color? borderColor;
-    if (p.isCurrentTurn) {
+    if (isShowdown && _showdownAnimationComplete && isWinner) {
+      borderColor = const Color(0xFFFFD700); // Gold for winner
+    } else if (p.isCurrentTurn) {
       borderColor = const Color(0xFFD4AF37);
     }
 
-    return Container(
-      width: 72,
-      margin: const EdgeInsets.symmetric(horizontal: 6),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Stack(
-            alignment: Alignment.center,
-            clipBehavior: Clip.none,
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: p.hasFolded ? Colors.grey.shade800 : Colors.white.withValues(alpha: 0.1),
-                  border: borderColor != null ? Border.all(color: borderColor, width: 3) : null,
-                ),
-                child: Center(
-                  child: Text(
-                    getAvatar(p.name),
-                    style: TextStyle(
-                      fontSize: 24,
-                      color: p.hasFolded ? Colors.grey : null,
+    return AnimatedOpacity(
+      duration: const Duration(milliseconds: 300),
+      opacity: isLoser ? 0.5 : 1.0,
+      child: Container(
+        width: 80,
+        margin: const EdgeInsets.symmetric(horizontal: 4),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Stack(
+              alignment: Alignment.center,
+              clipBehavior: Clip.none,
+              children: [
+                // Winner glow ring
+                if (isShowdown && _showdownAnimationComplete && isWinner)
+                  Container(
+                    width: 50,
+                    height: 50,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFFFD700).withValues(alpha: 0.6),
+                          blurRadius: 12,
+                          spreadRadius: 3,
+                        ),
+                      ],
+                    ),
+                  ),
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: p.hasFolded ? Colors.grey.shade800 : Colors.white.withValues(alpha: 0.1),
+                    border: borderColor != null ? Border.all(color: borderColor, width: 3) : null,
+                  ),
+                  child: Center(
+                    child: Text(
+                      getAvatar(p.name),
+                      style: TextStyle(
+                        fontSize: 20,
+                        color: p.hasFolded ? Colors.grey : null,
+                      ),
                     ),
                   ),
                 ),
-              ),
-              // Dealer badge
-              if (p.isDealer)
-                Positioned(
-                  bottom: -2,
-                  right: -2,
-                  child: Container(
-                    width: 18,
-                    height: 18,
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
+                // Dealer badge
+                if (p.isDealer)
+                  Positioned(
+                    bottom: -2,
+                    right: -2,
+                    child: Container(
+                      width: 16,
+                      height: 16,
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Center(
+                        child: Text('D',
+                            style: TextStyle(
+                              color: Colors.black,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            )),
+                      ),
                     ),
-                    child: const Center(
-                      child: Text('D',
+                  ),
+                // Winner badge
+                if (isShowdown && _showdownAnimationComplete && isWinner)
+                  Positioned(
+                    top: -4,
+                    left: -4,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFD700),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Text('WIN',
                           style: TextStyle(
                             color: Colors.black,
-                            fontSize: 11,
+                            fontSize: 7,
                             fontWeight: FontWeight.bold,
                           )),
                     ),
                   ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            // Name
+            Text(
+              p.name,
+              style: TextStyle(
+                color: p.hasFolded ? Colors.grey : Colors.white,
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+            // Chips on one line
+            Text(
+              p.currentBet > 0 ? '${_formatChips(p.chips)} (${_formatChips(p.currentBet)})' : _formatChips(p.chips),
+              style: TextStyle(
+                color: p.hasFolded ? Colors.grey : Colors.yellow.shade600,
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            // Show hole cards during showdown
+            if (isShowdown && !p.hasFolded && p.cards.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _buildMiniCard(
+                      p.cards[0],
+                      isHighlighted: _showdownAnimationComplete &&
+                          isWinner &&
+                          participantHand != null &&
+                          participantHand.isCardInWinningHand(p.cards[0]),
+                      isDimmed: isLoser,
+                    ),
+                    const SizedBox(width: 2),
+                    if (p.cards.length > 1)
+                      _buildMiniCard(
+                        p.cards[1],
+                        isHighlighted: _showdownAnimationComplete &&
+                            isWinner &&
+                            participantHand != null &&
+                            participantHand.isCardInWinningHand(p.cards[1]),
+                        isDimmed: isLoser,
+                      ),
+                  ],
                 ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          // Name
-          Text(
-            p.name,
-            style: TextStyle(
-              color: p.hasFolded ? Colors.grey : Colors.white,
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-            ),
-            overflow: TextOverflow.ellipsis,
-          ),
-          // Chips on one line
-          Text(
-            p.currentBet > 0 ? '${_formatChips(p.chips)} (${_formatChips(p.currentBet)})' : _formatChips(p.chips),
-            style: TextStyle(
-              color: p.hasFolded ? Colors.grey : Colors.yellow.shade600,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
+              ),
+            // Show hand name during showdown
+            if (isShowdown && _showdownAnimationComplete && !p.hasFolded && participantHand != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Text(
+                  _getShortHandName(participantHand.rank),
+                  style: TextStyle(
+                    color: isWinner ? const Color(0xFFFFD700) : Colors.white.withValues(alpha: 0.7),
+                    fontSize: 9,
+                    fontWeight: isWinner ? FontWeight.bold : FontWeight.normal,
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
 
+  /// Build a mini card for showdown display
+  Widget _buildMiniCard(PlayingCard card, {bool isHighlighted = false, bool isDimmed = false}) {
+    const width = 28.0;
+    const height = 38.0;
+    final isRed = card.suit == '♥' || card.suit == '♦';
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: isDimmed ? Colors.grey.shade300 : Colors.white,
+        borderRadius: BorderRadius.circular(4),
+        boxShadow: [
+          if (isHighlighted) ...[
+            BoxShadow(
+              color: const Color(0xFFFFD700).withValues(alpha: 0.8),
+              blurRadius: 8,
+              spreadRadius: 1,
+            ),
+          ] else
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isDimmed ? 0.1 : 0.3),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+        ],
+        border: isHighlighted ? Border.all(color: const Color(0xFFFFD700), width: 1.5) : null,
+      ),
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 300),
+        opacity: isDimmed ? 0.5 : 1.0,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              card.rank,
+              style: TextStyle(
+                color: isDimmed ? Colors.grey : (isRed ? Colors.red.shade700 : Colors.black),
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            Text(
+              card.suit,
+              style: TextStyle(
+                color: isDimmed ? Colors.grey : (isRed ? Colors.red.shade700 : Colors.black),
+                fontSize: 10,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Get short hand name for display
+  String _getShortHandName(_HandRank rank) {
+    switch (rank) {
+      case _HandRank.royalFlush:
+        return 'Royal Flush';
+      case _HandRank.straightFlush:
+        return 'Str. Flush';
+      case _HandRank.fourOfAKind:
+        return 'Quads';
+      case _HandRank.fullHouse:
+        return 'Full House';
+      case _HandRank.flush:
+        return 'Flush';
+      case _HandRank.straight:
+        return 'Straight';
+      case _HandRank.threeOfAKind:
+        return 'Trips';
+      case _HandRank.twoPair:
+        return 'Two Pair';
+      case _HandRank.onePair:
+        return 'Pair';
+      case _HandRank.highCard:
+        return 'High Card';
+    }
+  }
+
   Widget _buildCommunityCardsWithPot() {
+    final isShowdown = _gamePhase == 'showdown' && _showdownAnimationComplete;
+    final winnerHand = _winningSeat != null ? _showdownHands[_winningSeat] : null;
+
     return Column(
       children: [
+        // Winner text that fades in during showdown
+        AnimatedOpacity(
+          duration: const Duration(milliseconds: 500),
+          opacity: isShowdown && _winnerDescription.isNotEmpty ? 1.0 : 0.0,
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Text(
+              _winnerDescription,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.6),
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ),
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             for (var i = 0; i < 5; i++)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: i < _communityCards.length ? _buildMinimalCard(_communityCards[i]) : _buildEmptyCardSlot(),
+                child: () {
+                  if (i >= _communityCards.length) {
+                    return _buildEmptyCardSlot();
+                  }
+                  final card = _communityCards[i];
+                  final isHighlighted = isShowdown && winnerHand != null && winnerHand.isCardInWinningHand(card);
+                  final isDimmed = isShowdown && winnerHand != null && !winnerHand.isCardInWinningHand(card);
+                  return _buildMinimalCard(card, isHighlighted: isHighlighted, isDimmed: isDimmed);
+                }(),
               ),
             const SizedBox(width: 16),
             // Pot amount
@@ -1535,44 +1733,63 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildMinimalCard(PlayingCard card) {
-    const width = 56.0;
-    const height = 78.0;
+  Widget _buildMinimalCard(PlayingCard card,
+      {bool isLarge = false, bool isHighlighted = false, bool isDimmed = false}) {
+    final width = isLarge ? 70.0 : 56.0;
+    final height = isLarge ? 98.0 : 78.0;
     final isRed = card.suit == '♥' || card.suit == '♦';
 
-    return Container(
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
       width: width,
       height: height,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDimmed ? Colors.grey.shade300 : Colors.white,
         borderRadius: BorderRadius.circular(8),
         boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.3),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
-          ),
+          if (isHighlighted) ...[
+            BoxShadow(
+              color: const Color(0xFFFFD700).withValues(alpha: 0.8),
+              blurRadius: 12,
+              spreadRadius: 2,
+            ),
+            BoxShadow(
+              color: const Color(0xFFFFD700).withValues(alpha: 0.4),
+              blurRadius: 20,
+              spreadRadius: 4,
+            ),
+          ] else
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isDimmed ? 0.1 : 0.3),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
         ],
+        border: isHighlighted ? Border.all(color: const Color(0xFFFFD700), width: 2) : null,
       ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            card.rank,
-            style: TextStyle(
-              color: isRed ? Colors.red.shade700 : Colors.black,
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 300),
+        opacity: isDimmed ? 0.5 : 1.0,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              card.rank,
+              style: TextStyle(
+                color: isDimmed ? Colors.grey : (isRed ? Colors.red.shade700 : Colors.black),
+                fontSize: isLarge ? 24 : 20,
+                fontWeight: FontWeight.bold,
+              ),
             ),
-          ),
-          Text(
-            card.suit,
-            style: TextStyle(
-              color: isRed ? Colors.red.shade700 : Colors.black,
-              fontSize: 22,
+            Text(
+              card.suit,
+              style: TextStyle(
+                color: isDimmed ? Colors.grey : (isRed ? Colors.red.shade700 : Colors.black),
+                fontSize: isLarge ? 26 : 22,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -1599,6 +1816,15 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
 
   Widget _buildWaitMessage({String? message}) {
     String displayMessage = message ?? (_playerHasFolded ? 'You folded' : 'Hand complete');
+    final isShowdown = _gamePhase == 'showdown';
+    final isPlayerWinner = _winningSeat == 0;
+    final isPlayerLoser = isShowdown && _showdownAnimationComplete && !isPlayerWinner && !_playerHasFolded;
+    final playerHand = _showdownHands[0];
+
+    // During showdown, show simple status (winner text is shown above cards now)
+    if (isShowdown) {
+      displayMessage = isPlayerWinner ? 'You win!' : 'Showdown';
+    }
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -1608,37 +1834,72 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
             width: double.infinity,
             padding: const EdgeInsets.symmetric(vertical: 16),
             decoration: BoxDecoration(
-              color: Colors.transparent,
+              color: isShowdown && _showdownAnimationComplete && isPlayerWinner
+                  ? const Color(0xFFFFD700).withValues(alpha: 0.1)
+                  : Colors.transparent,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+              border: Border.all(
+                color: isShowdown && _showdownAnimationComplete && isPlayerWinner
+                    ? const Color(0xFFFFD700).withValues(alpha: 0.5)
+                    : Colors.white.withValues(alpha: 0.2),
+              ),
             ),
             child: Center(
               child: Text(
                 displayMessage,
                 style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.6),
+                  color: isShowdown && _showdownAnimationComplete && isPlayerWinner
+                      ? const Color(0xFFFFD700)
+                      : Colors.white.withValues(alpha: 0.6),
                   fontSize: 16,
+                  fontWeight: isPlayerWinner ? FontWeight.bold : FontWeight.normal,
                 ),
               ),
             ),
           ),
           const SizedBox(height: 16),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              // Player's cards
-              Row(
-                children: [
-                  _buildCardBack(width: 70, height: 98),
-                  Transform.translate(
-                    offset: const Offset(-20, 0),
-                    child: _buildCardBack(width: 70, height: 98),
-                  ),
-                ],
-              ),
-              const Spacer(),
-              _buildPlayerAvatar(),
-            ],
+          AnimatedOpacity(
+            duration: const Duration(milliseconds: 300),
+            opacity: isPlayerLoser ? 0.5 : 1.0,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                // Player's cards - always show face up during showdown (dimmed if folded or lost)
+                if (isShowdown && _playerCards.isNotEmpty)
+                  Row(
+                    children: [
+                      _buildMinimalCard(
+                        _playerCards[0],
+                        isLarge: true,
+                        isHighlighted: _showdownAnimationComplete &&
+                            isPlayerWinner &&
+                            !_playerHasFolded &&
+                            playerHand != null &&
+                            playerHand.isCardInWinningHand(_playerCards[0]),
+                        isDimmed: isPlayerLoser || _playerHasFolded,
+                      ),
+                      Transform.translate(
+                        offset: const Offset(-20, 0),
+                        child: _buildMinimalCard(
+                          _playerCards.length > 1 ? _playerCards[1] : _playerCards[0],
+                          isLarge: true,
+                          isHighlighted: _showdownAnimationComplete &&
+                              isPlayerWinner &&
+                              !_playerHasFolded &&
+                              playerHand != null &&
+                              _playerCards.length > 1 &&
+                              playerHand.isCardInWinningHand(_playerCards[1]),
+                          isDimmed: isPlayerLoser || _playerHasFolded,
+                        ),
+                      ),
+                    ],
+                  )
+                else
+                  _buildPlayerCards(),
+                const Spacer(),
+                _buildPlayerAvatar(),
+              ],
+            ),
           ),
         ],
       ),
@@ -1650,49 +1911,45 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     final canCheck = callAmount <= 0;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
+      padding: const EdgeInsets.symmetric(horizontal: 40),
       child: Column(
         children: [
           // Action buttons row
           Row(
             children: [
               Expanded(
-                child: GestureDetector(
+                child: _AnimatedGameButton(
                   onTap: () => _playerAction(canCheck ? 'check' : 'call'),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    decoration: BoxDecoration(
-                      color: Colors.transparent,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
-                    ),
-                    child: Center(
-                      child: Text(
-                        canCheck ? 'Check' : 'Call ${_formatChips(callAmount)}',
-                        style: const TextStyle(color: Colors.white, fontSize: 16),
-                      ),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  decoration: BoxDecoration(
+                    color: Colors.transparent,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
+                  ),
+                  child: Center(
+                    child: Text(
+                      canCheck ? 'Check' : 'Call ${_formatChips(callAmount)}',
+                      style: const TextStyle(color: Colors.white, fontSize: 16),
                     ),
                   ),
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: GestureDetector(
+                child: _AnimatedGameButton(
                   onTap: () {
                     final minRaise = _currentBet + _lastRaiseAmount;
                     _showRaiseSlider(minRaise);
                   },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Center(
-                      child: Text(
-                        'Raise',
-                        style: TextStyle(color: Colors.black, fontSize: 16, fontWeight: FontWeight.w600),
-                      ),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Center(
+                    child: Text(
+                      'Raise',
+                      style: TextStyle(color: Colors.black, fontSize: 16, fontWeight: FontWeight.w600),
                     ),
                   ),
                 ),
@@ -1758,12 +2015,15 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildPlayerCards() {
+  Widget _buildPlayerCards({bool isDimmed = false}) {
     return Row(
       children: [
-        if (_playerCards.isNotEmpty) _buildMinimalCard(_playerCards[0]),
-        const SizedBox(width: 8),
-        if (_playerCards.length > 1) _buildMinimalCard(_playerCards[1]),
+        if (_playerCards.isNotEmpty) _buildMinimalCard(_playerCards[0], isLarge: true, isDimmed: isDimmed),
+        if (_playerCards.length > 1)
+          Transform.translate(
+            offset: const Offset(-20, 0),
+            child: _buildMinimalCard(_playerCards[1], isLarge: true, isDimmed: isDimmed),
+          ),
       ],
     );
   }
@@ -1867,14 +2127,6 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
           ],
         ),
         const SizedBox(height: 4),
-        Text(
-          'You',
-          style: TextStyle(
-            color: const Color(0xFF3B82F6),
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
         Text(
           _formatChips(_playerChips),
           style: TextStyle(
@@ -2079,7 +2331,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   }
 }
 
-class _ActionButton extends StatelessWidget {
+class _ActionButton extends StatefulWidget {
   final String label;
   final Color color;
   final VoidCallback onTap;
@@ -2091,26 +2343,200 @@ class _ActionButton extends StatelessWidget {
   });
 
   @override
+  State<_ActionButton> createState() => _ActionButtonState();
+}
+
+class _ActionButtonState extends State<_ActionButton> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 100),
+    );
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.95).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final isWhite = color == Colors.white;
+    final isWhite = widget.color == Colors.white;
 
     return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        decoration: BoxDecoration(
-          color: isWhite ? Colors.white : color.withValues(alpha: 0.15),
-          borderRadius: BorderRadius.circular(24),
-          border: isWhite ? null : Border.all(color: color.withValues(alpha: 0.3)),
+      onTapDown: (_) => _controller.forward(),
+      onTapUp: (_) {
+        _controller.reverse();
+        widget.onTap();
+      },
+      onTapCancel: () => _controller.reverse(),
+      child: AnimatedBuilder(
+        animation: _scaleAnimation,
+        builder: (context, child) => Transform.scale(
+          scale: _scaleAnimation.value,
+          child: child,
         ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: isWhite ? Colors.black : color,
-            fontWeight: FontWeight.w600,
-            fontSize: 14,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          decoration: BoxDecoration(
+            color: isWhite ? Colors.white : widget.color.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(24),
+            border: isWhite ? null : Border.all(color: widget.color.withValues(alpha: 0.3)),
+          ),
+          child: Text(
+            widget.label,
+            style: TextStyle(
+              color: isWhite ? Colors.black : widget.color,
+              fontWeight: FontWeight.w600,
+              fontSize: 14,
+            ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Animated button widget with scale animation on press
+class _AnimatedGameButton extends StatefulWidget {
+  final Widget child;
+  final VoidCallback onTap;
+  final BoxDecoration? decoration;
+  final EdgeInsetsGeometry? padding;
+
+  const _AnimatedGameButton({
+    required this.child,
+    required this.onTap,
+    this.decoration,
+    this.padding,
+  });
+
+  @override
+  State<_AnimatedGameButton> createState() => _AnimatedGameButtonState();
+}
+
+class _AnimatedGameButtonState extends State<_AnimatedGameButton> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scaleAnimation;
+  late Animation<double> _opacityAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 100),
+    );
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.95).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+    _opacityAnimation = Tween<double>(begin: 1.0, end: 0.8).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) => _controller.forward(),
+      onTapUp: (_) {
+        _controller.reverse();
+        widget.onTap();
+      },
+      onTapCancel: () => _controller.reverse(),
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, child) => Transform.scale(
+          scale: _scaleAnimation.value,
+          child: Opacity(
+            opacity: _opacityAnimation.value,
+            child: child,
+          ),
+        ),
+        child: Container(
+          padding: widget.padding,
+          decoration: widget.decoration,
+          child: widget.child,
+        ),
+      ),
+    );
+  }
+}
+
+// Generic animated press button for setup screen and dialogs
+class _AnimatedPressButton extends StatefulWidget {
+  final Widget child;
+  final VoidCallback onTap;
+
+  const _AnimatedPressButton({
+    required this.child,
+    required this.onTap,
+  });
+
+  @override
+  State<_AnimatedPressButton> createState() => _AnimatedPressButtonState();
+}
+
+class _AnimatedPressButtonState extends State<_AnimatedPressButton> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scaleAnimation;
+  late Animation<double> _opacityAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 100),
+    );
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.95).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+    _opacityAnimation = Tween<double>(begin: 1.0, end: 0.8).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) => _controller.forward(),
+      onTapUp: (_) {
+        _controller.reverse();
+        widget.onTap();
+      },
+      onTapCancel: () => _controller.reverse(),
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, child) => Transform.scale(
+          scale: _scaleAnimation.value,
+          child: Opacity(
+            opacity: _opacityAnimation.value,
+            child: child,
+          ),
+        ),
+        child: widget.child,
       ),
     );
   }
@@ -2125,6 +2551,8 @@ class _Participant {
   final bool isCurrentTurn;
   final bool isPlayer;
   final bool isDealer;
+  final List<PlayingCard> cards;
+  final int seatIndex;
 
   _Participant({
     required this.name,
@@ -2134,6 +2562,8 @@ class _Participant {
     required this.isCurrentTurn,
     required this.isPlayer,
     required this.isDealer,
+    this.cards = const [],
+    this.seatIndex = 0,
   });
 }
 
@@ -2168,12 +2598,19 @@ class _EvaluatedHand {
   final _HandRank rank;
   final List<int> tiebreakers;
   final String description;
+  final List<PlayingCard> winningCards;
 
   _EvaluatedHand({
     required this.rank,
     required this.tiebreakers,
     required this.description,
+    this.winningCards = const [],
   });
+
+  /// Check if a card is part of the winning hand
+  bool isCardInWinningHand(PlayingCard card) {
+    return winningCards.any((c) => c.rank == card.rank && c.suit == card.suit);
+  }
 
   int compareTo(_EvaluatedHand other) {
     if (rank.index != other.rank.index) {
@@ -2196,14 +2633,22 @@ _EvaluatedHand _evaluateBestHand(List<PlayingCard> holeCards, List<PlayingCard> 
   _getCombinations(allCards, 5, 0, [], combinations);
 
   _EvaluatedHand? bestHand;
+  List<PlayingCard>? bestCombo;
   for (final combo in combinations) {
     final hand = _evaluateFiveCards(combo);
     if (bestHand == null || hand.compareTo(bestHand) > 0) {
       bestHand = hand;
+      bestCombo = combo;
     }
   }
 
-  return bestHand!;
+  // Return hand with the winning cards included
+  return _EvaluatedHand(
+    rank: bestHand!.rank,
+    tiebreakers: bestHand.tiebreakers,
+    description: bestHand.description,
+    winningCards: bestCombo ?? [],
+  );
 }
 
 void _getCombinations(

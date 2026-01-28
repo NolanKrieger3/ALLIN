@@ -10,7 +10,7 @@ class AppRoutes {
   // static const String settings = '/settings';
 
   static Map<String, WidgetBuilder> get routes => {
-        home: (context) => const HomeScreen(),
+        // Note: '/' is handled by home property in MaterialApp, don't add it here
         usernameSetup: (context) => const UsernameSetupScreen(),
         // Add more routes here
       };

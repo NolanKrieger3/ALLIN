@@ -730,53 +730,158 @@ class _TutorialScreenState extends State<TutorialScreen> with TickerProviderStat
 
   Widget _buildGameTable() {
     return Expanded(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-        child: Column(
+      child: Column(
+        children: [
+          // Bots row at top (matching game_screen style)
+          _buildBotsRow(),
+
+          // Spacer to push community cards to center
+          const Spacer(flex: 2),
+
+          // Community cards with pot inline
+          _buildCommunityCardsWithPot(),
+
+          const Spacer(flex: 3),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBotsRow() {
+    return Container(
+      height: 100,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Center(
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Bots area
-            Expanded(
-              flex: 3,
-              child: _buildBotsArea(),
-            ),
-
-            // Community cards
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  for (int i = 0; i < 5; i++) ...[
-                    if (i > 0) const SizedBox(width: 6),
-                    i < _visibleCommunityCards.length
-                        ? _buildCommunityCard(_visibleCommunityCards[i], highlight: _currentStep.highlightCards)
-                        : _buildEmptyCardSlot(),
-                  ],
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 8),
+            _buildBotAvatar('B1', _bot1Chips, _bot1Action, _showBot1Cards ? _currentLesson.bot1Cards : null),
+            const SizedBox(width: 16),
+            _buildBotAvatar('B2', _bot2Chips, _bot2Action, _showBot2Cards ? _currentLesson.bot2Cards : null),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildCommunityCard(TutorialCard card, {bool highlight = false}) {
-    final isRed = card.isRed;
+  Widget _buildBotAvatar(String name, int chips, String action, List<TutorialCard>? cards) {
+    final hasFolded = action.contains('FOLD');
+    final isCurrentTurn = false; // Tutorial doesn't track bot turns visually
+
     return Container(
-      width: 42,
-      height: 60,
+      width: 64,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Stack(
+            alignment: Alignment.center,
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: hasFolded ? Colors.grey.shade800 : Colors.white.withValues(alpha: 0.1),
+                ),
+                child: Center(
+                  child: Text(
+                    name == 'B1' ? '🤖' : '🦊',
+                    style: TextStyle(
+                      fontSize: 20,
+                      color: hasFolded ? Colors.grey : null,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            name,
+            style: TextStyle(
+              color: hasFolded ? Colors.grey : Colors.white,
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+          Text(
+            _formatChips(chips),
+            style: TextStyle(
+              color: hasFolded ? Colors.grey : Colors.yellow.shade600,
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          if (action.isNotEmpty)
+            Container(
+              margin: const EdgeInsets.only(top: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+              decoration: BoxDecoration(
+                color: hasFolded ? Colors.red.withValues(alpha: 0.3) : const Color(0xFF00D46A).withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                action,
+                style: TextStyle(
+                  color: hasFolded ? Colors.red.shade300 : const Color(0xFF00D46A),
+                  fontSize: 8,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCommunityCardsWithPot() {
+    return Column(
+      children: [
+        // Community cards
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            for (int i = 0; i < 5; i++) ...[
+              if (i > 0) const SizedBox(width: 6),
+              i < _visibleCommunityCards.length
+                  ? _buildMinimalCard(_visibleCommunityCards[i], highlight: _currentStep.highlightCards)
+                  : _buildEmptyCardSlot(),
+            ],
+            const SizedBox(width: 16),
+            // Pot amount
+            Text(
+              _pot.toString(),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 24,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMinimalCard(TutorialCard card, {bool highlight = false, bool isLarge = false}) {
+    final width = isLarge ? 70.0 : 56.0;
+    final height = isLarge ? 98.0 : 78.0;
+    final isRed = card.isRed;
+
+    return Container(
+      width: width,
+      height: height,
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(8),
         border: highlight ? Border.all(color: const Color(0xFFD4AF37), width: 2) : null,
         boxShadow: [
           BoxShadow(
-            color: highlight ? const Color(0xFFD4AF37).withValues(alpha: 0.5) : Colors.black.withValues(alpha: 0.2),
-            blurRadius: highlight ? 8 : 4,
-            offset: const Offset(0, 2),
+            color: highlight ? const Color(0xFFD4AF37).withValues(alpha: 0.5) : Colors.black.withValues(alpha: 0.3),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -786,18 +891,16 @@ class _TutorialScreenState extends State<TutorialScreen> with TickerProviderStat
           Text(
             card.rank,
             style: TextStyle(
-              color: isRed ? Colors.red.shade700 : Colors.black87,
-              fontSize: 14,
+              color: isRed ? Colors.red.shade700 : Colors.black,
+              fontSize: isLarge ? 24 : 20,
               fontWeight: FontWeight.bold,
-              height: 1,
             ),
           ),
           Text(
             card.suit,
             style: TextStyle(
-              color: isRed ? Colors.red.shade700 : Colors.black87,
-              fontSize: 12,
-              height: 1.2,
+              color: isRed ? Colors.red.shade700 : Colors.black,
+              fontSize: isLarge ? 26 : 22,
             ),
           ),
         ],
@@ -807,103 +910,12 @@ class _TutorialScreenState extends State<TutorialScreen> with TickerProviderStat
 
   Widget _buildEmptyCardSlot() {
     return Container(
-      width: 42,
-      height: 60,
+      width: 56,
+      height: 78,
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.03),
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
-      ),
-    );
-  }
-
-  Widget _buildBotsArea() {
-    return Center(
-      child: Wrap(
-        alignment: WrapAlignment.center,
-        spacing: 12,
-        runSpacing: 8,
-        children: [
-          _buildBotWidget('B1', _bot1Chips, _showBot1Cards ? _currentLesson.bot1Cards : null, _bot1Action),
-          _buildBotWidget('B2', _bot2Chips, _showBot2Cards ? _currentLesson.bot2Cards : null, _bot2Action),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBotWidget(String name, int chips, List<TutorialCard>? cards, String action) {
-    final hasFolded = action.contains('FOLD');
-
-    return Opacity(
-      opacity: hasFolded ? 0.3 : 1.0,
-      child: Container(
-        width: 80,
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-        decoration: BoxDecoration(
-          color: const Color(0xFF1A1A1A),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Cards
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: cards != null
-                  ? cards
-                      .map((c) => Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 1),
-                            child: _buildMiniCard(c),
-                          ))
-                      .toList()
-                  : [_buildMiniCardBack(), const SizedBox(width: 2), _buildMiniCardBack()],
-            ),
-            const SizedBox(height: 6),
-            // Name
-            Text(
-              name,
-              style: TextStyle(
-                color: hasFolded ? Colors.red.shade300 : Colors.white70,
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            // Chips
-            Text(
-              _formatChips(chips),
-              style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 10),
-            ),
-            // Action indicator
-            if (action.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: hasFolded
-                        ? Colors.red.withValues(alpha: 0.2)
-                        : action.contains('CHECK')
-                            ? Colors.white.withValues(alpha: 0.1)
-                            : const Color(0xFF00D46A).withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    action,
-                    style: TextStyle(
-                      color: hasFolded
-                          ? Colors.red.shade300
-                          : action.contains('CHECK')
-                              ? Colors.white70
-                              : const Color(0xFF00D46A),
-                      fontSize: 8,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-          ],
-        ),
       ),
     );
   }
@@ -1008,41 +1020,67 @@ class _TutorialScreenState extends State<TutorialScreen> with TickerProviderStat
   }
 
   Widget _buildPlayerArea() {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-      decoration: const BoxDecoration(
-        color: Color(0xFF111111),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 40),
       child: Column(
-        mainAxisSize: MainAxisSize.min,
         children: [
-          // Player cards
+          // Action buttons row
+          if (!_lessonComplete) _buildActionButtonsRow(),
+          const SizedBox(height: 16),
+          // Player cards and avatar row
           Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: _showPlayerCards
-                ? _currentLesson.playerCards
-                    .map((c) => Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 4),
-                          child: _buildCard(c, highlight: _currentStep.highlightCards),
-                        ))
-                    .toList()
-                : [_buildCardBack(), const SizedBox(width: 8), _buildCardBack()],
-          ),
-          const SizedBox(height: 12),
-          // Chips display
-          Text(
-            _formatChips(_playerChips),
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.5),
-              fontSize: 14,
-            ),
+            children: [
+              // Player cards (larger, swipe-to-fold style)
+              Expanded(
+                child: Row(
+                  children: _showPlayerCards
+                      ? _currentLesson.playerCards
+                          .map((c) => Padding(
+                                padding: const EdgeInsets.only(right: 8),
+                                child: _buildMinimalCard(c, highlight: _currentStep.highlightCards, isLarge: true),
+                              ))
+                          .toList()
+                      : [_buildCardBack(), const SizedBox(width: 8), _buildCardBack()],
+                ),
+              ),
+              const SizedBox(width: 12),
+              // Player avatar on right
+              _buildPlayerAvatar(),
+            ],
           ),
           const SizedBox(height: 16),
-          // Action buttons or lesson complete buttons
-          if (_lessonComplete) _buildLessonCompleteButtons() else _buildActionButtonsRow(),
+          // Lesson complete buttons
+          if (_lessonComplete) _buildLessonCompleteButtons(),
         ],
       ),
+    );
+  }
+
+  Widget _buildPlayerAvatar() {
+    return Column(
+      children: [
+        Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: Colors.white.withValues(alpha: 0.1),
+            border: Border.all(color: const Color(0xFF3B82F6), width: 2),
+          ),
+          child: const Center(
+            child: Text('👤', style: TextStyle(fontSize: 24)),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          _formatChips(_playerChips),
+          style: TextStyle(
+            color: Colors.yellow.shade600,
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
     );
   }
 
@@ -1067,21 +1105,67 @@ class _TutorialScreenState extends State<TutorialScreen> with TickerProviderStat
       );
     }
 
-    // Action buttons - match game_screen layout
+    // Action buttons - match game_screen layout (two buttons side by side)
+    final canCheck = _currentBet <= _playerBet;
+    final isCallRequired = step.requiredAction == 'call' || step.requiredAction == 'check';
+    final isRaiseRequired = step.requiredAction == 'raise' || step.requiredAction == 'allin';
+    final isFoldRequired = step.requiredAction == 'fold';
+
     return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        _buildActionBtn('Fold', Colors.red.shade400, step.requiredAction == 'fold'),
-        const SizedBox(width: 8),
-        _buildActionBtn(
-          _currentBet <= _playerBet ? 'Check' : 'Call',
-          _currentBet <= _playerBet ? Colors.white : Colors.green,
-          step.requiredAction == 'check' || step.requiredAction == 'call',
+        // Check/Call button
+        Expanded(
+          child: GestureDetector(
+            onTap: () => _handlePlayerAction(canCheck ? 'check' : 'call'),
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              decoration: BoxDecoration(
+                color: isCallRequired ? const Color(0xFF00D46A) : Colors.transparent,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: isCallRequired ? const Color(0xFF00D46A) : Colors.white.withValues(alpha: 0.3),
+                ),
+              ),
+              child: Center(
+                child: Text(
+                  canCheck ? 'Check' : 'Call',
+                  style: TextStyle(
+                    color: isCallRequired ? Colors.white : Colors.white,
+                    fontSize: 16,
+                    fontWeight: isCallRequired ? FontWeight.bold : FontWeight.normal,
+                  ),
+                ),
+              ),
+            ),
+          ),
         ),
-        const SizedBox(width: 8),
-        _buildActionBtn('Raise', Colors.orange, step.requiredAction == 'raise'),
-        const SizedBox(width: 8),
-        _buildActionBtn('All In', const Color(0xFFD4AF37), step.requiredAction == 'allin'),
+        const SizedBox(width: 12),
+        // Raise button
+        Expanded(
+          child: GestureDetector(
+            onTap: () => _handlePlayerAction(step.requiredAction == 'allin' ? 'allin' : 'raise'),
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              decoration: BoxDecoration(
+                color: isRaiseRequired ? const Color(0xFFD4AF37) : Colors.transparent,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: isRaiseRequired ? const Color(0xFFD4AF37) : Colors.white.withValues(alpha: 0.3),
+                ),
+              ),
+              child: Center(
+                child: Text(
+                  step.requiredAction == 'allin' ? 'All In' : 'Raise',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: isRaiseRequired ? FontWeight.bold : FontWeight.normal,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -1425,7 +1509,7 @@ class _TutorialScreenState extends State<TutorialScreen> with TickerProviderStat
     return Positioned(
       left: 16,
       right: 16,
-      bottom: _waitingForAction || _lessonComplete ? 140 : 100,
+      bottom: _waitingForAction || _lessonComplete ? 220 : 180,
       child: ScaleTransition(
         scale: _bubbleAnimation,
         child: Row(

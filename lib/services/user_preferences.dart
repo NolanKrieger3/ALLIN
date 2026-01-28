@@ -28,6 +28,8 @@ class LuckyHandType {
 class UserPreferences {
   static const String _usernameKey = 'username';
   static const String _hasSetUsernameKey = 'has_set_username';
+  static const String _cachedUidKey = 'cached_uid';
+  static const String _cachedPasswordKey = 'cached_password';
   static const String _chipsKey = 'chips';
   static const String _gemsKey = 'gems';
   static const String _luckyHandDateKey = 'lucky_hand_date';
@@ -79,6 +81,36 @@ class UserPreferences {
   static Future<void> clearUsername() async {
     await _prefs?.remove(_usernameKey);
     await _prefs?.setBool(_hasSetUsernameKey, false);
+  }
+
+  /// Get cached Firebase UID
+  static String? get cachedUid {
+    return _prefs?.getString(_cachedUidKey);
+  }
+
+  /// Set cached Firebase UID
+  static Future<void> setCachedUid(String uid) async {
+    await _prefs?.setString(_cachedUidKey, uid);
+  }
+
+  /// Get cached password for auto-login
+  static String? get cachedPassword {
+    return _prefs?.getString(_cachedPasswordKey);
+  }
+
+  /// Set cached password for auto-login
+  static Future<void> setCachedPassword(String password) async {
+    await _prefs?.setString(_cachedPasswordKey, password);
+  }
+
+  /// Clear all user data (when switching accounts)
+  static Future<void> clearAllUserData() async {
+    await _prefs?.remove(_usernameKey);
+    await _prefs?.setBool(_hasSetUsernameKey, false);
+    await _prefs?.remove(_cachedUidKey);
+    await _prefs?.remove(_cachedPasswordKey);
+    await _prefs?.setInt(_chipsKey, _defaultChips);
+    await _prefs?.setInt(_gemsKey, _defaultGems);
   }
 
   /// Generate a random fun name for testing

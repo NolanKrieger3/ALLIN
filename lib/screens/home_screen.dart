@@ -8,6 +8,7 @@ import '../models/team.dart';
 import '../services/friends_service.dart';
 import '../services/team_service.dart';
 import '../services/user_preferences.dart';
+import '../services/user_service.dart';
 import 'game_screen.dart';
 import 'lobby_screen.dart';
 import 'quick_play_screen.dart';
@@ -185,6 +186,7 @@ class _HomeTabState extends State<_HomeTab> {
   final FriendsService _friendsService = FriendsService();
   final TeamService _teamService = TeamService();
   final AuthService _authService = AuthService();
+  final UserService _userService = UserService();
   List<Friend> _friends = [];
   int _unreadNotifications = 0;
   int _pendingFriendRequests = 0;
@@ -214,11 +216,16 @@ class _HomeTabState extends State<_HomeTab> {
     _loadFriendsData();
     _loadChipBalance();
     _loadUserTeam();
+    _syncUserDataFromFirestore();
 
     // Listen to auth state changes to reload team when user is confirmed
     _authSub = _authService.authStateChanges.listen((user) {
-      if (user != null && _userTeam == null) {
-        _loadUserTeam();
+      if (user != null) {
+        if (_userTeam == null) {
+          _loadUserTeam();
+        }
+        // Sync all user data whenever auth state changes (e.g., sign in)
+        _syncUserDataFromFirestore();
       }
     });
 
@@ -237,15 +244,50 @@ class _HomeTabState extends State<_HomeTab> {
     });
   }
 
+  /// Sync all user data from Firestore - redirect to setup if no username
+  Future<void> _syncUserDataFromFirestore() async {
+    try {
+      final data = await _userService.syncAllUserData();
+      final needsSetup = await _userService.needsUsernameSetup();
+
+      if (mounted && needsSetup) {
+        // User doesn't have a username set in Firestore, redirect to setup
+        Navigator.of(context).pushReplacementNamed('/username-setup');
+      } else if (mounted) {
+        // Trigger rebuild to show updated data
+        _loadChipBalance();
+        setState(() {});
+      }
+    } catch (e) {
+      // If sync fails, continue with local data
+    }
+  }
+
   Future<void> _loadUserTeam() async {
     try {
       final team = await _teamService.getUserTeam();
       if (mounted) {
+        // Always cancel old subscription first
+        _teamSub?.cancel();
+        _teamSub = null;
+
         setState(() => _userTeam = team);
+
         if (team != null) {
-          _teamSub?.cancel();
+          // Watch for team updates, but verify user is still a member
           _teamSub = _teamService.watchTeam(team.id).listen((updatedTeam) {
-            if (mounted) setState(() => _userTeam = updatedTeam);
+            if (mounted) {
+              // Check if user is still in the team
+              final userId = _teamService.currentUserId;
+              if (updatedTeam == null || userId == null || !updatedTeam.isMember(userId)) {
+                // User is no longer in this team, clear it
+                setState(() => _userTeam = null);
+                _teamSub?.cancel();
+                _teamSub = null;
+              } else {
+                setState(() => _userTeam = updatedTeam);
+              }
+            }
           });
         }
       }
@@ -559,87 +601,147 @@ class _HomeTabState extends State<_HomeTab> {
                   itemCount: _userTeam!.sortedMembers.length,
                   itemBuilder: (context, index) {
                     final member = _userTeam!.sortedMembers[index];
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 6),
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.03),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Row(
-                        children: [
-                          // Rank number
-                          Container(
-                            width: 22,
-                            height: 22,
-                            decoration: BoxDecoration(
-                              color: index < 3
-                                  ? const Color(0xFFD4AF37).withValues(alpha: 0.2)
-                                  : Colors.white.withValues(alpha: 0.05),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Center(
-                              child: Text(
-                                '${index + 1}',
-                                style: TextStyle(
-                                  color: index < 3 ? const Color(0xFFD4AF37) : Colors.white.withValues(alpha: 0.5),
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
+                    final isMe = member.odeid == _teamService.currentUserId;
+                    final canKick = isCaptain && !isMe;
+
+                    return GestureDetector(
+                      onTap: canKick
+                          ? () {
+                              Navigator.pop(context);
+                              _confirmKickMember(member);
+                            }
+                          : null,
+                      child: Container(
+                        margin: const EdgeInsets.only(bottom: 6),
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.03),
+                          borderRadius: BorderRadius.circular(10),
+                          border: canKick ? Border.all(color: Colors.white.withValues(alpha: 0.05)) : null,
+                        ),
+                        child: Row(
+                          children: [
+                            // Rank number
+                            Container(
+                              width: 22,
+                              height: 22,
+                              decoration: BoxDecoration(
+                                color: index < 3
+                                    ? const Color(0xFFD4AF37).withValues(alpha: 0.2)
+                                    : Colors.white.withValues(alpha: 0.05),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  '${index + 1}',
+                                  style: TextStyle(
+                                    color: index < 3 ? const Color(0xFFD4AF37) : Colors.white.withValues(alpha: 0.5),
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                          const SizedBox(width: 10),
-                          // Name
-                          Expanded(
-                            child: Row(
-                              children: [
-                                Text(
-                                  member.displayName,
-                                  style:
-                                      const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500),
-                                ),
-                                if (member.rankIcon.isNotEmpty) ...[
-                                  const SizedBox(width: 5),
-                                  Text(member.rankIcon, style: const TextStyle(fontSize: 11)),
+                            const SizedBox(width: 10),
+                            // Name
+                            Expanded(
+                              child: Row(
+                                children: [
+                                  Text(
+                                    member.displayName,
+                                    style:
+                                        const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500),
+                                  ),
+                                  if (member.rankIcon.isNotEmpty) ...[
+                                    const SizedBox(width: 5),
+                                    Text(member.rankIcon, style: const TextStyle(fontSize: 11)),
+                                  ],
+                                  if (isMe) ...[
+                                    const SizedBox(width: 4),
+                                    Text('(You)',
+                                        style: TextStyle(color: Colors.white.withValues(alpha: 0.3), fontSize: 10)),
+                                  ],
                                 ],
-                              ],
-                            ),
-                          ),
-                          // Rank title
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: member.rank == 'captain'
-                                  ? const Color(0xFFD4AF37).withValues(alpha: 0.15)
-                                  : member.rank == 'officer'
-                                      ? const Color(0xFF3B82F6).withValues(alpha: 0.15)
-                                      : Colors.white.withValues(alpha: 0.05),
-                              borderRadius: BorderRadius.circular(5),
-                            ),
-                            child: Text(
-                              member.rankDisplayName,
-                              style: TextStyle(
-                                color: member.rank == 'captain'
-                                    ? const Color(0xFFD4AF37)
-                                    : member.rank == 'officer'
-                                        ? const Color(0xFF3B82F6)
-                                        : Colors.white.withValues(alpha: 0.5),
-                                fontSize: 9,
-                                fontWeight: FontWeight.w600,
                               ),
                             ),
-                          ),
-                          const SizedBox(width: 6),
-                          // MMR/Winnings
-                          Text(
-                            '${member.totalWinnings}',
-                            style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 11),
-                          ),
-                        ],
+                            // Rank title
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: member.rank == 'captain'
+                                    ? const Color(0xFFD4AF37).withValues(alpha: 0.15)
+                                    : member.rank == 'officer'
+                                        ? const Color(0xFF3B82F6).withValues(alpha: 0.15)
+                                        : Colors.white.withValues(alpha: 0.05),
+                                borderRadius: BorderRadius.circular(5),
+                              ),
+                              child: Text(
+                                member.rankDisplayName,
+                                style: TextStyle(
+                                  color: member.rank == 'captain'
+                                      ? const Color(0xFFD4AF37)
+                                      : member.rank == 'officer'
+                                          ? const Color(0xFF3B82F6)
+                                          : Colors.white.withValues(alpha: 0.5),
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            // MMR/Winnings or kick icon
+                            if (canKick)
+                              Icon(Icons.close_rounded, color: Colors.white.withValues(alpha: 0.2), size: 16)
+                            else
+                              Text(
+                                '${member.totalWinnings}',
+                                style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 11),
+                              ),
+                          ],
+                        ),
                       ),
                     );
                   },
+                ),
+              ),
+              // Leave/Disband Team button
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+                child: GestureDetector(
+                  onTap: () {
+                    Navigator.pop(context);
+                    if (isCaptain && _userTeam!.memberCount == 1) {
+                      _confirmDisbandTeam();
+                    } else {
+                      _confirmLeaveTeam();
+                    }
+                  },
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEF4444).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.2)),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          isCaptain && _userTeam!.memberCount == 1
+                              ? Icons.delete_outline_rounded
+                              : Icons.logout_rounded,
+                          color: const Color(0xFFEF4444),
+                          size: 16,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          isCaptain && _userTeam!.memberCount == 1 ? 'Disband Team' : 'Leave Team',
+                          style: const TextStyle(color: Color(0xFFEF4444), fontSize: 13, fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -647,6 +749,424 @@ class _HomeTabState extends State<_HomeTab> {
         ),
       ),
     );
+  }
+
+  Future<void> _confirmLeaveTeam() async {
+    if (_userTeam == null) return;
+
+    // Verify user is still in the team before proceeding
+    final userId = _teamService.currentUserId;
+    if (userId == null || !_userTeam!.isMember(userId)) {
+      // User is no longer in this team, refresh the data
+      _teamSub?.cancel();
+      _teamSub = null;
+      setState(() => _userTeam = null);
+      return;
+    }
+
+    final isCaptain = _userTeam!.isCaptain(_teamService.currentUserId ?? '');
+
+    // If captain with other members, show transfer leadership prompt
+    if (isCaptain && _userTeam!.memberCount > 1) {
+      showDialog(
+        context: context,
+        barrierColor: Colors.black.withValues(alpha: 0.8),
+        builder: (ctx) => Dialog(
+          backgroundColor: Colors.transparent,
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 340),
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1A1A1A),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: const Color(0xFFFFD700).withValues(alpha: 0.2)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFD700).withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Icon(Icons.swap_horiz_rounded, color: Color(0xFFFFD700), size: 28),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Transfer Leadership',
+                  style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'As captain, you need to transfer leadership to another member before leaving. Go to the Team screen to manage members.',
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 13, height: 1.4),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 20),
+                GestureDetector(
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _navigateToTeamScreen();
+                  },
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFFFD700), Color(0xFFFFC000)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.groups_rounded, color: Colors.black, size: 18),
+                        SizedBox(width: 8),
+                        Text('Go to Team',
+                            style: TextStyle(color: Colors.black, fontSize: 14, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      return;
+    }
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.8),
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 340),
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1A1A1A),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.2)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEF4444).withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Icon(Icons.logout_rounded, color: Color(0xFFEF4444), size: 28),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Leave Team',
+                style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Are you sure you want to leave ${_userTeam!.name}?',
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 13),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => Navigator.pop(ctx, false),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.06),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Center(
+                          child: Text('Cancel',
+                              style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.w600)),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => Navigator.pop(ctx, true),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(colors: [Color(0xFFEF4444), Color(0xFFDC2626)]),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.logout_rounded, color: Colors.white, size: 16),
+                            SizedBox(width: 6),
+                            Text('Leave',
+                                style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (confirm == true) {
+      try {
+        await _teamService.leaveTeam(_userTeam!.id);
+        if (mounted) {
+          _teamSub?.cancel();
+          _teamSub = null;
+          setState(() => _userTeam = null);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Left team'), backgroundColor: Color(0xFF00D46A)),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          // If user is no longer in team, clear the stale data
+          if (e.toString().contains('not in this team')) {
+            _teamSub?.cancel();
+            _teamSub = null;
+            setState(() => _userTeam = null);
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('You already left this team'), backgroundColor: Color(0xFF00D46A)),
+            );
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+            );
+          }
+        }
+      }
+    }
+  }
+
+  Future<void> _confirmDisbandTeam() async {
+    if (_userTeam == null) return;
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.8),
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 340),
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1A1A1A),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.2)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEF4444).withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 28),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Disband Team',
+                style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Are you sure you want to disband ${_userTeam!.name}? This will permanently delete the team.',
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 13),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => Navigator.pop(ctx, false),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.06),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Center(
+                          child: Text('Cancel',
+                              style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.w600)),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => Navigator.pop(ctx, true),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(colors: [Color(0xFFEF4444), Color(0xFFDC2626)]),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.delete_outline_rounded, color: Colors.white, size: 16),
+                            SizedBox(width: 6),
+                            Text('Disband',
+                                style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (confirm == true) {
+      try {
+        await _teamService.disbandTeam(_userTeam!.id);
+        if (mounted) {
+          setState(() => _userTeam = null);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Team disbanded'), backgroundColor: Color(0xFF00D46A)),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _confirmKickMember(TeamMember member) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.8),
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 340),
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1A1A1A),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.2)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEF4444).withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Icon(Icons.person_remove_rounded, color: Color(0xFFEF4444), size: 28),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Kick Member',
+                style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Remove ${member.displayName} from the team?',
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 13),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => Navigator.pop(ctx, false),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.06),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Center(
+                          child: Text('Cancel',
+                              style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.w600)),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => Navigator.pop(ctx, true),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(colors: [Color(0xFFEF4444), Color(0xFFDC2626)]),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.person_remove_rounded, color: Colors.white, size: 16),
+                            SizedBox(width: 6),
+                            Text('Kick',
+                                style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (confirm == true && _userTeam != null) {
+      try {
+        await _teamService.kickMember(_userTeam!.id, member.odeid);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('${member.displayName} has been kicked'), backgroundColor: const Color(0xFF00D46A)),
+          );
+          // Refresh team data
+          _loadUserTeam();
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+          );
+        }
+      }
+    }
   }
 
   void _showTeamSettingsPopup() {
@@ -1115,7 +1635,7 @@ class _HomeTabState extends State<_HomeTab> {
   }
 
   Future<void> _addTestChips() async {
-    await UserPreferences.addChips(100000);
+    await _userService.addChips(1000000);
     setState(() {}); // Trigger rebuild to show updated balance
   }
 
@@ -1227,14 +1747,14 @@ class _HomeTabState extends State<_HomeTab> {
                       _DevMenuItem(
                         icon: Icons.add_box,
                         color: const Color(0xFF4CAF50),
-                        title: 'Add 100K Chips',
+                        title: 'Add 1M Chips',
                         onTap: () async {
                           Navigator.pop(dialogContext);
                           await _addTestChips();
                           parentScaffoldMessenger.showSnackBar(
                             SnackBar(
                               content: Text(
-                                'Added 100,000 chips! Balance: ${UserPreferences.formatChips(UserPreferences.chips)}',
+                                'Added 1,000,000 chips! Balance: ${UserPreferences.formatChips(UserPreferences.chips)}',
                               ),
                             ),
                           );
@@ -1630,17 +2150,18 @@ class _HomeTabState extends State<_HomeTab> {
                           WidgetsBinding.instance.addPostFrameCallback((_) {
                             final context = _teamSectionKey.currentContext;
                             if (context != null) {
-                              final box = context.findRenderObject() as RenderBox?;
-                              if (box != null) {
-                                final position = box.localToGlobal(Offset.zero);
-                                final screenHeight = MediaQuery.of(this.context).size.height;
-                                final targetOffset =
-                                    _homeScrollController.offset + position.dy - (screenHeight / 2) + 100;
-                                _homeScrollController.animateTo(
-                                  targetOffset.clamp(0, _homeScrollController.position.maxScrollExtent),
-                                  duration: const Duration(milliseconds: 300),
-                                  curve: Curves.easeOutCubic,
-                                );
+                              final renderObject = context.findRenderObject();
+                              if (renderObject != null) {
+                                // For slivers, we need to use a different approach
+                                final scrollableState = Scrollable.of(context);
+                                if (scrollableState.context.findRenderObject() != null) {
+                                  Scrollable.ensureVisible(
+                                    context,
+                                    alignment: 0.3, // Show in upper third
+                                    duration: const Duration(milliseconds: 300),
+                                    curve: Curves.easeOutCubic,
+                                  );
+                                }
                               }
                             }
                           });
@@ -3882,19 +4403,35 @@ class _ProfileTabState extends State<_ProfileTab> {
   final FriendsService _friendsService = FriendsService();
   List<Friend> _friends = [];
   StreamSubscription? _friendsSub;
+  StreamSubscription? _authSub;
+  String _displayUsername = '';
 
   @override
   void initState() {
     super.initState();
+    _displayUsername = UserPreferences.username;
     _loadFriends();
     _friendsSub = _friendsService.friendsStream.listen((friends) {
       if (mounted) setState(() => _friends = friends);
+    });
+    // Listen for auth state changes to refresh username
+    _authSub = AuthService().authStateChanges.listen((user) async {
+      if (user != null && mounted) {
+        // Sync data from Firestore when user changes
+        await UserService().syncAllUserData();
+        if (mounted) {
+          setState(() {
+            _displayUsername = UserPreferences.username;
+          });
+        }
+      }
     });
   }
 
   @override
   void dispose() {
     _friendsSub?.cancel();
+    _authSub?.cancel();
     super.dispose();
   }
 
@@ -3952,7 +4489,16 @@ class _ProfileTabState extends State<_ProfileTab> {
                       _DevMenuItem(
                         icon: Icons.swap_horiz,
                         color: const Color(0xFFFF9800),
-                        title: 'Switch Test Account',
+                        title: 'Sign In (Username)',
+                        onTap: () {
+                          Navigator.pop(dialogContext);
+                          _showUsernameSignIn(context);
+                        },
+                      ),
+                      _DevMenuItem(
+                        icon: Icons.email,
+                        color: const Color(0xFF9C27B0),
+                        title: 'Sign In (Email - Dev)',
                         onTap: () {
                           Navigator.pop(dialogContext);
                           _showAccountSwitcher(context);
@@ -3960,8 +4506,8 @@ class _ProfileTabState extends State<_ProfileTab> {
                       ),
                       _DevMenuItem(
                         icon: Icons.person_add,
-                        color: const Color(0xFF9C27B0),
-                        title: 'Create Test Account',
+                        color: const Color(0xFF673AB7),
+                        title: 'Create Test Account (Email)',
                         onTap: () {
                           Navigator.pop(dialogContext);
                           _showCreateTestAccount(context);
@@ -3970,15 +4516,15 @@ class _ProfileTabState extends State<_ProfileTab> {
                       _DevMenuItem(
                         icon: Icons.add_box,
                         color: const Color(0xFF4CAF50),
-                        title: 'Add 100K Chips',
+                        title: 'Add 1M Chips',
                         onTap: () async {
                           Navigator.pop(dialogContext);
-                          await UserPreferences.addChips(100000);
+                          await UserService().addChips(1000000);
                           widget.onChipsChanged?.call();
                           parentScaffoldMessenger.showSnackBar(
                             SnackBar(
                               content: Text(
-                                'Added 100,000 chips! Balance: ${UserPreferences.formatChips(UserPreferences.chips)}',
+                                'Added 1,000,000 chips! Balance: ${UserPreferences.formatChips(UserPreferences.chips)}',
                               ),
                             ),
                           );
@@ -4151,6 +4697,105 @@ class _ProfileTabState extends State<_ProfileTab> {
     );
   }
 
+  void _showUsernameSignIn(BuildContext context) {
+    final usernameController = TextEditingController();
+    final passwordController = TextEditingController();
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: const Color(0xFF121212),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: Text(
+          'Sign In with Username',
+          style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 16, fontWeight: FontWeight.w600),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Sign into an existing account',
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 12),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: usernameController,
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 14),
+              decoration: InputDecoration(
+                hintText: 'Username',
+                hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3)),
+                prefixIcon: Icon(Icons.person, color: Colors.white.withValues(alpha: 0.3)),
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: passwordController,
+              obscureText: true,
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 14),
+              decoration: InputDecoration(
+                hintText: 'Password',
+                hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3)),
+                prefixIcon: Icon(Icons.lock, color: Colors.white.withValues(alpha: 0.3)),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text('Cancel', style: TextStyle(color: Colors.white.withValues(alpha: 0.5))),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFD4AF37),
+              foregroundColor: Colors.black,
+            ),
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              final username = usernameController.text.trim();
+              final password = passwordController.text;
+              if (username.isEmpty || password.isEmpty) {
+                scaffoldMessenger.showSnackBar(
+                  const SnackBar(content: Text('Please enter username and password')),
+                );
+                return;
+              }
+              try {
+                // Sign out first
+                await AuthService().signOut();
+                // Sign in with username/password
+                await AuthService().signInWithUsername(username: username, password: password);
+                // Cache the credentials for auto-login
+                await UserPreferences.setUsername(username);
+                await UserPreferences.setCachedPassword(password);
+                await UserPreferences.setCachedUid(AuthService().currentUser!.uid);
+                // Sync user data
+                await UserService().syncAllUserData();
+                if (mounted) {
+                  setState(() => _displayUsername = username);
+                  scaffoldMessenger.showSnackBar(SnackBar(content: Text('Signed in as $username')));
+                }
+              } catch (e) {
+                if (mounted) {
+                  String errorMsg = 'Sign in failed';
+                  final errorStr = e.toString().toLowerCase();
+                  if (errorStr.contains('user-not-found') ||
+                      errorStr.contains('wrong-password') ||
+                      errorStr.contains('invalid-credential')) {
+                    errorMsg = 'Invalid username or password';
+                  }
+                  scaffoldMessenger.showSnackBar(SnackBar(content: Text(errorMsg)));
+                }
+              }
+            },
+            child: const Text('Sign In'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildAccountOption(
     BuildContext dialogContext,
     ScaffoldMessengerState scaffoldMessenger,
@@ -4168,14 +4813,19 @@ class _ProfileTabState extends State<_ProfileTab> {
               try {
                 await AuthService().signOut();
                 await AuthService().signInWithEmail(email: email, password: password);
+                // Sync user data after switching
+                await UserService().syncAllUserData();
                 if (mounted) {
+                  setState(() => _displayUsername = UserPreferences.username);
                   scaffoldMessenger.showSnackBar(SnackBar(content: Text('Signed in as $email')));
                 }
               } catch (e) {
                 // If sign-in fails, try to create the account first
                 try {
                   await AuthService().registerWithEmail(email: email, password: password);
+                  await UserService().syncAllUserData();
                   if (mounted) {
+                    setState(() => _displayUsername = UserPreferences.username);
                     scaffoldMessenger.showSnackBar(SnackBar(content: Text('Created & signed in as $email')));
                   }
                 } catch (createError) {
@@ -4270,7 +4920,7 @@ class _ProfileTabState extends State<_ProfileTab> {
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      'Player123',
+                      _displayUsername,
                       style: TextStyle(
                         color: Colors.white.withValues(alpha: 0.9),
                         fontSize: 18,
@@ -5701,17 +6351,22 @@ class _DailySpinDialogState extends State<_DailySpinDialog> with SingleTickerPro
     final prizeIndex = random.nextInt(_prizes.length);
     final rotations = 5 + random.nextDouble() * 3;
     // Calculate angle so that segment prizeIndex lands at the TOP (where pointer is)
-    // Wheel draws segment 0 at top (-pi/2), and rotates clockwise
-    // To land on segment N, we need to rotate so that segment is at top
+    // Wheel draws segment 0 at top (-pi/2), segments go clockwise
+    // Transform.rotate with positive angle rotates counter-clockwise
+    // To land on segment N, rotate so that segment N aligns with the pointer at top
     final segmentAngle = 2 * pi / _prizes.length;
-    final targetAngle = rotations * 2 * pi - (prizeIndex * segmentAngle) - (segmentAngle / 2);
+    // Rotate counter-clockwise: higher segments come to top
+    // For segment N to be at top, we need to rotate by (N * segmentAngle) + half segment for centering
+    final targetAngle = rotations * 2 * pi + (prizeIndex * segmentAngle) + (segmentAngle / 2);
 
     _animation = Tween<double>(
       begin: 0,
       end: targetAngle,
     ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
 
-    _controller.forward().then((_) {
+    _controller.forward().then((_) async {
+      // Add the chips to the user's account
+      await UserService().addChips(_prizes[prizeIndex]);
       setState(() {
         _isSpinning = false;
         _hasSpun = true;
@@ -5886,11 +6541,11 @@ class _GemWheelDialogState extends State<_GemWheelDialog> with SingleTickerProvi
     super.dispose();
   }
 
-  void _spin() {
+  void _spin() async {
     if (_isSpinning || _gemsBalance < _spinCost) return;
 
-    // Deduct gems using UserPreferences
-    UserPreferences.addGems(-_spinCost);
+    // Deduct gems using UserService (syncs to Firestore)
+    await UserService().spendGems(_spinCost);
 
     setState(() {
       _isSpinning = true;
@@ -5908,9 +6563,9 @@ class _GemWheelDialogState extends State<_GemWheelDialog> with SingleTickerProvi
       end: targetAngle,
     ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
 
-    _controller.forward().then((_) {
+    _controller.forward().then((_) async {
       final wonChips = _prizes[prizeIndex];
-      UserPreferences.addChips(wonChips);
+      await UserService().addChips(wonChips);
       setState(() {
         _isSpinning = false;
         _hasSpun = true;
