@@ -99,7 +99,9 @@ class GameService {
     print('ROOM PLAYERS: ${room.players.map((p) => "${p.displayName} (${p.uid})").join(", ")}');
 
     if (room.isFull) throw Exception('Room is full');
-    if (room.status != 'waiting') throw Exception('Game already in progress');
+    // Allow joining rooms that are 'waiting' OR 'playing' with 'waiting_for_players' phase
+    final isJoinable = room.status == 'waiting' || (room.status == 'playing' && room.phase == 'waiting_for_players');
+    if (!isJoinable) throw Exception('Game already in progress');
     if (room.players.any((p) => p.uid == userId)) {
       print('ALREADY IN ROOM: User $userId is already a player');
       return; // Already in room
@@ -114,6 +116,8 @@ class GameService {
       Uri.parse('$_databaseUrl/game_rooms/$roomId.json?auth=$token'),
       body: jsonEncode({'players': updatedPlayers.map((p) => p.toJson()).toList()}),
     );
+
+    print('✅ Successfully joined room $roomId with ${updatedPlayers.length} players');
   }
 
   /// Leave a room
