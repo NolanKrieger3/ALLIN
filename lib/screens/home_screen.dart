@@ -4785,11 +4785,19 @@ class _DailySpinDialogState extends State<_DailySpinDialog> with SingleTickerPro
                 ),
                 const SizedBox(height: 28),
                 SizedBox(
-                  width: 200,
-                  height: 200,
+                  width: 220,
+                  height: 220,
                   child: Stack(
                     alignment: Alignment.center,
                     children: [
+                      Container(
+                        width: 200,
+                        height: 200,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.3), width: 2),
+                        ),
+                      ),
                       AnimatedBuilder(
                         animation: _animation,
                         builder: (context, child) => Transform.rotate(
@@ -4998,6 +5006,14 @@ class _GemWheelDialogState extends State<_GemWheelDialog> with SingleTickerProvi
                   child: Stack(
                     alignment: Alignment.center,
                     children: [
+                      Container(
+                        width: 200,
+                        height: 200,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.3), width: 2),
+                        ),
+                      ),
                       AnimatedBuilder(
                         animation: _animation,
                         builder: (context, child) => Transform.rotate(
