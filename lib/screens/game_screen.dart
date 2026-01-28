@@ -1401,30 +1401,15 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     ];
 
     return Container(
-      height: 100,
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      child: ShaderMask(
-        shaderCallback: (Rect bounds) {
-          return LinearGradient(
-            begin: Alignment.centerLeft,
-            end: Alignment.centerRight,
-            colors: [
-              Colors.transparent,
-              Colors.black,
-              Colors.black,
-              Colors.transparent,
-            ],
-            stops: const [0.0, 0.02, 0.98, 1.0],
-          ).createShader(bounds);
-        },
-        blendMode: BlendMode.dstIn,
-        child: ListView.builder(
+      height: 110,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Center(
+        child: SingleChildScrollView(
           scrollDirection: Axis.horizontal,
-          itemCount: allParticipants.length,
-          itemBuilder: (context, index) {
-            final p = allParticipants[index];
-            return _buildParticipantAvatar(p);
-          },
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: allParticipants.map((p) => _buildParticipantAvatar(p)).toList(),
+          ),
         ),
       ),
     );
@@ -1442,13 +1427,11 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     Color? borderColor;
     if (p.isCurrentTurn) {
       borderColor = const Color(0xFFD4AF37);
-    } else if (p.isPlayer) {
-      borderColor = const Color(0xFF3B82F6);
     }
 
     return Container(
-      width: 58,
-      margin: const EdgeInsets.only(right: 8),
+      width: 72,
+      margin: const EdgeInsets.symmetric(horizontal: 6),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -1457,18 +1440,18 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
             clipBehavior: Clip.none,
             children: [
               Container(
-                width: 44,
-                height: 44,
+                width: 48,
+                height: 48,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: p.hasFolded ? Colors.grey.shade800 : Colors.white.withValues(alpha: 0.1),
-                  border: borderColor != null ? Border.all(color: borderColor, width: 2) : null,
+                  border: borderColor != null ? Border.all(color: borderColor, width: 3) : null,
                 ),
                 child: Center(
                   child: Text(
                     getAvatar(p.name),
                     style: TextStyle(
-                      fontSize: 22,
+                      fontSize: 24,
                       color: p.hasFolded ? Colors.grey : null,
                     ),
                   ),
@@ -1480,8 +1463,8 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                   bottom: -2,
                   right: -2,
                   child: Container(
-                    width: 16,
-                    height: 16,
+                    width: 18,
+                    height: 18,
                     decoration: const BoxDecoration(
                       color: Colors.white,
                       shape: BoxShape.circle,
@@ -1490,52 +1473,35 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                       child: Text('D',
                           style: TextStyle(
                             color: Colors.black,
-                            fontSize: 10,
+                            fontSize: 11,
                             fontWeight: FontWeight.bold,
                           )),
                     ),
                   ),
                 ),
-              // "You" badge
-              if (p.isPlayer)
-                Positioned(
-                  top: -4,
-                  right: -6,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF3B82F6),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: const Text('YOU',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 7,
-                          fontWeight: FontWeight.bold,
-                        )),
-                  ),
-                ),
             ],
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 6),
           // Name
           Text(
-            p.name.length > 6 ? '${p.name.substring(0, 6)}' : p.name,
+            p.name,
             style: TextStyle(
-              color: p.hasFolded ? Colors.grey : (p.isPlayer ? const Color(0xFF3B82F6) : Colors.white),
-              fontSize: 10,
-              fontWeight: p.isPlayer ? FontWeight.w700 : FontWeight.w500,
+              color: p.hasFolded ? Colors.grey : Colors.white,
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
             ),
             overflow: TextOverflow.ellipsis,
           ),
-          // Chips
+          // Chips on one line
           Text(
             p.currentBet > 0 ? '${_formatChips(p.chips)} (${_formatChips(p.currentBet)})' : _formatChips(p.chips),
             style: TextStyle(
               color: p.hasFolded ? Colors.grey : Colors.yellow.shade600,
-              fontSize: 11,
+              fontSize: 12,
               fontWeight: FontWeight.w600,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
@@ -1854,7 +1820,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
 
   Widget _buildPlayerAvatar() {
     final isDealer = _dealerPosition == 0;
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
