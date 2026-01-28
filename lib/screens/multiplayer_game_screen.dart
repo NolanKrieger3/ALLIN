@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/game_room.dart';
 import '../services/game_service.dart';
+import '../services/hand_evaluator.dart';
 import '../widgets/mobile_wrapper.dart';
 
 class MultiplayerGameScreen extends StatefulWidget {
@@ -1268,7 +1269,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
               ),
               const Spacer(),
               // Player info
-              _buildPlayerInfoMinimal(player),
+              _buildPlayerInfoMinimal(player, room: room),
             ],
           ),
         ],
@@ -1368,7 +1369,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
               ),
               const Spacer(),
               // Player info
-              _buildPlayerInfoMinimal(player),
+              _buildPlayerInfoMinimal(player, room: room),
             ],
           ),
         ],
@@ -1411,7 +1412,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
                 ],
               ),
               const Spacer(),
-              _buildPlayerInfoMinimal(player),
+              _buildPlayerInfoMinimal(player, room: room),
             ],
           ),
         ],
@@ -1419,7 +1420,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
     );
   }
 
-  Widget _buildPlayerInfoMinimal(GamePlayer player) {
+  Widget _buildPlayerInfoMinimal(GamePlayer player, {GameRoom? room}) {
     String getAvatar(String name) {
       if (name.isEmpty) return '👤';
       final firstChar = name[0].toLowerCase();
@@ -1454,47 +1455,102 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
       return avatars[firstChar] ?? '👤';
     }
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Avatar
-          Text(getAvatar(player.displayName), style: const TextStyle(fontSize: 32)),
-          const SizedBox(width: 12),
-          // Chips
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    // Get current hand strength
+    String? handStrength;
+    if (room != null && player.cards.length == 2 && room.communityCards.isNotEmpty) {
+      final evaluatedHand = HandEvaluator.evaluateBestHand(player.cards, room.communityCards);
+      handStrength = _getShortHandName(evaluatedHand.rank);
+    } else if (player.cards.length == 2) {
+      // Preflop - show if we have a pocket pair
+      if (player.cards[0].rank == player.cards[1].rank) {
+        handStrength = 'Pair';
+      }
+    }
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Hand strength indicator
+        if (handStrength != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: Text(
+              handStrength,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.7),
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+          ),
+          child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                _formatChips(player.chips),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
+              // Avatar
+              Text(getAvatar(player.displayName), style: const TextStyle(fontSize: 32)),
+              const SizedBox(width: 12),
+              // Chips
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    _formatChips(player.chips),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(width: 12),
+              // Emoji button
+              GestureDetector(
+                onTap: () => _showEmotePanel(context),
+                child: Icon(
+                  Icons.emoji_emotions_outlined,
+                  color: Colors.white.withValues(alpha: 0.5),
+                  size: 24,
                 ),
               ),
             ],
           ),
-          const SizedBox(width: 12),
-          // Emoji button
-          GestureDetector(
-            onTap: () => _showEmotePanel(context),
-            child: Icon(
-              Icons.emoji_emotions_outlined,
-              color: Colors.white.withValues(alpha: 0.5),
-              size: 24,
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
+  }
+
+  String _getShortHandName(HandRank rank) {
+    switch (rank) {
+      case HandRank.royalFlush:
+        return 'Royal!';
+      case HandRank.straightFlush:
+        return 'Str Flush';
+      case HandRank.fourOfAKind:
+        return 'Quads';
+      case HandRank.fullHouse:
+        return 'Full House';
+      case HandRank.flush:
+        return 'Flush';
+      case HandRank.straight:
+        return 'Straight';
+      case HandRank.threeOfAKind:
+        return 'Trips';
+      case HandRank.twoPair:
+        return 'Two Pair';
+      case HandRank.onePair:
+        return 'Pair';
+      case HandRank.highCard:
+        return 'High Card';
+    }
   }
 
   void _showRaiseDialog(GameRoom room, GamePlayer player) {
