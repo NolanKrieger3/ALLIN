@@ -197,20 +197,20 @@ class GameService {
 
     try {
       final response = await http.get(Uri.parse('$_databaseUrl/game_rooms.json?auth=$token'));
-      
+
       if (response.statusCode != 200 || response.body == 'null') return;
 
       final data = jsonDecode(response.body) as Map<String, dynamic>;
       final now = DateTime.now();
-      
+
       for (final entry in data.entries) {
         final roomId = entry.key;
         final roomData = Map<String, dynamic>.from(entry.value as Map);
         final room = GameRoom.fromJson(roomData, roomId);
-        
+
         bool shouldDelete = false;
         String reason = '';
-        
+
         // Delete if no players
         if (room.players.isEmpty) {
           shouldDelete = true;
@@ -229,7 +229,7 @@ class GameService {
             reason = 'stale (${age.inMinutes} min old with 1 player)';
           }
         }
-        
+
         if (shouldDelete) {
           print('🧹 Deleting room $roomId: $reason');
           await http.delete(Uri.parse('$_databaseUrl/game_rooms/$roomId.json?auth=$token'));
@@ -244,7 +244,7 @@ class GameService {
   Future<List<GameRoom>> fetchJoinableRoomsByBlind(int bigBlind) async {
     // Clean up stale rooms first
     await cleanupStaleRooms();
-    
+
     final token = await _getAuthToken();
     final userId = currentUserId;
 
