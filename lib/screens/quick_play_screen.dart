@@ -53,30 +53,58 @@ class _QuickPlayScreenState extends State<QuickPlayScreen> {
       final bigBlind = blindLevel['big'] as int;
       final buyIn = blindLevel['buyIn'] as int;
 
-      // Try to find a joinable room with the same blind level
-      final rooms = await _gameService.fetchJoinableRoomsByBlind(bigBlind);
-
-      String roomId;
-      if (rooms.isNotEmpty) {
-        // Join existing room
-        final room = rooms.first;
-        await _gameService.joinRoom(room.id, startingChips: buyIn);
-        roomId = room.id;
-      } else {
-        // Create new room
+      String? roomId;
+      
+      // Retry logic: Try to find and join a room multiple times before creating
+      for (int attempt = 0; attempt < 3; attempt++) {
+        print('🔍 Matchmaking attempt ${attempt + 1}/3 for blind $bigBlind');
+        
+        // Search for joinable rooms
+        final rooms = await _gameService.fetchJoinableRoomsByBlind(bigBlind);
+        
+        if (rooms.isNotEmpty) {
+          // Try to join each room until one succeeds
+          for (final room in rooms) {
+            try {
+              print('🎯 Attempting to join room ${room.id}');
+              await _gameService.joinRoom(room.id, startingChips: buyIn);
+              roomId = room.id;
+              print('✅ Successfully joined room ${room.id}');
+              break;
+            } catch (e) {
+              print('❌ Failed to join room ${room.id}: $e');
+              // Room might be full or game started, try next room
+              continue;
+            }
+          }
+        }
+        
+        if (roomId != null) break;
+        
+        // Small delay before next attempt to allow other rooms to appear
+        if (attempt < 2) {
+          await Future.delayed(const Duration(milliseconds: 500));
+        }
+      }
+      
+      // If no room found after retries, create a new one
+      if (roomId == null) {
+        print('📦 No joinable rooms found, creating new room');
         final room = await _gameService.createRoom(bigBlind: bigBlind, startingChips: buyIn);
         roomId = room.id;
+        print('✅ Created room ${room.id}');
       }
 
       if (mounted) {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (_) => MultiplayerGameScreen(roomId: roomId, autoStart: true),
+            builder: (_) => MultiplayerGameScreen(roomId: roomId!, autoStart: true),
           ),
         );
       }
     } catch (e) {
+      print('❌ Matchmaking failed: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

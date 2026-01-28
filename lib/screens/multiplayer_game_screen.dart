@@ -36,21 +36,31 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> {
 
     final isHost = room.hostId == _gameService.currentUserId;
 
-    // Case 1: Room is in 'waiting' status - host should start solo
-    if (room.status == 'waiting' && isHost) {
+    // Case 1: Room is in 'waiting' status with only 1 player - wait a bit for others to join
+    if (room.status == 'waiting' && isHost && room.players.length == 1) {
+      // Don't auto-start immediately - wait for another player
+      // The room will stay in 'waiting' status so others can find it
+      print('⏳ Waiting for more players to join room ${widget.roomId}...');
+      return;
+    }
+    
+    // Case 2: Room is in 'waiting' status with 2+ players - start the game!
+    if (room.status == 'waiting' && isHost && room.players.length >= 2) {
       _hasAutoStarted = true;
       setState(() => _isLoading = true);
+      print('🎮 Starting game with ${room.players.length} players!');
       try {
-        await _gameService.startGameSolo(widget.roomId);
+        await _gameService.startGame(widget.roomId);
       } catch (e) {
+        print('❌ Failed to start game: $e');
         _hasAutoStarted = false; // Allow retry
       }
       if (mounted) setState(() => _isLoading = false);
       return;
     }
 
-    // Case 2: Room is 'playing' but in 'waiting_for_players' phase and has 2+ players
-    // This means a second player joined - start the real game
+    // Case 3: Room is 'playing' but in 'waiting_for_players' phase and has 2+ players
+    // This means a second player joined a solo-started game - start the real game
     if (room.status == 'playing' && room.phase == 'waiting_for_players' && room.players.length >= 2 && isHost) {
       _hasAutoStarted = true;
       setState(() => _isLoading = true);
@@ -1092,8 +1102,14 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> {
 
   Widget _buildWaitMessage(GameRoom room, GamePlayer player) {
     String message = 'Wait for the next hand';
-    if (room.phase == 'waiting_for_players') {
+    bool showSpinner = false;
+    
+    if (room.status == 'waiting' && room.players.length == 1) {
+      message = 'Finding opponent...';
+      showSpinner = true;
+    } else if (room.phase == 'waiting_for_players') {
       message = 'Waiting for players...';
+      showSpinner = true;
     } else if (player.hasFolded) {
       message = 'You folded';
     } else if (room.status == 'finished') {
@@ -1113,14 +1129,28 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> {
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
             ),
-            child: Center(
-              child: Text(
-                message,
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.6),
-                  fontSize: 16,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (showSpinner) ...[
+                  SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white.withValues(alpha: 0.6),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                ],
+                Text(
+                  message,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.6),
+                    fontSize: 16,
+                  ),
                 ),
-              ),
+              ],
             ),
           ),
           const SizedBox(height: 16),
