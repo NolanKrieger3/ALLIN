@@ -26,6 +26,7 @@ class GamePlayer {
   final List<PlayingCard> cards;
   final bool hasFolded;
   final int currentBet;
+  final int totalContributed; // Cumulative contribution to pot this hand (for side pots)
   final bool isReady;
   final bool hasActed; // Track if player has acted in current betting round
   final String? lastAction; // Track last action for UI indicator (CALL, CHECK, FOLD, RAISE, ALL-IN)
@@ -37,6 +38,7 @@ class GamePlayer {
     this.cards = const [],
     this.hasFolded = false,
     this.currentBet = 0,
+    this.totalContributed = 0,
     this.isReady = false,
     this.hasActed = false,
     this.lastAction,
@@ -49,6 +51,7 @@ class GamePlayer {
         'cards': cards.map((c) => c.toJson()).toList(),
         'hasFolded': hasFolded,
         'currentBet': currentBet,
+        'totalContributed': totalContributed,
         'isReady': isReady,
         'hasActed': hasActed,
         'lastAction': lastAction,
@@ -63,6 +66,7 @@ class GamePlayer {
           (json['cards'] as List<dynamic>?)?.map((c) => PlayingCard.fromJson(c as Map<String, dynamic>)).toList() ?? [],
       hasFolded: json['hasFolded'] as bool? ?? false,
       currentBet: json['currentBet'] as int? ?? 0,
+      totalContributed: json['totalContributed'] as int? ?? 0,
       isReady: json['isReady'] as bool? ?? false,
       hasActed: json['hasActed'] as bool? ?? false,
       lastAction: json['lastAction'] as String?,
@@ -76,6 +80,7 @@ class GamePlayer {
     List<PlayingCard>? cards,
     bool? hasFolded,
     int? currentBet,
+    int? totalContributed,
     bool? isReady,
     bool? hasActed,
     Object? lastAction = _sentinel,
@@ -87,6 +92,7 @@ class GamePlayer {
       cards: cards ?? this.cards,
       hasFolded: hasFolded ?? this.hasFolded,
       currentBet: currentBet ?? this.currentBet,
+      totalContributed: totalContributed ?? this.totalContributed,
       isReady: isReady ?? this.isReady,
       hasActed: hasActed ?? this.hasActed,
       lastAction: lastAction == _sentinel ? this.lastAction : lastAction as String?,
