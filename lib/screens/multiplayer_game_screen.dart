@@ -18,16 +18,85 @@ class MultiplayerGameScreen extends StatefulWidget {
   State<MultiplayerGameScreen> createState() => _MultiplayerGameScreenState();
 }
 
-class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> {
+class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with TickerProviderStateMixin {
   final GameService _gameService = GameService();
   final TextEditingController _chatController = TextEditingController();
   bool _isLoading = false;
   bool _hasAutoStarted = false;
+  bool _hasTriggeredNewHand = false;
+
+  // Fold animation
+  late AnimationController _foldAnimationController;
+  late Animation<Offset> _foldSlideAnimation;
+  late Animation<double> _foldOpacityAnimation;
+  bool _isFolding = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _foldAnimationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 400),
+    );
+    _foldSlideAnimation = Tween<Offset>(
+      begin: Offset.zero,
+      end: const Offset(0, -2),
+    ).animate(CurvedAnimation(
+      parent: _foldAnimationController,
+      curve: Curves.easeInBack,
+    ));
+    _foldOpacityAnimation = Tween<double>(
+      begin: 1.0,
+      end: 0.0,
+    ).animate(CurvedAnimation(
+      parent: _foldAnimationController,
+      curve: Curves.easeOut,
+    ));
+  }
 
   @override
   void dispose() {
+    _foldAnimationController.dispose();
     _chatController.dispose();
     super.dispose();
+  }
+
+  /// Animate cards flying away then trigger fold action
+  Future<void> _animateFold() async {
+    if (_isFolding) return;
+    setState(() => _isFolding = true);
+
+    await _foldAnimationController.forward();
+    await _gameService.playerAction(widget.roomId, 'fold');
+
+    // Reset animation for next hand
+    _foldAnimationController.reset();
+    if (mounted) setState(() => _isFolding = false);
+  }
+
+  /// Start a new hand after the current one finishes
+  Future<void> _triggerNewHand(GameRoom room) async {
+    if (_hasTriggeredNewHand || _isLoading) return;
+    final isHost = room.hostId == _gameService.currentUserId;
+    if (!isHost) return;
+
+    _hasTriggeredNewHand = true;
+
+    // Wait 3 seconds to show the result
+    await Future.delayed(const Duration(seconds: 3));
+
+    if (!mounted) return;
+
+    try {
+      await _gameService.newHand(widget.roomId);
+      _hasAutoStarted = false; // Reset so startGame can trigger again
+    } catch (e) {
+      print('❌ Failed to start new hand: $e');
+    }
+
+    if (mounted) {
+      _hasTriggeredNewHand = false;
+    }
   }
 
   /// Attempt auto-start when conditions are met
@@ -131,6 +200,13 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> {
               (room.status == 'playing' && room.phase == 'waiting_for_players' && room.players.length >= 2)) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
               _tryAutoStart(room);
+            });
+          }
+
+          // Auto-start new hand after game finishes
+          if (room.status == 'finished' && room.players.length >= 2) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              _triggerNewHand(room);
             });
           }
 
@@ -1256,32 +1332,38 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              // Swipeable cards
+              // Swipeable cards with fold animation
               GestureDetector(
                 onVerticalDragEnd: (details) {
                   // Swipe up to fold
                   if (details.primaryVelocity != null && details.primaryVelocity! < -300) {
-                    _gameService.playerAction(widget.roomId, 'fold');
+                    _animateFold();
                   }
                 },
-                child: Column(
-                  children: [
-                    Text(
-                      '↑ Swipe to fold',
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.4),
-                        fontSize: 11,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
+                child: SlideTransition(
+                  position: _foldSlideAnimation,
+                  child: FadeTransition(
+                    opacity: _foldOpacityAnimation,
+                    child: Column(
                       children: [
-                        if (player.cards.isNotEmpty) _buildMinimalCard(player.cards[0]),
-                        const SizedBox(width: 8),
-                        if (player.cards.length > 1) _buildMinimalCard(player.cards[1]),
+                        Text(
+                          '↑ Swipe to fold',
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.4),
+                            fontSize: 11,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            if (player.cards.isNotEmpty) _buildMinimalCard(player.cards[0]),
+                            const SizedBox(width: 8),
+                            if (player.cards.length > 1) _buildMinimalCard(player.cards[1]),
+                          ],
+                        ),
                       ],
                     ),
-                  ],
+                  ),
                 ),
               ),
               const Spacer(),
