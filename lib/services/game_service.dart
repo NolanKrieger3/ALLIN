@@ -190,8 +190,61 @@ class GameService {
     return _fetchAvailableRooms('cash');
   }
 
+  /// Clean up stale rooms (rooms with 1 player waiting too long, or finished games)
+  Future<void> cleanupStaleRooms() async {
+    final token = await _getAuthToken();
+    if (token == null) return;
+
+    try {
+      final response = await http.get(Uri.parse('$_databaseUrl/game_rooms.json?auth=$token'));
+      
+      if (response.statusCode != 200 || response.body == 'null') return;
+
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      final now = DateTime.now();
+      
+      for (final entry in data.entries) {
+        final roomId = entry.key;
+        final roomData = Map<String, dynamic>.from(entry.value as Map);
+        final room = GameRoom.fromJson(roomData, roomId);
+        
+        bool shouldDelete = false;
+        String reason = '';
+        
+        // Delete if no players
+        if (room.players.isEmpty) {
+          shouldDelete = true;
+          reason = 'empty room';
+        }
+        // Delete if finished for more than 2 minutes
+        else if (room.status == 'finished') {
+          shouldDelete = true;
+          reason = 'game finished';
+        }
+        // Delete if 1 player waiting for more than 5 minutes
+        else if (room.players.length == 1 && room.status == 'waiting') {
+          final age = now.difference(room.createdAt);
+          if (age.inMinutes >= 5) {
+            shouldDelete = true;
+            reason = 'stale (${age.inMinutes} min old with 1 player)';
+          }
+        }
+        
+        if (shouldDelete) {
+          print('🧹 Deleting room $roomId: $reason');
+          await http.delete(Uri.parse('$_databaseUrl/game_rooms/$roomId.json?auth=$token'));
+        }
+      }
+    } catch (e) {
+      print('⚠️ Cleanup error: $e');
+    }
+  }
+
   /// Fetch joinable cash game rooms by blind level (includes rooms waiting for players)
   Future<List<GameRoom>> fetchJoinableRoomsByBlind(int bigBlind) async {
+    // Clean up stale rooms first
+    await cleanupStaleRooms();
+    
     final token = await _getAuthToken();
     final userId = currentUserId;
 
@@ -219,20 +272,28 @@ class GameService {
     // - Not private
     // - User not already in room
     // - Either waiting OR playing with phase='waiting_for_players'
+    // - Has exactly 1 player (to join them)
     final joinableRooms = allRooms.where((room) {
       final isCorrectBlind = room.bigBlind == bigBlind;
       final isNotFull = !room.isFull;
       final isNotPrivate = !room.isPrivate;
       final userNotInRoom = !room.players.any((p) => p.uid == userId);
       final isJoinable = room.status == 'waiting' || (room.status == 'playing' && room.phase == 'waiting_for_players');
+      final needsPlayer = room.players.length == 1; // Only join rooms that have exactly 1 player waiting
 
       print(
-          '🔍 Room ${room.id}: blind=${room.bigBlind}, status=${room.status}, phase=${room.phase}, players=${room.players.length}, joinable=$isJoinable');
+          '🔍 Room ${room.id}: blind=${room.bigBlind}, status=${room.status}, players=${room.players.length}, needsPlayer=$needsPlayer, userNotInRoom=$userNotInRoom');
 
-      return isCorrectBlind && isNotFull && isNotPrivate && userNotInRoom && isJoinable;
+      return isCorrectBlind && isNotFull && isNotPrivate && userNotInRoom && isJoinable && needsPlayer;
     }).toList();
 
+    // Sort by most recently created (newest first) - these are more likely to have active players
+    joinableRooms.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
     print('🔍 Joinable rooms for blind $bigBlind: ${joinableRooms.length}');
+    if (joinableRooms.isNotEmpty) {
+      print('🎯 Best room to join: ${joinableRooms.first.id} (created ${joinableRooms.first.createdAt})');
+    }
     return joinableRooms;
   }
 
