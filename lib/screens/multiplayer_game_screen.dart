@@ -6,10 +6,12 @@ import '../widgets/mobile_wrapper.dart';
 
 class MultiplayerGameScreen extends StatefulWidget {
   final String roomId;
+  final bool autoStart;
 
   const MultiplayerGameScreen({
     super.key,
     required this.roomId,
+    this.autoStart = false,
   });
 
   @override
@@ -20,11 +22,45 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> {
   final GameService _gameService = GameService();
   final TextEditingController _chatController = TextEditingController();
   bool _isLoading = false;
+  bool _hasAutoStarted = false;
 
   @override
   void dispose() {
     _chatController.dispose();
     super.dispose();
+  }
+
+  /// Attempt auto-start when conditions are met
+  Future<void> _tryAutoStart(GameRoom room) async {
+    if (_hasAutoStarted || _isLoading) return;
+
+    final isHost = room.hostId == _gameService.currentUserId;
+
+    // Case 1: Room is in 'waiting' status - host should start solo
+    if (room.status == 'waiting' && isHost) {
+      _hasAutoStarted = true;
+      setState(() => _isLoading = true);
+      try {
+        await _gameService.startGameSolo(widget.roomId);
+      } catch (e) {
+        _hasAutoStarted = false; // Allow retry
+      }
+      if (mounted) setState(() => _isLoading = false);
+      return;
+    }
+
+    // Case 2: Room is 'playing' but in 'waiting_for_players' phase and has 2+ players
+    // This means a second player joined - start the real game
+    if (room.status == 'playing' && room.phase == 'waiting_for_players' && room.players.length >= 2 && isHost) {
+      _hasAutoStarted = true;
+      setState(() => _isLoading = true);
+      try {
+        await _gameService.startGameFromWaiting(widget.roomId);
+      } catch (e) {
+        _hasAutoStarted = false; // Allow retry
+      }
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override
@@ -71,11 +107,17 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> {
             );
           }
 
-          if (room.status == 'waiting') {
-            return _buildWaitingRoom(room);
-          } else {
-            return _buildGameTable(room);
+          // Auto-start the game immediately (skip waiting room)
+          // Also handle when 2nd player joins a 'waiting_for_players' room
+          if (room.status == 'waiting' || 
+              (room.status == 'playing' && room.phase == 'waiting_for_players' && room.players.length >= 2)) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              _tryAutoStart(room);
+            });
           }
+
+          // Always show the game table - no waiting room
+          return _buildGameTable(room);
         },
       ),
     );
@@ -283,9 +325,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> {
                 child: ElevatedButton(
                   onPressed: () => _gameService.toggleReady(widget.roomId),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: currentPlayer.isReady
-                        ? Colors.grey
-                        : const Color(0xFF4CAF50),
+                    backgroundColor: currentPlayer.isReady ? Colors.grey : const Color(0xFF4CAF50),
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -362,14 +402,10 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isMe
-            ? const Color(0xFFD4AF37).withValues(alpha: 0.1)
-            : Colors.white.withValues(alpha: 0.05),
+        color: isMe ? const Color(0xFFD4AF37).withValues(alpha: 0.1) : Colors.white.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: isMe
-              ? const Color(0xFFD4AF37).withValues(alpha: 0.3)
-              : Colors.white.withValues(alpha: 0.1),
+          color: isMe ? const Color(0xFFD4AF37).withValues(alpha: 0.3) : Colors.white.withValues(alpha: 0.1),
         ),
       ),
       child: Row(
@@ -383,9 +419,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> {
             ),
             child: Center(
               child: Text(
-                player.displayName.isNotEmpty
-                    ? player.displayName[0].toUpperCase()
-                    : '?',
+                player.displayName.isNotEmpty ? player.displayName[0].toUpperCase() : '?',
                 style: const TextStyle(
                   color: Color(0xFFD4AF37),
                   fontSize: 20,
@@ -696,104 +730,60 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> {
       (p) => p.uid == _gameService.currentUserId,
       orElse: () => room.players.first,
     );
-    final opponent = room.players.firstWhere(
-      (p) => p.uid != _gameService.currentUserId,
-      orElse: () => room.players.last,
-    );
+    final opponents = room.players.where((p) => p.uid != _gameService.currentUserId).toList();
     final isMyTurn = room.currentTurnPlayerId == _gameService.currentUserId;
     final isHost = room.hostId == _gameService.currentUserId;
+    final isWaitingForPlayers = room.phase == 'waiting_for_players';
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0D0D0D),
+      backgroundColor: Colors.black,
       body: SafeArea(
         child: Column(
           children: [
-            // Top Bar
+            // Top Bar - Back button and status
             Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  IconButton(
-                    icon: const Icon(Icons.arrow_back, color: Colors.white),
-                    onPressed: () async {
-                      final confirm = await showDialog<bool>(
-                        context: context,
-                        builder: (context) => AlertDialog(
-                          title: const Text('Leave Game?'),
-                          content: const Text('You will forfeit the current hand.'),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(context, false),
-                              child: const Text('Cancel'),
-                            ),
-                            TextButton(
-                              onPressed: () => Navigator.pop(context, true),
-                              child: const Text('Leave'),
-                            ),
-                          ],
-                        ),
-                      );
-                      if (confirm == true && mounted) {
-                        await _gameService.leaveRoom(widget.roomId);
-                        Navigator.pop(context);
-                      }
+                  GestureDetector(
+                    onTap: () async {
+                      await _gameService.leaveRoom(widget.roomId);
+                      if (mounted) Navigator.pop(context);
                     },
+                    child: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
                   ),
+                  const Spacer(),
+                  // Online indicator
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
+                    width: 24,
+                    height: 24,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFD4AF37).withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(20),
+                      color: const Color(0xFF22C55E).withValues(alpha: 0.2),
+                      shape: BoxShape.circle,
                     ),
-                    child: Text(
-                      room.phase.toUpperCase(),
-                      style: const TextStyle(
-                        color: Color(0xFFD4AF37),
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 1,
-                      ),
-                    ),
-                  ),
-                  // Chat/Emotes button
-                  IconButton(
-                    icon: const Icon(Icons.emoji_emotions_outlined, color: Colors.white),
-                    onPressed: () => _showEmotePanel(context),
+                    child: const Icon(Icons.pie_chart, color: Color(0xFF22C55E), size: 14),
                   ),
                 ],
               ),
             ),
 
-            // Opponent Area
-            _buildOpponentArea(opponent, room),
+            // Players Row
+            _buildPlayersRow(room, opponents, currentPlayer),
 
-            const Spacer(),
+            const Spacer(flex: 2),
 
-            // Community Cards & Pot
-            _buildCommunityArea(room),
+            // Community Cards with Pot
+            _buildCommunityCardsMinimal(room),
 
-            const Spacer(),
+            const Spacer(flex: 3),
 
-            // Player Cards
-            _buildPlayerCards(currentPlayer, room),
-
-            const SizedBox(height: 16),
-
-            // Player Info & Chips
-            _buildPlayerInfo(currentPlayer),
-
-            const SizedBox(height: 16),
-
-            // Action Buttons
-            if (room.status == 'playing' && !currentPlayer.hasFolded)
-              _buildActionButtons(room, currentPlayer, isMyTurn),
-
-            // Game Over
-            if (room.status == 'finished')
-              _buildGameOverArea(room, isHost),
+            // Action Bar / Wait Message
+            if (isWaitingForPlayers || room.status != 'playing' || currentPlayer.hasFolded)
+              _buildWaitMessage(room, currentPlayer)
+            else if (isMyTurn)
+              _buildSwipeablePlayerArea(currentPlayer, room)
+            else
+              _buildPlayerAreaWithCards(currentPlayer, room),
 
             const SizedBox(height: 16),
           ],
@@ -802,262 +792,256 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> {
     );
   }
 
-  Widget _buildOpponentArea(GamePlayer opponent, GameRoom room) {
-    final isOpponentTurn = room.currentTurnPlayerId == opponent.uid;
-
+  Widget _buildPlayersRow(GameRoom room, List<GamePlayer> opponents, GamePlayer currentPlayer) {
+    final allPlayers = [...opponents];
+    
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 24),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isOpponentTurn
-            ? const Color(0xFFD4AF37).withValues(alpha: 0.1)
-            : Colors.white.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isOpponentTurn
-              ? const Color(0xFFD4AF37).withValues(alpha: 0.5)
-              : Colors.white.withValues(alpha: 0.1),
-          width: isOpponentTurn ? 2 : 1,
-        ),
-      ),
+      height: 110,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
         children: [
-          // Avatar
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: const Color(0xFFD4AF37).withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(24),
-            ),
-            child: Center(
-              child: Text(
-                opponent.displayName.isNotEmpty
-                    ? opponent.displayName[0].toUpperCase()
-                    : '?',
-                style: const TextStyle(
-                  color: Color(0xFFD4AF37),
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 16),
-          // Name & Chips
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  opponent.displayName,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: allPlayers.length + 1, // +1 for add button
+              itemBuilder: (context, index) {
+                if (index < allPlayers.length) {
+                  return _buildPlayerAvatar(allPlayers[index], room);
+                }
+                // Add player button
+                return Container(
+                  width: 56,
+                  margin: const EdgeInsets.only(right: 16),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        width: 56,
+                        height: 56,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.2), width: 2),
+                        ),
+                        child: Icon(Icons.add, color: Colors.white.withValues(alpha: 0.4), size: 28),
+                      ),
+                    ],
                   ),
-                ),
-                Text(
-                  '${opponent.chips} chips',
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.5),
-                    fontSize: 14,
-                  ),
-                ),
-              ],
+                );
+              },
             ),
-          ),
-          // Cards (face down or revealed) with action indicator
-          Stack(
-            alignment: Alignment.center,
-            children: [
-              Row(
-                children: [
-                  _buildCard(
-                    room.status == 'finished' && opponent.cards.isNotEmpty
-                        ? opponent.cards[0]
-                        : null,
-                    faceDown: room.status != 'finished',
-                  ),
-                  const SizedBox(width: 4),
-                  _buildCard(
-                    room.status == 'finished' && opponent.cards.length > 1
-                        ? opponent.cards[1]
-                        : null,
-                    faceDown: room.status != 'finished',
-                  ),
-                ],
-              ),
-              // Action indicator overlay
-              if (opponent.lastAction != null)
-                _buildActionIndicator(opponent.lastAction!),
-            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _buildCommunityArea(GameRoom room) {
-    return Column(
-      children: [
-        // Pot
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-          decoration: BoxDecoration(
-            color: const Color(0xFFD4AF37).withValues(alpha: 0.15),
-            borderRadius: BorderRadius.circular(30),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
+  Widget _buildPlayerAvatar(GamePlayer player, GameRoom room) {
+    final isTheirTurn = room.currentTurnPlayerId == player.uid;
+    final hasFolded = player.hasFolded;
+    
+    // Avatar emojis based on display name first letter
+    String getAvatar(String name) {
+      if (name.isEmpty) return '👤';
+      final firstChar = name[0].toLowerCase();
+      final avatars = {
+        'a': '👨', 'b': '🧔', 'c': '👩', 'd': '🧑', 'e': '👴',
+        'f': '👵', 'g': '🦊', 'h': '🦄', 'i': '🐸', 'j': '🐵',
+        'k': '🐻', 'l': '🐼', 'm': '🦁', 'n': '🐯', 'o': '🐨',
+        'p': '🐷', 'q': '🐰', 'r': '🐶', 's': '🐱', 't': '🐲',
+        'u': '🦋', 'v': '🦅', 'w': '🐺', 'x': '🦈', 'y': '🦜', 'z': '🦎',
+      };
+      return avatars[firstChar] ?? '👤';
+    }
+
+    return Container(
+      width: 80,
+      margin: const EdgeInsets.only(right: 12),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // Avatar
+          Stack(
             children: [
-              const Icon(
-                Icons.monetization_on,
-                color: Color(0xFFD4AF37),
-                size: 20,
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: hasFolded ? Colors.grey.shade800 : Colors.white.withValues(alpha: 0.1),
+                  border: isTheirTurn 
+                      ? Border.all(color: const Color(0xFFD4AF37), width: 3)
+                      : null,
+                ),
+                child: Center(
+                  child: Text(
+                    getAvatar(player.displayName),
+                    style: TextStyle(
+                      fontSize: 28,
+                      color: hasFolded ? Colors.grey : null,
+                    ),
+                  ),
+                ),
               ),
-              const SizedBox(width: 8),
-              Text(
-                'POT: ${room.pot}',
+              // Dealer badge
+              if (player.uid == room.players[room.dealerIndex].uid)
+                Positioned(
+                  bottom: 0,
+                  right: 0,
+                  child: Container(
+                    width: 20,
+                    height: 20,
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Center(
+                      child: Text('D', style: TextStyle(
+                        color: Colors.black,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      )),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          // Name
+          Text(
+            player.displayName.length > 8 
+                ? '${player.displayName.substring(0, 8)}' 
+                : player.displayName,
+            style: TextStyle(
+              color: hasFolded ? Colors.grey : Colors.white,
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+          // Chips
+          Text(
+            _formatChips(player.chips),
+            style: TextStyle(
+              color: hasFolded ? Colors.grey : Colors.yellow.shade600,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          // Current bet badge
+          if (player.currentBet > 0)
+            Container(
+              margin: const EdgeInsets.only(top: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.yellow.shade800,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                _formatChips(player.currentBet),
                 style: const TextStyle(
-                  color: Color(0xFFD4AF37),
-                  fontSize: 18,
+                  color: Colors.white,
+                  fontSize: 10,
                   fontWeight: FontWeight.bold,
                 ),
               ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 24),
-        // Community Cards
+            ),
+        ],
+      ),
+    );
+  }
+
+  String _formatChips(int chips) {
+    if (chips >= 1000000) return '${(chips / 1000000).toStringAsFixed(1)}M';
+    if (chips >= 1000) return '${(chips / 1000).toStringAsFixed(chips % 1000 == 0 ? 0 : 1)}k';
+    return chips.toString();
+  }
+
+  Widget _buildCommunityCardsMinimal(GameRoom room) {
+    return Column(
+      children: [
+        // Community Cards Row
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             for (var i = 0; i < 5; i++)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: _buildCard(
+                child: _buildMinimalCard(
                   i < room.communityCards.length ? room.communityCards[i] : null,
-                  large: true,
+                  isEmpty: i >= room.communityCards.length,
                 ),
               ),
+            const SizedBox(width: 16),
+            // Pot amount
+            Text(
+              room.pot.toString(),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 24,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ],
         ),
       ],
     );
   }
 
-  Widget _buildPlayerCards(GamePlayer player, GameRoom room) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        if (player.cards.isNotEmpty)
-          _buildCard(player.cards[0], large: true),
-        const SizedBox(width: 8),
-        if (player.cards.length > 1)
-          _buildCard(player.cards[1], large: true),
-      ],
-    );
-  }
+  Widget _buildMinimalCard(PlayingCard? card, {bool isEmpty = false, bool isHoleCard = false}) {
+    const width = 56.0;
+    const height = 78.0;
 
-  Widget _buildPlayerInfo(GamePlayer player) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 24),
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(30),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(
-            Icons.account_balance_wallet,
-            color: Colors.white70,
-            size: 18,
-          ),
-          const SizedBox(width: 8),
-          Text(
-            '${player.chips} chips',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildActionButtons(GameRoom room, GamePlayer player, bool isMyTurn) {
-    // If player is all-in, show status instead of buttons
-    if (player.chips == 0) {
+    if (isEmpty || card == null) {
       return Container(
-        margin: const EdgeInsets.symmetric(horizontal: 16),
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        child: Text(
-          'ALL IN!',
-          style: TextStyle(
-            color: const Color(0xFFD4AF37),
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
+        width: width,
+        height: height,
+        decoration: BoxDecoration(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.15), width: 2),
+        ),
+        child: Center(
+          child: Icon(
+            Icons.casino_outlined,
+            color: Colors.white.withValues(alpha: 0.1),
+            size: 24,
           ),
-          textAlign: TextAlign.center,
         ),
       );
     }
-    
-    final callAmount = room.currentBet - player.currentBet;
-    final canCheck = room.currentBet == player.currentBet;
+
+    final isRed = card.suit == '♥' || card.suit == '♦';
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      child: Row(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.3),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Fold
-          Expanded(
-            child: _buildActionButton(
-              'FOLD',
-              Colors.red,
-              isMyTurn ? () => _gameService.playerAction(widget.roomId, 'fold') : null,
+          Text(
+            card.rank,
+            style: TextStyle(
+              color: isRed ? Colors.red.shade700 : Colors.black,
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
             ),
           ),
-          const SizedBox(width: 8),
-          // Check / Call
-          Expanded(
-            child: _buildActionButton(
-              canCheck ? 'CHECK' : 'CALL $callAmount',
-              Colors.blue,
-              isMyTurn
-                  ? () => _gameService.playerAction(
-                        widget.roomId,
-                        canCheck ? 'check' : 'call',
-                      )
-                  : null,
-            ),
-          ),
-          const SizedBox(width: 8),
-          // Raise
-          Expanded(
-            child: _buildActionButton(
-              'RAISE',
-              const Color(0xFF4CAF50),
-              isMyTurn
-                  ? () => _showRaiseDialog(room, player)
-                  : null,
-            ),
-          ),
-          const SizedBox(width: 8),
-          // All In
-          Expanded(
-            child: _buildActionButton(
-              'ALL IN',
-              const Color(0xFFD4AF37),
-              isMyTurn
-                  ? () => _gameService.playerAction(widget.roomId, 'allin')
-                  : null,
+          Text(
+            card.suit,
+            style: TextStyle(
+              color: isRed ? Colors.red.shade700 : Colors.black,
+              fontSize: 22,
             ),
           ),
         ],
@@ -1065,27 +1049,281 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> {
     );
   }
 
-  Widget _buildActionButton(String label, Color color, VoidCallback? onPressed) {
-    return ElevatedButton(
-      onPressed: onPressed,
-      style: ElevatedButton.styleFrom(
-        backgroundColor: color.withValues(alpha: onPressed != null ? 0.2 : 0.05),
-        foregroundColor: color,
-        disabledForegroundColor: color.withValues(alpha: 0.3),
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-          side: BorderSide(
-            color: color.withValues(alpha: onPressed != null ? 0.5 : 0.1),
-          ),
+  Widget _buildCardBack({double width = 56, double height = 78}) {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFFE57373), Color(0xFFEF5350)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.white, width: 2),
+      ),
+      child: Center(
+        child: Icon(
+          Icons.radio_button_checked,
+          color: Colors.white.withValues(alpha: 0.6),
+          size: 28,
         ),
       ),
-      child: Text(
-        label,
-        style: const TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.bold,
-        ),
+    );
+  }
+
+  Widget _buildWaitMessage(GameRoom room, GamePlayer player) {
+    String message = 'Wait for the next hand';
+    if (room.phase == 'waiting_for_players') {
+      message = 'Waiting for players...';
+    } else if (player.hasFolded) {
+      message = 'You folded';
+    } else if (room.status == 'finished') {
+      message = room.winnerId == player.uid ? 'You won!' : 'Hand complete';
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Column(
+        children: [
+          // Message bar
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            decoration: BoxDecoration(
+              color: Colors.transparent,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+            ),
+            child: Center(
+              child: Text(
+                message,
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.6),
+                  fontSize: 16,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          // Bottom area: cards and player info
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              // Player's cards (face down when waiting)
+              Row(
+                children: [
+                  _buildCardBack(width: 70, height: 98),
+                  Transform.translate(
+                    offset: const Offset(-20, 0),
+                    child: _buildCardBack(width: 70, height: 98),
+                  ),
+                ],
+              ),
+              const Spacer(),
+              // Player info
+              _buildPlayerInfoMinimal(player),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSwipeablePlayerArea(GamePlayer player, GameRoom room) {
+    final callAmount = room.currentBet - player.currentBet;
+    final canCheck = room.currentBet == player.currentBet;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Column(
+        children: [
+          // Action buttons row
+          Row(
+            children: [
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => _gameService.playerAction(widget.roomId, canCheck ? 'check' : 'call'),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    decoration: BoxDecoration(
+                      color: Colors.transparent,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
+                    ),
+                    child: Center(
+                      child: Text(
+                        canCheck ? 'Check' : 'Call ${_formatChips(callAmount)}',
+                        style: const TextStyle(color: Colors.white, fontSize: 16),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => _showRaiseDialog(room, player),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Center(
+                      child: Text(
+                        'Raise',
+                        style: TextStyle(color: Colors.black, fontSize: 16, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          // Cards area with swipe to fold
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              // Swipeable cards
+              GestureDetector(
+                onVerticalDragEnd: (details) {
+                  // Swipe up to fold
+                  if (details.primaryVelocity != null && details.primaryVelocity! < -300) {
+                    _gameService.playerAction(widget.roomId, 'fold');
+                  }
+                },
+                child: Column(
+                  children: [
+                    Text(
+                      '↑ Swipe to fold',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.4),
+                        fontSize: 11,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        if (player.cards.isNotEmpty)
+                          _buildMinimalCard(player.cards[0]),
+                        const SizedBox(width: 8),
+                        if (player.cards.length > 1)
+                          _buildMinimalCard(player.cards[1]),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const Spacer(),
+              // Player info
+              _buildPlayerInfoMinimal(player),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPlayerAreaWithCards(GamePlayer player, GameRoom room) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Column(
+        children: [
+          // Waiting indicator
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            decoration: BoxDecoration(
+              color: Colors.transparent,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+            ),
+            child: Center(
+              child: Text(
+                'Waiting for opponent...',
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 16),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          // Cards and player info
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              // Player's cards
+              Row(
+                children: [
+                  if (player.cards.isNotEmpty)
+                    _buildMinimalCard(player.cards[0]),
+                  const SizedBox(width: 8),
+                  if (player.cards.length > 1)
+                    _buildMinimalCard(player.cards[1]),
+                ],
+              ),
+              const Spacer(),
+              _buildPlayerInfoMinimal(player),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPlayerInfoMinimal(GamePlayer player) {
+    String getAvatar(String name) {
+      if (name.isEmpty) return '👤';
+      final firstChar = name[0].toLowerCase();
+      final avatars = {
+        'a': '👨', 'b': '🧔', 'c': '👩', 'd': '🧑', 'e': '👴',
+        'f': '👵', 'g': '🦊', 'h': '🦄', 'i': '🐸', 'j': '🐵',
+        'k': '🐻', 'l': '🐼', 'm': '🦁', 'n': '🐯', 'o': '🐨',
+        'p': '🐷', 'q': '🐰', 'r': '🐶', 's': '🐱', 't': '🐲',
+        'u': '🦋', 'v': '🦅', 'w': '🐺', 'x': '🦈', 'y': '🦜', 'z': '🦎',
+      };
+      return avatars[firstChar] ?? '👤';
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Avatar
+          Text(getAvatar(player.displayName), style: const TextStyle(fontSize: 32)),
+          const SizedBox(width: 12),
+          // Chips
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                _formatChips(player.chips),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(width: 12),
+          // Emoji button
+          GestureDetector(
+            onTap: () => _showEmotePanel(context),
+            child: Icon(
+              Icons.emoji_emotions_outlined,
+              color: Colors.white.withValues(alpha: 0.5),
+              size: 24,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1167,14 +1405,10 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> {
       margin: const EdgeInsets.symmetric(horizontal: 24),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: didWin
-            ? const Color(0xFF4CAF50).withValues(alpha: 0.1)
-            : Colors.red.withValues(alpha: 0.1),
+        color: didWin ? const Color(0xFF4CAF50).withValues(alpha: 0.1) : Colors.red.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: didWin
-              ? const Color(0xFF4CAF50).withValues(alpha: 0.3)
-              : Colors.red.withValues(alpha: 0.3),
+          color: didWin ? const Color(0xFF4CAF50).withValues(alpha: 0.3) : Colors.red.withValues(alpha: 0.3),
         ),
       ),
       child: Column(
@@ -1316,7 +1550,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> {
   Widget _buildActionIndicator(String action) {
     Color bgColor;
     Color textColor = Colors.white;
-    
+
     switch (action) {
       case 'FOLD':
         bgColor = Colors.red.shade700;
@@ -1336,7 +1570,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> {
       default:
         bgColor = Colors.grey.shade700;
     }
-    
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(

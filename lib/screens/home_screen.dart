@@ -8,6 +8,7 @@ import '../services/friends_service.dart';
 import '../services/user_preferences.dart';
 import 'game_screen.dart';
 import 'lobby_screen.dart';
+import 'quick_play_screen.dart';
 import 'multiplayer_game_screen.dart';
 import '../services/game_service.dart';
 import '../services/auth_service.dart';
@@ -88,7 +89,7 @@ class _HomeTabState extends State<_HomeTab> {
   StreamSubscription? _friendsSub;
   StreamSubscription? _notificationsSub;
   StreamSubscription? _requestsSub;
-  
+
   // Swipeable play card
   final PageController _playCardController = PageController(initialPage: 0);
   int _currentPlayMode = 0;
@@ -437,28 +438,25 @@ class _HomeTabState extends State<_HomeTab> {
     return SafeArea(
       child: CustomScrollView(
         slivers: [
-          // Header - Balance (clickable to shop)
+          // Header - Balance and Notification
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(24, 32, 24, 0),
-              child: GestureDetector(
-                onTap: () {
-                  final homeState = context.findAncestorStateOfType<_HomeScreenState>();
-                  homeState?.setState(() => homeState._currentIndex = 0);
-                },
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Balance',
-                      style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 14),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      _chipBalance.toString().replaceAllMapped(
-                        RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-                        (Match m) => '${m[1]},',
-                      ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Balance (clickable to shop)
+                  GestureDetector(
+                    onTap: () {
+                      final homeState = context.findAncestorStateOfType<_HomeScreenState>();
+                      homeState?.setState(() => homeState._currentIndex = 0);
+                    },
+                    child: Text(
+                      '\$${_chipBalance.toString().replaceAllMapped(
+                            RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+                            (Match m) => '${m[1]},',
+                          )}',
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 48,
@@ -466,8 +464,50 @@ class _HomeTabState extends State<_HomeTab> {
                         letterSpacing: -1,
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                  // Notification button
+                  GestureDetector(
+                    onTap: _showNotificationPanel,
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Stack(
+                        children: [
+                          Icon(
+                            Icons.notifications_outlined,
+                            color: Colors.white.withValues(alpha: 0.7),
+                            size: 24,
+                          ),
+                          if (_unreadNotifications > 0)
+                            Positioned(
+                              right: 0,
+                              top: 0,
+                              child: Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFFFF4444),
+                                  shape: BoxShape.circle,
+                                ),
+                                constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                                child: Text(
+                                  _unreadNotifications > 9 ? '9+' : _unreadNotifications.toString(),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -523,7 +563,8 @@ class _HomeTabState extends State<_HomeTab> {
                           subtitle: 'Jump into a game',
                           icon: Icons.play_arrow_rounded,
                           gradient: const [Color(0xFF3B82F6), Color(0xFF2563EB)],
-                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LobbyScreen())),
+                          onTap: () =>
+                              Navigator.push(context, MaterialPageRoute(builder: (_) => const QuickPlayScreen())),
                         ),
                         // AI Mode
                         _buildPlayModeCard(
@@ -580,9 +621,7 @@ class _HomeTabState extends State<_HomeTab> {
                         width: _currentPlayMode == index ? 24 : 8,
                         height: 8,
                         decoration: BoxDecoration(
-                          color: _currentPlayMode == index 
-                            ? Colors.white 
-                            : Colors.white.withValues(alpha: 0.3),
+                          color: _currentPlayMode == index ? Colors.white : Colors.white.withValues(alpha: 0.3),
                           borderRadius: BorderRadius.circular(4),
                         ),
                       );
@@ -820,16 +859,12 @@ class _HomeTabState extends State<_HomeTab> {
       child: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: isLocked 
-              ? [Colors.white.withValues(alpha: 0.05), Colors.white.withValues(alpha: 0.02)]
-              : gradient,
+            colors: isLocked ? [Colors.white.withValues(alpha: 0.05), Colors.white.withValues(alpha: 0.02)] : gradient,
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
           borderRadius: BorderRadius.circular(20),
-          border: isLocked 
-            ? Border.all(color: Colors.white.withValues(alpha: 0.1))
-            : null,
+          border: isLocked ? Border.all(color: Colors.white.withValues(alpha: 0.1)) : null,
         ),
         child: Stack(
           children: [
@@ -886,9 +921,7 @@ class _HomeTabState extends State<_HomeTab> {
                       Text(
                         subtitle,
                         style: TextStyle(
-                          color: isLocked 
-                            ? Colors.white.withValues(alpha: 0.3) 
-                            : Colors.white.withValues(alpha: 0.8),
+                          color: isLocked ? Colors.white.withValues(alpha: 0.3) : Colors.white.withValues(alpha: 0.8),
                           fontSize: 14,
                         ),
                       ),
@@ -1327,86 +1360,6 @@ class _ShopTabState extends State<_ShopTab> with SingleTickerProviderStateMixin 
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Gems Section
-          Text(
-            'Gems',
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.5),
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              letterSpacing: 1,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _CurrencyCard(
-                  emoji: '💎',
-                  amount: '100',
-                  price: '\$0.99',
-                  color: Colors.white.withValues(alpha: 0.6),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _CurrencyCard(
-                  emoji: '💎',
-                  amount: '500',
-                  price: '\$4.99',
-                  color: Colors.white.withValues(alpha: 0.6),
-                  bonus: '+50',
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _CurrencyCard(
-                  emoji: '💎',
-                  amount: '1,200',
-                  price: '\$9.99',
-                  color: Colors.white.withValues(alpha: 0.6),
-                  bonus: '+200',
-                  isBest: true,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: _CurrencyCard(
-                  emoji: '💎',
-                  amount: '2,500',
-                  price: '\$19.99',
-                  color: Colors.white.withValues(alpha: 0.6),
-                  bonus: '+500',
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _CurrencyCard(
-                  emoji: '💎',
-                  amount: '6,500',
-                  price: '\$49.99',
-                  color: Colors.white.withValues(alpha: 0.6),
-                  bonus: '+1500',
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _CurrencyCard(
-                  emoji: '💎',
-                  amount: '14K',
-                  price: '\$99.99',
-                  color: Colors.white.withValues(alpha: 0.6),
-                  bonus: '+4000',
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-
           // Chips Section
           Text(
             'Chips',
@@ -1481,6 +1434,86 @@ class _ShopTabState extends State<_ShopTab> with SingleTickerProviderStateMixin 
                   price: '\$99.99',
                   color: Colors.white.withValues(alpha: 0.6),
                   bonus: '+1.5M',
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+
+          // Gems Section
+          Text(
+            'Gems',
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.5),
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              letterSpacing: 1,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _CurrencyCard(
+                  emoji: '💎',
+                  amount: '100',
+                  price: '\$0.99',
+                  color: Colors.white.withValues(alpha: 0.6),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _CurrencyCard(
+                  emoji: '💎',
+                  amount: '500',
+                  price: '\$4.99',
+                  color: Colors.white.withValues(alpha: 0.6),
+                  bonus: '+50',
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _CurrencyCard(
+                  emoji: '💎',
+                  amount: '1,200',
+                  price: '\$9.99',
+                  color: Colors.white.withValues(alpha: 0.6),
+                  bonus: '+200',
+                  isBest: true,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: _CurrencyCard(
+                  emoji: '💎',
+                  amount: '2,500',
+                  price: '\$19.99',
+                  color: Colors.white.withValues(alpha: 0.6),
+                  bonus: '+500',
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _CurrencyCard(
+                  emoji: '💎',
+                  amount: '6,500',
+                  price: '\$49.99',
+                  color: Colors.white.withValues(alpha: 0.6),
+                  bonus: '+1500',
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _CurrencyCard(
+                  emoji: '💎',
+                  amount: '14K',
+                  price: '\$99.99',
+                  color: Colors.white.withValues(alpha: 0.6),
+                  bonus: '+4000',
                 ),
               ),
             ],

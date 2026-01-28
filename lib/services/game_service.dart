@@ -186,6 +186,53 @@ class GameService {
     return _fetchAvailableRooms('cash');
   }
 
+  /// Fetch joinable cash game rooms by blind level (includes rooms waiting for players)
+  Future<List<GameRoom>> fetchJoinableRoomsByBlind(int bigBlind) async {
+    final token = await _getAuthToken();
+    final userId = currentUserId;
+
+    // Fetch ALL rooms (we'll filter locally since Firebase REST has limited query support)
+    final response = await http.get(
+      Uri.parse('$_databaseUrl/game_rooms.json?auth=$token'),
+    );
+
+    print('🔍 Fetching joinable rooms for bigBlind: $bigBlind');
+
+    if (response.statusCode != 200 || response.body == 'null') {
+      print('🔍 No rooms found or error');
+      return [];
+    }
+
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    print('🔍 Total rooms in database: ${data.length}');
+
+    final allRooms = data.entries
+        .map((e) => GameRoom.fromJson(Map<String, dynamic>.from(e.value as Map), e.key))
+        .toList();
+
+    // Filter for joinable rooms:
+    // - Same blind level
+    // - Not full
+    // - Not private
+    // - User not already in room
+    // - Either waiting OR playing with phase='waiting_for_players'
+    final joinableRooms = allRooms.where((room) {
+      final isCorrectBlind = room.bigBlind == bigBlind;
+      final isNotFull = !room.isFull;
+      final isNotPrivate = !room.isPrivate;
+      final userNotInRoom = !room.players.any((p) => p.uid == userId);
+      final isJoinable = room.status == 'waiting' || 
+          (room.status == 'playing' && room.phase == 'waiting_for_players');
+      
+      print('🔍 Room ${room.id}: blind=${room.bigBlind}, status=${room.status}, phase=${room.phase}, players=${room.players.length}, joinable=$isJoinable');
+      
+      return isCorrectBlind && isNotFull && isNotPrivate && userNotInRoom && isJoinable;
+    }).toList();
+
+    print('🔍 Joinable rooms for blind $bigBlind: ${joinableRooms.length}');
+    return joinableRooms;
+  }
+
   /// Immediately fetch available Sit & Go rooms (no stream delay)
   Future<List<GameRoom>> fetchAvailableSitAndGoRooms() async {
     return _fetchAvailableRooms('sitandgo');
@@ -370,6 +417,184 @@ class GameService {
         'communityCards': [],
         'lastRaiseAmount': room.bigBlind,
         'bbHasOption': true, // Big blind gets option to raise preflop
+      }),
+    );
+  }
+
+  /// Start the game immediately (skip waiting room, works with 1+ players)
+  Future<void> startGameSolo(String roomId) async {
+    final userId = currentUserId;
+    if (userId == null) return;
+
+    final token = await _getAuthToken();
+    final room = await _fetchRoom(roomId);
+    if (room == null) return;
+
+    if (room.hostId != userId) throw Exception('Only host can start the game');
+
+    // Create and shuffle deck
+    final deck = _createShuffledDeck();
+
+    // Deal cards to players
+    final updatedPlayers = room.players.map((p) {
+      final card1 = deck.removeLast();
+      final card2 = deck.removeLast();
+      return p.copyWith(
+        cards: [
+          PlayingCard(rank: card1.split('|')[0], suit: card1.split('|')[1]),
+          PlayingCard(rank: card2.split('|')[0], suit: card2.split('|')[1]),
+        ],
+        currentBet: 0,
+        hasFolded: false,
+        hasActed: false,
+        lastAction: null,
+      );
+    }).toList();
+
+    final numPlayers = updatedPlayers.length;
+    
+    // Handle solo player case
+    if (numPlayers == 1) {
+      // Solo mode - no blinds needed, just show the game table
+      await http.patch(
+        Uri.parse('$_databaseUrl/game_rooms/$roomId.json?auth=$token'),
+        body: jsonEncode({
+          'status': 'playing',
+          'phase': 'waiting_for_players', // Special phase for solo
+          'players': updatedPlayers.map((p) => p.toJson()).toList(),
+          'deck': deck,
+          'pot': 0,
+          'currentBet': 0,
+          'minRaise': room.bigBlind,
+          'currentTurnPlayerId': updatedPlayers[0].uid,
+          'communityCards': [],
+          'lastRaiseAmount': room.bigBlind,
+          'bbHasOption': false,
+        }),
+      );
+      return;
+    }
+
+    final isHeadsUp = numPlayers == 2;
+
+    int sbIndex;
+    int bbIndex;
+    int firstToAct;
+
+    if (isHeadsUp) {
+      sbIndex = room.dealerIndex;
+      bbIndex = (room.dealerIndex + 1) % numPlayers;
+      firstToAct = sbIndex;
+    } else {
+      sbIndex = (room.dealerIndex + 1) % numPlayers;
+      bbIndex = (room.dealerIndex + 2) % numPlayers;
+      firstToAct = (bbIndex + 1) % numPlayers;
+    }
+
+    final sbAmount = min(room.smallBlind, updatedPlayers[sbIndex].chips);
+    final bbAmount = min(room.bigBlind, updatedPlayers[bbIndex].chips);
+
+    updatedPlayers[sbIndex] = updatedPlayers[sbIndex].copyWith(
+      chips: updatedPlayers[sbIndex].chips - sbAmount,
+      currentBet: sbAmount,
+    );
+    updatedPlayers[bbIndex] = updatedPlayers[bbIndex].copyWith(
+      chips: updatedPlayers[bbIndex].chips - bbAmount,
+      currentBet: bbAmount,
+    );
+
+    await http.patch(
+      Uri.parse('$_databaseUrl/game_rooms/$roomId.json?auth=$token'),
+      body: jsonEncode({
+        'status': 'playing',
+        'phase': 'preflop',
+        'players': updatedPlayers.map((p) => p.toJson()).toList(),
+        'deck': deck,
+        'pot': sbAmount + bbAmount,
+        'currentBet': bbAmount,
+        'minRaise': room.bigBlind,
+        'currentTurnPlayerId': updatedPlayers[firstToAct].uid,
+        'communityCards': [],
+        'lastRaiseAmount': room.bigBlind,
+        'bbHasOption': true,
+      }),
+    );
+  }
+
+  /// Start the game from waiting_for_players phase (when 2nd player joins)
+  Future<void> startGameFromWaiting(String roomId) async {
+    final userId = currentUserId;
+    if (userId == null) return;
+
+    final token = await _getAuthToken();
+    final room = await _fetchRoom(roomId);
+    if (room == null) return;
+
+    if (room.hostId != userId) throw Exception('Only host can start the game');
+    if (room.players.length < 2) throw Exception('Need at least 2 players');
+
+    // Create and shuffle a new deck
+    final deck = _createShuffledDeck();
+
+    // Deal fresh cards to all players
+    final updatedPlayers = room.players.map((p) {
+      final card1 = deck.removeLast();
+      final card2 = deck.removeLast();
+      return p.copyWith(
+        cards: [
+          PlayingCard(rank: card1.split('|')[0], suit: card1.split('|')[1]),
+          PlayingCard(rank: card2.split('|')[0], suit: card2.split('|')[1]),
+        ],
+        currentBet: 0,
+        hasFolded: false,
+        hasActed: false,
+        lastAction: null,
+      );
+    }).toList();
+
+    final numPlayers = updatedPlayers.length;
+    final isHeadsUp = numPlayers == 2;
+
+    int sbIndex;
+    int bbIndex;
+    int firstToAct;
+
+    if (isHeadsUp) {
+      sbIndex = room.dealerIndex;
+      bbIndex = (room.dealerIndex + 1) % numPlayers;
+      firstToAct = sbIndex;
+    } else {
+      sbIndex = (room.dealerIndex + 1) % numPlayers;
+      bbIndex = (room.dealerIndex + 2) % numPlayers;
+      firstToAct = (bbIndex + 1) % numPlayers;
+    }
+
+    final sbAmount = min(room.smallBlind, updatedPlayers[sbIndex].chips);
+    final bbAmount = min(room.bigBlind, updatedPlayers[bbIndex].chips);
+
+    updatedPlayers[sbIndex] = updatedPlayers[sbIndex].copyWith(
+      chips: updatedPlayers[sbIndex].chips - sbAmount,
+      currentBet: sbAmount,
+    );
+    updatedPlayers[bbIndex] = updatedPlayers[bbIndex].copyWith(
+      chips: updatedPlayers[bbIndex].chips - bbAmount,
+      currentBet: bbAmount,
+    );
+
+    await http.patch(
+      Uri.parse('$_databaseUrl/game_rooms/$roomId.json?auth=$token'),
+      body: jsonEncode({
+        'status': 'playing',
+        'phase': 'preflop',
+        'players': updatedPlayers.map((p) => p.toJson()).toList(),
+        'deck': deck,
+        'pot': sbAmount + bbAmount,
+        'currentBet': bbAmount,
+        'minRaise': room.bigBlind,
+        'currentTurnPlayerId': updatedPlayers[firstToAct].uid,
+        'communityCards': [],
+        'lastRaiseAmount': room.bigBlind,
+        'bbHasOption': true,
       }),
     );
   }
