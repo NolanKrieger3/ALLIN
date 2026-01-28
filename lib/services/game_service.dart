@@ -44,7 +44,7 @@ class GameService {
   // ============================================================================
 
   /// Create a new game room
-  Future<GameRoom> createRoom({int bigBlind = 100, int startingChips = 1000, bool isPrivate = false}) async {
+  Future<GameRoom> createRoom({int bigBlind = 100, int startingChips = 1000, bool isPrivate = false, String gameType = 'cash'}) async {
     final userId = currentUserId;
     if (userId == null) throw Exception('Must be logged in to create a room');
 
@@ -61,6 +61,7 @@ class GameService {
       smallBlind: bigBlind ~/ 2,
       createdAt: DateTime.now(),
       isPrivate: isPrivate,
+      gameType: gameType,
     );
 
     final response = await http.put(
@@ -76,7 +77,8 @@ class GameService {
   }
 
   /// Join an existing room
-  Future<void> joinRoom(String roomId, {int startingChips = 1000}) async {
+  /// If [startingChips] is not provided, it will match the host's starting chips
+  Future<void> joinRoom(String roomId, {int? startingChips}) async {
     final userId = currentUserId;
     if (userId == null) throw Exception('Must be logged in to join a room');
 
@@ -107,8 +109,12 @@ class GameService {
       return; // Already in room
     }
 
-    final newPlayer = GamePlayer(uid: userId, displayName: currentUserName, chips: startingChips);
-    print('ADDING PLAYER: ${newPlayer.displayName} (${newPlayer.uid})');
+    // Use provided chips or match the host's chips
+    final chips = startingChips ?? room.players.first.chips;
+
+    // Auto-ready the player so game can start immediately when matched
+    final newPlayer = GamePlayer(uid: userId, displayName: currentUserName, chips: chips, isReady: true);
+    print('ADDING PLAYER: ${newPlayer.displayName} (${newPlayer.uid}) with $chips chips - auto-ready');
 
     final updatedPlayers = [...room.players, newPlayer];
 
@@ -241,7 +247,7 @@ class GameService {
   }
 
   /// Fetch joinable cash game rooms by blind level (includes rooms waiting for players)
-  Future<List<GameRoom>> fetchJoinableRoomsByBlind(int bigBlind) async {
+  Future<List<GameRoom>> fetchJoinableRoomsByBlind(int bigBlind, {String gameType = 'cash'}) async {
     // Clean up stale rooms first
     await cleanupStaleRooms();
 
@@ -253,7 +259,7 @@ class GameService {
       Uri.parse('$_databaseUrl/game_rooms.json?auth=$token'),
     );
 
-    print('🔍 Fetching joinable rooms for bigBlind: $bigBlind');
+    print('🔍 Fetching joinable rooms for bigBlind: $bigBlind, gameType: $gameType');
 
     if (response.statusCode != 200 || response.body == 'null') {
       print('🔍 No rooms found or error');
@@ -268,6 +274,7 @@ class GameService {
 
     // Filter for joinable rooms:
     // - Same blind level
+    // - Same game type
     // - Not full
     // - Not private
     // - User not already in room
@@ -275,6 +282,7 @@ class GameService {
     // - Has exactly 1 player (to join them)
     final joinableRooms = allRooms.where((room) {
       final isCorrectBlind = room.bigBlind == bigBlind;
+      final isCorrectGameType = room.gameType == gameType;
       final isNotFull = !room.isFull;
       final isNotPrivate = !room.isPrivate;
       final userNotInRoom = !room.players.any((p) => p.uid == userId);
@@ -282,9 +290,9 @@ class GameService {
       final needsPlayer = room.players.length == 1; // Only join rooms that have exactly 1 player waiting
 
       print(
-          '🔍 Room ${room.id}: blind=${room.bigBlind}, status=${room.status}, players=${room.players.length}, needsPlayer=$needsPlayer, userNotInRoom=$userNotInRoom');
+          '🔍 Room ${room.id}: blind=${room.bigBlind}, gameType=${room.gameType}, status=${room.status}, players=${room.players.length}, needsPlayer=$needsPlayer, userNotInRoom=$userNotInRoom');
 
-      return isCorrectBlind && isNotFull && isNotPrivate && userNotInRoom && isJoinable && needsPlayer;
+      return isCorrectBlind && isCorrectGameType && isNotFull && isNotPrivate && userNotInRoom && isJoinable && needsPlayer;
     }).toList();
 
     // Sort by most recently created (newest first) - these are more likely to have active players
@@ -399,7 +407,8 @@ class GameService {
   // ============================================================================
 
   /// Start the game (host only)
-  Future<void> startGame(String roomId) async {
+  /// Set [skipReadyCheck] to true for auto-matched games where players are auto-ready
+  Future<void> startGame(String roomId, {bool skipReadyCheck = false}) async {
     final userId = currentUserId;
     if (userId == null) return;
 
@@ -408,7 +417,8 @@ class GameService {
     if (room == null) return;
 
     if (room.hostId != userId) throw Exception('Only host can start the game');
-    if (!room.canStart) throw Exception('Not all players are ready');
+    if (room.players.length < 2) throw Exception('Need at least 2 players to start');
+    if (!skipReadyCheck && !room.canStart) throw Exception('Not all players are ready');
 
     // Create and shuffle deck
     final deck = _createShuffledDeck();

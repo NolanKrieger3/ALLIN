@@ -50,7 +50,8 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> {
       setState(() => _isLoading = true);
       print('🎮 Starting game with ${room.players.length} players!');
       try {
-        await _gameService.startGame(widget.roomId);
+        // Skip ready check for auto-matched games - players are auto-ready when joining
+        await _gameService.startGame(widget.roomId, skipReadyCheck: true);
       } catch (e) {
         print('❌ Failed to start game: $e');
         _hasAutoStarted = false; // Allow retry

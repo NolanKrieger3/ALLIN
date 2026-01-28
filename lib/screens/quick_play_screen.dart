@@ -59,8 +59,8 @@ class _QuickPlayScreenState extends State<QuickPlayScreen> {
       for (int attempt = 0; attempt < 3; attempt++) {
         print('🔍 Matchmaking attempt ${attempt + 1}/3 for blind $bigBlind');
 
-        // Search for joinable rooms
-        final rooms = await _gameService.fetchJoinableRoomsByBlind(bigBlind);
+        // Search for joinable Quick Play rooms (separate from Cash Games)
+        final rooms = await _gameService.fetchJoinableRoomsByBlind(bigBlind, gameType: 'quickplay');
 
         if (rooms.isNotEmpty) {
           // Try to join each room until one succeeds
@@ -90,7 +90,7 @@ class _QuickPlayScreenState extends State<QuickPlayScreen> {
       // If no room found after retries, create a new one
       if (roomId == null) {
         print('📦 No joinable rooms found, creating new room');
-        final room = await _gameService.createRoom(bigBlind: bigBlind, startingChips: buyIn);
+        final room = await _gameService.createRoom(bigBlind: bigBlind, startingChips: buyIn, gameType: 'quickplay');
         roomId = room.id;
         print('✅ Created room ${room.id}');
       }

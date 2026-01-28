@@ -238,18 +238,13 @@ class _LobbyScreenState extends State<LobbyScreen> {
     });
 
     try {
-      // Try to find an available room at this stake level
-      final rooms = await _gameService.fetchAvailableCashRooms();
+      // Try to find an available room at this stake level (filtered by blind and gameType)
+      final rooms = await _gameService.fetchJoinableRoomsByBlind(stake.bigBlind, gameType: 'cash');
 
-      // Prioritize rooms that already have players (non-empty lobbies)
-      final nonEmptyRooms = rooms.where((r) => r.players.isNotEmpty).toList();
-      // Sort by number of players descending to fill rooms first
-      nonEmptyRooms.sort((a, b) => b.players.length.compareTo(a.players.length));
-
-      final roomToJoin = nonEmptyRooms.isNotEmpty ? nonEmptyRooms.first : (rooms.isNotEmpty ? rooms.first : null);
-
-      if (roomToJoin != null) {
-        await _gameService.joinRoom(roomToJoin.id);
+      if (rooms.isNotEmpty) {
+        // Join the first available room at this stake
+        final roomToJoin = rooms.first;
+        await _gameService.joinRoom(roomToJoin.id, startingChips: stake.minBuyIn);
         if (mounted) {
           Navigator.push(
             context,
@@ -257,14 +252,19 @@ class _LobbyScreenState extends State<LobbyScreen> {
           );
         }
       } else {
-        // No rooms available, create one
-        final room = await _gameService.createRoom();
+        // No rooms available at this stake, create one
+        final room = await _gameService.createRoom(
+          bigBlind: stake.bigBlind,
+          startingChips: stake.minBuyIn,
+          isPrivate: false,
+          gameType: 'cash',
+        );
         if (mounted) {
           Navigator.push(context, MaterialPageRoute(builder: (context) => MultiplayerGameScreen(roomId: room.id)));
         }
       }
     } catch (e) {
-      setState(() => _error = 'Failed to join table');
+      setState(() => _error = 'Failed to join table: $e');
     }
 
     setState(() {
@@ -286,16 +286,13 @@ class _LobbyScreenState extends State<LobbyScreen> {
     });
 
     try {
-      final rooms = await _gameService.fetchAvailableCashRooms();
+      // Try to find an available room at this stake level (filtered by blind and gameType)
+      final rooms = await _gameService.fetchJoinableRoomsByBlind(stake.bigBlind, gameType: 'headsup');
 
-      // Prioritize rooms that already have players (non-empty lobbies)
-      final nonEmptyRooms = rooms.where((r) => r.players.isNotEmpty).toList();
-      nonEmptyRooms.sort((a, b) => b.players.length.compareTo(a.players.length));
-
-      final roomToJoin = nonEmptyRooms.isNotEmpty ? nonEmptyRooms.first : (rooms.isNotEmpty ? rooms.first : null);
-
-      if (roomToJoin != null) {
-        await _gameService.joinRoom(roomToJoin.id);
+      if (rooms.isNotEmpty) {
+        // Join the first available room at this stake
+        final roomToJoin = rooms.first;
+        await _gameService.joinRoom(roomToJoin.id, startingChips: stake.minBuyIn);
         if (mounted) {
           Navigator.push(
             context,
@@ -303,13 +300,19 @@ class _LobbyScreenState extends State<LobbyScreen> {
           );
         }
       } else {
-        final room = await _gameService.createRoom();
+        // No rooms available at this stake, create one
+        final room = await _gameService.createRoom(
+          bigBlind: stake.bigBlind,
+          startingChips: stake.minBuyIn,
+          isPrivate: false,
+          gameType: 'headsup',
+        );
         if (mounted) {
           Navigator.push(context, MaterialPageRoute(builder: (context) => MultiplayerGameScreen(roomId: room.id)));
         }
       }
     } catch (e) {
-      setState(() => _error = 'Failed to find duel');
+      setState(() => _error = 'Failed to find duel: $e');
     }
 
     setState(() {
@@ -333,14 +336,17 @@ class _LobbyScreenState extends State<LobbyScreen> {
     try {
       final rooms = await _gameService.fetchAvailableSitAndGoRooms();
 
+      // Filter for rooms at this buy-in level
+      final matchingRooms = rooms.where((r) => r.bigBlind == buyIn.buyIn || (buyIn.buyIn == 0 && r.bigBlind == 100)).toList();
+      
       // Prioritize rooms that already have players (non-empty lobbies)
-      final nonEmptyRooms = rooms.where((r) => r.players.isNotEmpty).toList();
+      final nonEmptyRooms = matchingRooms.where((r) => r.players.isNotEmpty).toList();
       nonEmptyRooms.sort((a, b) => b.players.length.compareTo(a.players.length));
 
-      final roomToJoin = nonEmptyRooms.isNotEmpty ? nonEmptyRooms.first : (rooms.isNotEmpty ? rooms.first : null);
+      final roomToJoin = nonEmptyRooms.isNotEmpty ? nonEmptyRooms.first : (matchingRooms.isNotEmpty ? matchingRooms.first : null);
 
       if (roomToJoin != null) {
-        await _gameService.joinRoom(roomToJoin.id);
+        await _gameService.joinRoom(roomToJoin.id, startingChips: buyIn.prizePool ~/ 2);
         if (mounted) {
           Navigator.push(
             context,
@@ -348,13 +354,16 @@ class _LobbyScreenState extends State<LobbyScreen> {
           );
         }
       } else {
-        final room = await _gameService.createSitAndGoRoom();
+        final room = await _gameService.createSitAndGoRoom(
+          bigBlind: buyIn.buyIn > 0 ? buyIn.buyIn : 100,
+          startingChips: buyIn.prizePool ~/ 2,
+        );
         if (mounted) {
           Navigator.push(context, MaterialPageRoute(builder: (context) => MultiplayerGameScreen(roomId: room.id)));
         }
       }
     } catch (e) {
-      setState(() => _error = 'Failed to join tournament');
+      setState(() => _error = 'Failed to join tournament: $e');
     }
 
     setState(() {
