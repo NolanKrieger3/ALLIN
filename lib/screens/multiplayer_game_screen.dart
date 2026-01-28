@@ -43,7 +43,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> {
       print('⏳ Waiting for more players to join room ${widget.roomId}...');
       return;
     }
-    
+
     // Case 2: Room is in 'waiting' status with 2+ players - start the game!
     if (room.status == 'waiting' && isHost && room.players.length >= 2) {
       _hasAutoStarted = true;
@@ -1103,7 +1103,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> {
   Widget _buildWaitMessage(GameRoom room, GamePlayer player) {
     String message = 'Wait for the next hand';
     bool showSpinner = false;
-    
+
     if (room.status == 'waiting' && room.players.length == 1) {
       message = 'Finding opponent...';
       showSpinner = true;
