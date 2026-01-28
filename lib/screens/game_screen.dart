@@ -82,10 +82,7 @@ class _GameScreenState extends State<GameScreen> {
   @override
   void initState() {
     super.initState();
-    // Show settings dialog after build
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _showGameSettingsDialog();
-    });
+    // Setup screen is shown until user taps Play
   }
 
   void _showGameSettingsDialog() {
@@ -1089,34 +1086,212 @@ class _GameScreenState extends State<GameScreen> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    // Show loading state while waiting for game settings
-    if (!_gameStarted) {
-      return MobileWrapper(
-        child: Scaffold(
-          backgroundColor: const Color(0xFF0D0D0D),
-          body: SafeArea(
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        Colors.white.withValues(alpha: 0.3),
+  Widget _buildSetupScreen() {
+    // Difficulty labels for display
+    final difficultyLabels = {
+      'Easy': 'BEGINNER',
+      'Medium': 'INTERMEDIATE', 
+      'Hard': 'EXPERT',
+    };
+    
+    return MobileWrapper(
+      child: Scaffold(
+        backgroundColor: const Color(0xFF0A0A0A),
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            child: Column(
+              children: [
+                const SizedBox(height: 24),
+                // Back button
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.06),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(Icons.arrow_back, color: Colors.white, size: 20),
+                    ),
+                  ),
+                ),
+
+                const Spacer(flex: 1),
+
+                // Opponents display
+                Text(
+                  '$_numberOfBots',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 64,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -2,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  _numberOfBots == 1 ? 'OPPONENT' : 'OPPONENTS',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.4),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: 4,
+                  ),
+                ),
+
+                const SizedBox(height: 24),
+
+                // Difficulty display
+                Text(
+                  difficultyLabels[_difficulty] ?? _difficulty.toUpperCase(),
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.6),
+                    fontSize: 28,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'DIFFICULTY',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.3),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: 3,
+                  ),
+                ),
+
+                const SizedBox(height: 48),
+
+                // Opponents Slider
+                SliderTheme(
+                  data: SliderTheme.of(context).copyWith(
+                    activeTrackColor: Colors.white,
+                    inactiveTrackColor: Colors.white.withValues(alpha: 0.1),
+                    thumbColor: Colors.white,
+                    overlayColor: Colors.white.withValues(alpha: 0.1),
+                    trackHeight: 4,
+                    thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
+                  ),
+                  child: Slider(
+                    value: _numberOfBots.toDouble(),
+                    min: 1,
+                    max: 5,
+                    divisions: 4,
+                    onChanged: (value) {
+                      setState(() => _numberOfBots = value.round());
+                    },
+                  ),
+                ),
+
+                // Min/Max labels for opponents
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        '1',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.3),
+                          fontSize: 12,
+                        ),
+                      ),
+                      Text(
+                        '5',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.3),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 32),
+
+                // Difficulty selection
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: ['Easy', 'Medium', 'Hard'].map((diff) {
+                    final isSelected = _difficulty == diff;
+                    return GestureDetector(
+                      onTap: () {
+                        setState(() => _difficulty = diff);
+                      },
+                      child: Container(
+                        width: 80,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? Colors.white
+                              : Colors.white.withValues(alpha: 0.06),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Center(
+                          child: Text(
+                            diff,
+                            style: TextStyle(
+                              color: isSelected ? const Color(0xFF0A0A0A) : Colors.white.withValues(alpha: 0.6),
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+
+                const Spacer(flex: 2),
+
+                // Play button
+                GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _gameStarted = true;
+                    });
+                    _startNewHand();
+                  },
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 20),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: const Center(
+                      child: Text(
+                        'PLAY',
+                        style: TextStyle(
+                          color: Color(0xFF0A0A0A),
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 2,
+                        ),
                       ),
                     ),
                   ),
-                ],
-              ),
+                ),
+
+                const SizedBox(height: 48),
+              ],
             ),
           ),
         ),
-      );
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Show setup screen until user taps Play
+    if (!_gameStarted) {
+      return _buildSetupScreen();
     }
     
     return MobileWrapper(
