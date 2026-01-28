@@ -33,6 +33,7 @@ class UserPreferences {
   static const String _luckyHandDateKey = 'lucky_hand_date';
   static const String _luckyHandIndexKey = 'lucky_hand_index';
   static const String _luckyHandWinsKey = 'lucky_hand_wins_today';
+  static const String _hasProPassKey = 'has_pro_pass';
   static const int _defaultChips = 1000;
   static const int _defaultGems = 100;
 
@@ -41,6 +42,16 @@ class UserPreferences {
   /// Initialize shared preferences
   static Future<void> init() async {
     _prefs = await SharedPreferences.getInstance();
+  }
+
+  /// Check if user has Pro Pass (for dev testing)
+  static bool get hasProPass {
+    return _prefs?.getBool(_hasProPassKey) ?? false;
+  }
+
+  /// Set Pro Pass status (for dev testing)
+  static Future<void> setProPass(bool value) async {
+    await _prefs?.setBool(_hasProPassKey, value);
   }
 
   /// Check if user has set their username
@@ -244,22 +255,19 @@ class UserPreferences {
     if (lucky.contains('straight') &&
         !lucky.contains('flush') &&
         check.contains('straight') &&
-        !check.contains('flush'))
-      return true;
+        !check.contains('flush')) return true;
     if (lucky.contains('flush') &&
         !lucky.contains('straight') &&
         !lucky.contains('royal') &&
         check.contains('flush') &&
         !check.contains('straight') &&
-        !check.contains('royal'))
-      return true;
+        !check.contains('royal')) return true;
     if (lucky.contains('full house') && check.contains('full house')) return true;
     if (lucky.contains('four of a kind') && (check.contains('four') || check.contains('quads'))) return true;
     if (lucky.contains('straight flush') &&
         !lucky.contains('royal') &&
         check.contains('straight flush') &&
-        !check.contains('royal'))
-      return true;
+        !check.contains('royal')) return true;
     if (lucky.contains('royal flush') && check.contains('royal')) return true;
 
     return lucky == check;

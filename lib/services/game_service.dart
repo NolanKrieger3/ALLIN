@@ -576,6 +576,7 @@ class GameService {
         'pot': sbAmount + bbAmount,
         'currentBet': bbAmount,
         'currentTurnPlayerId': updatedPlayers[firstToAct].uid,
+        'turnStartTime': DateTime.now().millisecondsSinceEpoch,
         'communityCards': [],
         'lastRaiseAmount': effectiveLastRaise,
         'bbHasOption': bbHasChips,
@@ -833,6 +834,7 @@ class GameService {
           'currentBet': currentBet,
           'lastRaiseAmount': lastRaiseAmount,
           'currentTurnPlayerId': updatedPlayers[nextPlayerIndex].uid,
+          'turnStartTime': DateTime.now().millisecondsSinceEpoch,
           'bbHasOption': !bbOptionUsed,
         }),
       );
@@ -1044,6 +1046,7 @@ class GameService {
         'currentBet': 0,
         'lastRaiseAmount': room.bigBlind, // Reset min raise to big blind
         'currentTurnPlayerId': updatedPlayers[firstToActIdx].uid,
+        'turnStartTime': DateTime.now().millisecondsSinceEpoch,
         'bbHasOption': false, // BB option only applies preflop, reset for new streets
       }),
     );

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'dart:async';
 import '../models/game_room.dart';
 import '../services/game_service.dart';
 import '../services/hand_evaluator.dart';
@@ -8,11 +9,13 @@ import '../widgets/mobile_wrapper.dart';
 class MultiplayerGameScreen extends StatefulWidget {
   final String roomId;
   final bool autoStart;
+  final int requiredPlayers;
 
   const MultiplayerGameScreen({
     super.key,
     required this.roomId,
     this.autoStart = false,
+    this.requiredPlayers = 2,
   });
 
   @override
@@ -31,6 +34,12 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
   late Animation<Offset> _foldSlideAnimation;
   late Animation<double> _foldOpacityAnimation;
   bool _isFolding = false;
+
+  // Turn timer
+  Timer? _turnTimer;
+  int _remainingSeconds = 30;
+  String? _lastTurnPlayerId;
+  bool _hasAutoFolded = false;
 
   @override
   void initState() {
@@ -57,9 +66,51 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
 
   @override
   void dispose() {
+    _turnTimer?.cancel();
     _foldAnimationController.dispose();
     _chatController.dispose();
     super.dispose();
+  }
+
+  /// Start or update the turn timer based on room state
+  void _updateTurnTimer(GameRoom room) {
+    final currentTurnId = room.currentTurnPlayerId;
+    final isMyTurn = currentTurnId == _gameService.currentUserId;
+
+    // Reset auto-fold flag when it's a new turn
+    if (currentTurnId != _lastTurnPlayerId) {
+      _hasAutoFolded = false;
+      _lastTurnPlayerId = currentTurnId;
+
+      // Calculate remaining time from turnStartTime
+      if (room.turnStartTime != null && room.status == 'playing' && room.phase != 'showdown') {
+        final elapsed = DateTime.now().millisecondsSinceEpoch - room.turnStartTime!;
+        final elapsedSeconds = (elapsed / 1000).floor();
+        _remainingSeconds = (room.turnTimeLimit - elapsedSeconds).clamp(0, room.turnTimeLimit);
+
+        // Cancel existing timer
+        _turnTimer?.cancel();
+
+        // Start new timer
+        _turnTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+          if (!mounted) {
+            timer.cancel();
+            return;
+          }
+
+          setState(() {
+            _remainingSeconds--;
+          });
+
+          // Auto-fold when time runs out (only if it's my turn)
+          if (_remainingSeconds <= 0 && isMyTurn && !_hasAutoFolded) {
+            timer.cancel();
+            _hasAutoFolded = true;
+            _gameService.playerAction(widget.roomId, 'fold');
+          }
+        });
+      }
+    }
   }
 
   /// Animate cards flying away then trigger fold action
@@ -105,17 +156,16 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
     if (_hasAutoStarted || _isLoading) return;
 
     final isHost = room.hostId == _gameService.currentUserId;
+    final requiredPlayers = widget.requiredPlayers;
 
-    // Case 1: Room is in 'waiting' status with only 1 player - wait a bit for others to join
-    if (room.status == 'waiting' && room.players.length == 1) {
-      // Don't auto-start immediately - wait for another player
-      // The room will stay in 'waiting' status so others can find it
-      print('⏳ Waiting for more players to join room ${widget.roomId}...');
+    // Case 1: Room doesn't have enough players yet - wait for more
+    if (room.status == 'waiting' && room.players.length < requiredPlayers) {
+      print('⏳ Waiting for more players (${room.players.length}/$requiredPlayers)...');
       return;
     }
 
-    // Case 2: Room is in 'waiting' status with 2+ players - HOST starts the game!
-    if (room.status == 'waiting' && room.players.length >= 2) {
+    // Case 2: Room is in 'waiting' status with required players - HOST starts the game!
+    if (room.status == 'waiting' && room.players.length >= requiredPlayers) {
       if (isHost) {
         _hasAutoStarted = true;
         setState(() => _isLoading = true);
@@ -135,9 +185,12 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
       return;
     }
 
-    // Case 3: Room is 'playing' but in 'waiting_for_players' phase and has 2+ players
-    // This means a second player joined a solo-started game - start the real game
-    if (room.status == 'playing' && room.phase == 'waiting_for_players' && room.players.length >= 2 && isHost) {
+    // Case 3: Room is 'playing' but in 'waiting_for_players' phase and has required players
+    // This means enough players joined - start the real game
+    if (room.status == 'playing' &&
+        room.phase == 'waiting_for_players' &&
+        room.players.length >= requiredPlayers &&
+        isHost) {
       _hasAutoStarted = true;
       setState(() => _isLoading = true);
       print('🎮 Starting game from waiting_for_players phase!');
@@ -208,6 +261,13 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
           if (room.status == 'finished' && room.players.length >= 2) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
               _triggerNewHand(room);
+            });
+          }
+
+          // Update turn timer
+          if (room.status == 'playing' && room.phase != 'showdown') {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              _updateTurnTimer(room);
             });
           }
 
@@ -873,7 +933,10 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
             const Spacer(flex: 3),
 
             // Action Bar / Wait Message
-            if (isWaitingForPlayers || room.status != 'playing' || currentPlayer.hasFolded)
+            // Show fold animation if folding, otherwise check normal conditions
+            if (_isFolding)
+              _buildFoldingAnimation(currentPlayer, room)
+            else if (isWaitingForPlayers || room.status != 'playing' || currentPlayer.hasFolded)
               _buildWaitMessage(room, currentPlayer)
             else if (isMyTurn)
               _buildSwipeablePlayerArea(currentPlayer, room)
@@ -986,9 +1049,24 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Avatar
+          // Avatar with timer ring
           Stack(
+            alignment: Alignment.center,
             children: [
+              // Timer ring (only show when it's their turn and game is active)
+              if (isTheirTurn && room.status == 'playing' && room.phase != 'showdown')
+                SizedBox(
+                  width: 64,
+                  height: 64,
+                  child: CircularProgressIndicator(
+                    value: _remainingSeconds / room.turnTimeLimit,
+                    strokeWidth: 3,
+                    backgroundColor: Colors.grey.shade800,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      _remainingSeconds <= 5 ? Colors.red : const Color(0xFFD4AF37),
+                    ),
+                  ),
+                ),
               Container(
                 width: 56,
                 height: 56,
@@ -1007,6 +1085,26 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
                   ),
                 ),
               ),
+              // Timer text overlay (when their turn)
+              if (isTheirTurn && room.status == 'playing' && room.phase != 'showdown')
+                Positioned(
+                  bottom: -2,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: _remainingSeconds <= 5 ? Colors.red : const Color(0xFFD4AF37),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      '${_remainingSeconds}s',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
               // Dealer badge
               if (player.uid == room.players[room.dealerIndex].uid)
                 Positioned(
@@ -1370,6 +1468,59 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
               const Spacer(),
               // Player info
               _buildPlayerInfoMinimal(player, room: room),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Widget shown during fold animation - cards flying away
+  Widget _buildFoldingAnimation(GamePlayer player, GameRoom room) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Column(
+        children: [
+          // "Folding..." message
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            decoration: BoxDecoration(
+              color: Colors.transparent,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.red.withValues(alpha: 0.4)),
+            ),
+            child: const Center(
+              child: Text(
+                'Folding...',
+                style: TextStyle(
+                  color: Colors.red,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          // Animated cards flying away
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              SlideTransition(
+                position: _foldSlideAnimation,
+                child: FadeTransition(
+                  opacity: _foldOpacityAnimation,
+                  child: Row(
+                    children: [
+                      if (player.cards.isNotEmpty) _buildMinimalCard(player.cards[0]),
+                      const SizedBox(width: 8),
+                      if (player.cards.length > 1) _buildMinimalCard(player.cards[1]),
+                    ],
+                  ),
+                ),
+              ),
+              const Spacer(),
+              _buildPlayerInfoMinimal(player),
             ],
           ),
         ],

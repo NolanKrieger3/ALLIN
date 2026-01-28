@@ -9,6 +9,7 @@ import '../services/user_preferences.dart';
 import 'game_screen.dart';
 import 'lobby_screen.dart';
 import 'quick_play_screen.dart';
+import 'sit_and_go_screen.dart';
 import 'multiplayer_game_screen.dart';
 import '../services/game_service.dart';
 import '../services/auth_service.dart';
@@ -293,6 +294,25 @@ class _HomeTabState extends State<_HomeTab> {
                           }
                         },
                       ),
+                      _DevMenuItem(
+                        icon: UserPreferences.hasProPass ? Icons.star : Icons.star_border,
+                        color: const Color(0xFFFFD700),
+                        title: UserPreferences.hasProPass ? 'Pro Pass: ON' : 'Pro Pass: OFF',
+                        onTap: () async {
+                          Navigator.pop(dialogContext);
+                          await UserPreferences.setProPass(!UserPreferences.hasProPass);
+                          if (mounted) {
+                            setState(() {});
+                            parentScaffoldMessenger.showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  UserPreferences.hasProPass ? 'Pro Pass enabled!' : 'Pro Pass disabled!',
+                                ),
+                              ),
+                            );
+                          }
+                        },
+                      ),
                     ],
                   ),
                 ),
@@ -553,70 +573,32 @@ class _HomeTabState extends State<_HomeTab> {
                 children: [
                   SizedBox(
                     height: 160,
-                    child: PageView(
-                      controller: _playCardController,
-                      onPageChanged: (index) => setState(() => _currentPlayMode = index),
-                      children: [
-                        // Play Now - Main mode
-                        _buildPlayModeCard(
-                          title: 'Play Now',
-                          subtitle: 'Jump into a game',
-                          icon: Icons.play_arrow_rounded,
-                          gradient: const [Color(0xFF3B82F6), Color(0xFF2563EB)],
-                          onTap: () =>
-                              Navigator.push(context, MaterialPageRoute(builder: (_) => const QuickPlayScreen())),
-                        ),
-                        // AI Mode
-                        _buildPlayModeCard(
-                          title: 'AI Mode',
-                          subtitle: 'Practice vs bots',
-                          icon: Icons.smart_toy_rounded,
-                          gradient: const [Color(0xFF22C55E), Color(0xFF16A34A)],
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const GameScreen(gameMode: 'Practice')),
-                          ),
-                        ),
-                        // Tournament
-                        _buildPlayModeCard(
-                          title: 'Tournament',
-                          subtitle: 'Compete for prizes',
-                          icon: Icons.emoji_events_rounded,
-                          gradient: const [Color(0xFFF59E0B), Color(0xFFD97706)],
-                          onTap: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Tournaments coming soon!'),
-                                backgroundColor: Color(0xFF1A1A2E),
-                              ),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final cardWidth = constraints.maxWidth;
+                        return PageView.builder(
+                          controller: _playCardController,
+                          onPageChanged: (index) => setState(() => _currentPlayMode = index),
+                          itemCount: 5,
+                          itemBuilder: (context, index) {
+                            final isLast = index == 4;
+                            return Padding(
+                              padding: EdgeInsets.only(right: isLast ? 0 : 12),
+                              child: _buildPlayModeCardByIndex(index),
                             );
                           },
-                        ),
-                        // Private Table - Locked
-                        _buildPlayModeCard(
-                          title: 'Private Table',
-                          subtitle: 'Play with friends',
-                          icon: Icons.lock_rounded,
-                          gradient: const [Color(0xFF6B7280), Color(0xFF4B5563)],
-                          isLocked: true,
-                          onTap: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Upgrade to Premium to unlock Private Games'),
-                                backgroundColor: Color(0xFF1A1A2E),
-                              ),
-                            );
-                          },
-                        ),
-                      ],
+                        );
+                      },
                     ),
                   ),
                   const SizedBox(height: 16),
-                  // Dots indicator
+                  // Animated dots indicator
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
-                    children: List.generate(4, (index) {
-                      return Container(
+                    children: List.generate(5, (index) {
+                      return AnimatedContainer(
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeOutCubic,
                         margin: const EdgeInsets.symmetric(horizontal: 4),
                         width: _currentPlayMode == index ? 24 : 8,
                         height: 8,
@@ -632,58 +614,13 @@ class _HomeTabState extends State<_HomeTab> {
             ),
           ),
 
-          // Tutorial Button
+          // Friends Button
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
               child: GestureDetector(
                 onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const GameScreen(gameMode: 'Tutorial')),
-                  );
-                },
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.03),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.school_rounded, color: Colors.white.withValues(alpha: 0.6), size: 24),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Tutorial',
-                              style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
-                            ),
-                            Text(
-                              'Learn how to play',
-                              style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 12),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Icon(Icons.chevron_right_rounded, color: Colors.white.withValues(alpha: 0.3), size: 24),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-
-          // Friends Button
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
-              child: GestureDetector(
-                onTap: () {
-                  _showNotificationPanel();
+                  _showFriendsListDialog();
                 },
                 child: Container(
                   padding: const EdgeInsets.all(16),
@@ -839,11 +776,121 @@ class _HomeTabState extends State<_HomeTab> {
             ),
           ),
 
+          // Tutorial Button
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
+              child: GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const GameScreen(gameMode: 'Tutorial')),
+                  );
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.03),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.school_rounded, color: Colors.white.withValues(alpha: 0.6), size: 24),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Tutorial',
+                              style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
+                            ),
+                            Text(
+                              'Learn how to play',
+                              style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 12),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Icon(Icons.chevron_right_rounded, color: Colors.white.withValues(alpha: 0.3), size: 24),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+
           // Bottom spacing
           const SliverToBoxAdapter(child: SizedBox(height: 30)),
         ],
       ),
     );
+  }
+
+  Widget _buildPlayModeCardByIndex(int index) {
+    switch (index) {
+      case 0:
+        return _buildPlayModeCard(
+          title: 'Play Now',
+          subtitle: 'Jump into a game',
+          icon: Icons.play_arrow_rounded,
+          gradient: const [Color(0xFF3B82F6), Color(0xFF2563EB)],
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const QuickPlayScreen())),
+        );
+      case 1:
+        return _buildPlayModeCard(
+          title: 'Sit & Go',
+          subtitle: 'Starts when full',
+          icon: Icons.groups_rounded,
+          gradient: const [Color(0xFFEF4444), Color(0xFFDC2626)],
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SitAndGoScreen())),
+        );
+      case 2:
+        return _buildPlayModeCard(
+          title: 'Tournaments',
+          subtitle: 'Compete for prizes',
+          icon: Icons.emoji_events_rounded,
+          gradient: const [Color(0xFFF59E0B), Color(0xFFD97706)],
+          onTap: () {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Tournaments coming soon!'), backgroundColor: Color(0xFF1A1A2E)),
+            );
+          },
+        );
+      case 3:
+        return _buildPlayModeCard(
+          title: 'Practice',
+          subtitle: 'Play vs bots',
+          icon: Icons.smart_toy_rounded,
+          gradient: const [Color(0xFF22C55E), Color(0xFF16A34A)],
+          onTap: () =>
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const GameScreen(gameMode: 'Practice'))),
+        );
+      case 4:
+      default:
+        return _buildPlayModeCard(
+          title: 'Private Games',
+          subtitle: 'Play with friends',
+          icon: UserPreferences.hasProPass ? Icons.vpn_key_rounded : Icons.lock_rounded,
+          gradient: UserPreferences.hasProPass
+              ? const [Color(0xFF8B5CF6), Color(0xFF7C3AED)]
+              : const [Color(0xFF6B7280), Color(0xFF4B5563)],
+          isLocked: !UserPreferences.hasProPass,
+          onTap: () {
+            if (UserPreferences.hasProPass) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Private Games - Coming soon!'), backgroundColor: Color(0xFF8B5CF6)),
+              );
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                    content: Text('Upgrade to Premium to unlock Private Games'), backgroundColor: Color(0xFF1A1A2E)),
+              );
+            }
+          },
+        );
+    }
   }
 
   Widget _buildPlayModeCard({
@@ -1101,8 +1148,8 @@ class _ShopTabState extends State<_ShopTab> with SingleTickerProviderStateMixin 
   int _selectedCategory = 0;
 
   final List<Map<String, dynamic>> _categories = [
-    {'icon': '💎', 'name': 'Currency'},
     {'icon': '✨', 'name': 'Featured'},
+    {'icon': '💎', 'name': 'Currency'},
     {'icon': '🎨', 'name': 'Cosmetics'},
     {'icon': '📦', 'name': 'Chests'},
   ];
@@ -1179,7 +1226,7 @@ class _ShopTabState extends State<_ShopTab> with SingleTickerProviderStateMixin 
           Expanded(
             child: TabBarView(
               controller: _tabController,
-              children: [_buildCurrencyTab(), _buildFeaturedTab(), _buildCosmeticsTab(), _buildChestsTab()],
+              children: [_buildFeaturedTab(), _buildCurrencyTab(), _buildCosmeticsTab(), _buildChestsTab()],
             ),
           ),
         ],
@@ -1206,7 +1253,14 @@ class _ShopTabState extends State<_ShopTab> with SingleTickerProviderStateMixin 
               ),
               child: Row(
                 children: [
-                  const Text('🎡', style: TextStyle(fontSize: 28)),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF22C55E).withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.refresh_rounded, color: Color(0xFF22C55E), size: 24),
+                  ),
                   const SizedBox(width: 14),
                   Expanded(
                     child: Column(
@@ -1252,7 +1306,14 @@ class _ShopTabState extends State<_ShopTab> with SingleTickerProviderStateMixin 
                     ),
                     child: Column(
                       children: [
-                        const Text('🎰', style: TextStyle(fontSize: 28)),
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.06),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Icon(Icons.donut_large_rounded, color: Colors.white.withValues(alpha: 0.7), size: 24),
+                        ),
                         const SizedBox(height: 8),
                         const Text(
                           'Gem Wheel',
@@ -1262,7 +1323,7 @@ class _ShopTabState extends State<_ShopTab> with SingleTickerProviderStateMixin 
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Text('💎', style: TextStyle(fontSize: 11)),
+                            Icon(Icons.diamond_outlined, color: Colors.white.withValues(alpha: 0.5), size: 14),
                             const SizedBox(width: 4),
                             Text('50', style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 12)),
                           ],
@@ -1292,7 +1353,14 @@ class _ShopTabState extends State<_ShopTab> with SingleTickerProviderStateMixin 
                     ),
                     child: Column(
                       children: [
-                        Text(UserPreferences.todaysLuckyHand.emoji, style: const TextStyle(fontSize: 28)),
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFD4AF37).withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(Icons.style_rounded, color: Color(0xFFD4AF37), size: 24),
+                        ),
                         const SizedBox(height: 8),
                         const Text(
                           'Lucky Hand',
@@ -1329,7 +1397,7 @@ class _ShopTabState extends State<_ShopTab> with SingleTickerProviderStateMixin 
           _HotDealCard(
             title: 'Starter Pack',
             subtitle: 'Perfect for new players',
-            emoji: '🚀',
+            icon: Icons.rocket_launch_rounded,
             items: ['10,000 Chips', '50 Gems', 'Gold Card Back'],
             price: '\$2.99',
             originalPrice: '\$5.99',
@@ -1341,7 +1409,7 @@ class _ShopTabState extends State<_ShopTab> with SingleTickerProviderStateMixin 
           _HotDealCard(
             title: 'VIP Bundle',
             subtitle: 'Best value pack',
-            emoji: '👑',
+            icon: Icons.workspace_premium_rounded,
             items: ['100,000 Chips', '500 Gems', 'Royal Set'],
             price: '\$19.99',
             originalPrice: '\$49.99',
@@ -2374,7 +2442,7 @@ class _CosmeticGridItem extends StatelessWidget {
 class _HotDealCard extends StatelessWidget {
   final String title;
   final String subtitle;
-  final String emoji;
+  final IconData icon;
   final List<String> items;
   final String price;
   final String originalPrice;
@@ -2384,7 +2452,7 @@ class _HotDealCard extends StatelessWidget {
   const _HotDealCard({
     required this.title,
     required this.subtitle,
-    required this.emoji,
+    required this.icon,
     required this.items,
     required this.price,
     required this.originalPrice,
@@ -2403,7 +2471,14 @@ class _HotDealCard extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Text(emoji, style: const TextStyle(fontSize: 28)),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: Colors.white.withValues(alpha: 0.7), size: 24),
+          ),
           const SizedBox(width: 14),
           Expanded(
             child: Column(
@@ -4357,8 +4432,6 @@ class _ProfileTabState extends State<_ProfileTab> {
               const Divider(color: Colors.white12, height: 24),
               _SettingsItem(icon: Icons.help_outline, title: 'Help & Support'),
               _SettingsItem(icon: Icons.info_outline, title: 'About'),
-              const Divider(color: Colors.white12, height: 24),
-              _SettingsItem(icon: Icons.logout, title: 'Log Out', isDestructive: true),
             ],
           ),
         ),
@@ -4636,14 +4709,14 @@ class _DailySpinDialogState extends State<_DailySpinDialog> with SingleTickerPro
 
   final List<int> _prizes = [500, 1000, 2500, 5000, 1000, 10000, 500, 25000];
   final List<Color> _colors = [
-    const Color(0xFFE53935),
-    const Color(0xFF1E88E5),
-    const Color(0xFF43A047),
-    const Color(0xFFFB8C00),
-    const Color(0xFF8E24AA),
-    const Color(0xFF00ACC1),
-    const Color(0xFFD81B60),
-    const Color(0xFFFFB300),
+    const Color(0xFF2A2A2A),
+    const Color(0xFFD4AF37).withValues(alpha: 0.25),
+    const Color(0xFF2A2A2A),
+    const Color(0xFFD4AF37).withValues(alpha: 0.35),
+    const Color(0xFF2A2A2A),
+    const Color(0xFFD4AF37).withValues(alpha: 0.25),
+    const Color(0xFF2A2A2A),
+    const Color(0xFFD4AF37).withValues(alpha: 0.45),
   ];
 
   @override
@@ -4688,87 +4761,117 @@ class _DailySpinDialogState extends State<_DailySpinDialog> with SingleTickerPro
     return Dialog(
       backgroundColor: const Color(0xFF1A1A1A),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-      child: Padding(
-        padding: const EdgeInsets.all(28),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              '🎡 Daily Spin',
-              style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 28),
-            SizedBox(
-              width: 200,
-              height: 200,
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  AnimatedBuilder(
-                    animation: _animation,
-                    builder: (context, child) => Transform.rotate(
-                      angle: _animation.value,
-                      child: CustomPaint(size: const Size(180, 180), painter: _WheelPainter(_prizes, _colors)),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.75,
+          maxWidth: 360,
+        ),
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(28),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.refresh_rounded, color: Colors.white.withValues(alpha: 0.7), size: 26),
+                    const SizedBox(width: 10),
+                    const Text(
+                      'Daily Spin',
+                      style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w700),
                     ),
+                  ],
+                ),
+                const SizedBox(height: 28),
+                SizedBox(
+                  width: 220,
+                  height: 220,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Container(
+                        width: 200,
+                        height: 200,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.3), width: 2),
+                        ),
+                      ),
+                      AnimatedBuilder(
+                        animation: _animation,
+                        builder: (context, child) => Transform.rotate(
+                          angle: _animation.value,
+                          child: CustomPaint(size: const Size(180, 180), painter: _WheelPainter(_prizes, _colors)),
+                        ),
+                      ),
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1A1A1A),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 3),
+                        ),
+                        child: Center(
+                            child: Icon(Icons.monetization_on_outlined,
+                                color: Colors.white.withValues(alpha: 0.8), size: 22)),
+                      ),
+                      const Positioned(top: 0, child: _WheelPointer()),
+                    ],
                   ),
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1A1A1A),
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 3),
-                    ),
-                    child: const Center(child: Text('🪙', style: TextStyle(fontSize: 18))),
-                  ),
-                  const Positioned(top: 0, child: _WheelPointer()),
-                ],
-              ),
-            ),
-            const SizedBox(height: 28),
-            if (_hasSpun)
-              Column(
-                children: [
-                  const Text('🎉', style: TextStyle(fontSize: 40)),
-                  const SizedBox(height: 8),
-                  Text(
-                    '+$_wonAmount',
-                    style: const TextStyle(color: Color(0xFFD4AF37), fontSize: 32, fontWeight: FontWeight.w800),
-                  ),
-                  const SizedBox(height: 20),
+                ),
+                const SizedBox(height: 28),
+                if (_hasSpun)
+                  Column(
+                    children: [
+                      Icon(Icons.check_circle_rounded, color: const Color(0xFF22C55E), size: 48),
+                      const SizedBox(height: 12),
+                      Text(
+                        '+$_wonAmount',
+                        style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w700),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'chips added',
+                        style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 14),
+                      ),
+                      const SizedBox(height: 20),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.white.withValues(alpha: 0.1),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          ),
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text('Collect', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+                        ),
+                      ),
+                    ],
+                  )
+                else
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFD4AF37),
-                        foregroundColor: Colors.black,
+                        backgroundColor: _isSpinning ? Colors.grey : Colors.white.withValues(alpha: 0.1),
+                        foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                       ),
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('Collect', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+                      onPressed: _isSpinning ? null : _spin,
+                      child: Text(
+                        _isSpinning ? 'Spinning...' : 'SPIN FREE',
+                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                      ),
                     ),
                   ),
-                ],
-              )
-            else
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _isSpinning ? Colors.grey : const Color(0xFF4CAF50),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                  ),
-                  onPressed: _isSpinning ? null : _spin,
-                  child: Text(
-                    _isSpinning ? 'Spinning...' : 'SPIN FREE',
-                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
-                  ),
-                ),
-              ),
-          ],
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -4793,16 +4896,16 @@ class _GemWheelDialogState extends State<_GemWheelDialog> with SingleTickerProvi
 
   final List<int> _prizes = [1000, 2500, 5000, 10000, 2500, 25000, 5000, 50000, 1000, 100000];
   final List<Color> _colors = [
-    const Color(0xFF1976D2),
-    const Color(0xFF388E3C),
-    const Color(0xFFF57C00),
-    const Color(0xFF7B1FA2),
-    const Color(0xFF00796B),
-    const Color(0xFFC2185B),
-    const Color(0xFF512DA8),
-    const Color(0xFFD4AF37),
-    const Color(0xFF0097A7),
-    const Color(0xFFFF5722),
+    const Color(0xFF2A2A2A),
+    const Color(0xFF9C27B0).withValues(alpha: 0.25),
+    const Color(0xFF2A2A2A),
+    const Color(0xFF9C27B0).withValues(alpha: 0.35),
+    const Color(0xFF2A2A2A),
+    const Color(0xFF9C27B0).withValues(alpha: 0.25),
+    const Color(0xFF2A2A2A),
+    const Color(0xFF9C27B0).withValues(alpha: 0.45),
+    const Color(0xFF2A2A2A),
+    const Color(0xFF9C27B0).withValues(alpha: 0.30),
   ];
 
   @override
@@ -4853,156 +4956,180 @@ class _GemWheelDialogState extends State<_GemWheelDialog> with SingleTickerProvi
     return Dialog(
       backgroundColor: const Color(0xFF1A1A1A),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-      child: Padding(
-        padding: const EdgeInsets.all(28),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.75,
+          maxWidth: 360,
+        ),
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(28),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                const Text(
-                  '🎰 Gem Wheel',
-                  style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w700),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF9C27B0).withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Row(
-                    children: [
-                      const Text('💎', style: TextStyle(fontSize: 14)),
-                      const SizedBox(width: 4),
-                      Text(
-                        '$_gemsBalance',
-                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: 220,
-              height: 220,
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  AnimatedBuilder(
-                    animation: _animation,
-                    builder: (context, child) => Transform.rotate(
-                      angle: _animation.value,
-                      child: CustomPaint(size: const Size(200, 200), painter: _GemWheelPainter(_prizes, _colors)),
-                    ),
-                  ),
-                  Container(
-                    width: 50,
-                    height: 50,
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(colors: [Color(0xFF9C27B0), Color(0xFFE91E63)]),
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 3),
-                    ),
-                    child: const Center(child: Text('💎', style: TextStyle(fontSize: 20))),
-                  ),
-                  const Positioned(top: 0, child: _WheelPointer()),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-            if (_hasSpun)
-              Column(
-                children: [
-                  const Text(
-                    '🎉 JACKPOT!',
-                    style: TextStyle(color: Color(0xFFD4AF37), fontSize: 22, fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Text('🪙', style: TextStyle(fontSize: 28)),
-                      const SizedBox(width: 8),
-                      Text(
-                        _formatNumber(_wonAmount),
-                        style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w700),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: Colors.white,
-                            side: BorderSide(color: Colors.white.withValues(alpha: 0.3)),
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
-                          onPressed: () => Navigator.pop(context),
-                          child: const Text('Close'),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF9C27B0),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
-                          onPressed: _gemsBalance >= _spinCost
-                              ? () {
-                                  setState(() => _hasSpun = false);
-                                  _spin();
-                                }
-                              : null,
-                          child: const Text('Again 💎50'),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              )
-            else
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _isSpinning ? Colors.grey : const Color(0xFF9C27B0),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                  ),
-                  onPressed: _isSpinning || _gemsBalance < _spinCost ? null : _spin,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        _isSpinning ? 'Spinning...' : 'SPIN',
-                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
-                      ),
-                      if (!_isSpinning) ...[
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.donut_large_rounded, color: Colors.white.withValues(alpha: 0.7), size: 24),
                         const SizedBox(width: 10),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Text('💎 50', style: TextStyle(fontWeight: FontWeight.w700)),
+                        const Text(
+                          'Gem Wheel',
+                          style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w700),
                         ),
                       ],
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.diamond_outlined, color: Colors.white.withValues(alpha: 0.8), size: 16),
+                          const SizedBox(width: 4),
+                          Text(
+                            '$_gemsBalance',
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: 220,
+                  height: 220,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Container(
+                        width: 200,
+                        height: 200,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.3), width: 2),
+                        ),
+                      ),
+                      AnimatedBuilder(
+                        animation: _animation,
+                        builder: (context, child) => Transform.rotate(
+                          angle: _animation.value,
+                          child: CustomPaint(size: const Size(200, 200), painter: _GemWheelPainter(_prizes, _colors)),
+                        ),
+                      ),
+                      Container(
+                        width: 50,
+                        height: 50,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1A1A1A),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 3),
+                        ),
+                        child: Center(
+                            child: Icon(Icons.diamond_outlined, color: Colors.white.withValues(alpha: 0.8), size: 24)),
+                      ),
+                      const Positioned(top: 0, child: _WheelPointer()),
                     ],
                   ),
                 ),
-              ),
-          ],
+                const SizedBox(height: 24),
+                if (_hasSpun)
+                  Column(
+                    children: [
+                      Icon(Icons.check_circle_rounded, color: const Color(0xFF22C55E), size: 48),
+                      const SizedBox(height: 12),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.monetization_on_outlined, color: Colors.white.withValues(alpha: 0.7), size: 28),
+                          const SizedBox(width: 8),
+                          Text(
+                            _formatNumber(_wonAmount),
+                            style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w700),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'chips won',
+                        style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 14),
+                      ),
+                      const SizedBox(height: 20),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.white,
+                                side: BorderSide(color: Colors.white.withValues(alpha: 0.3)),
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              ),
+                              onPressed: () => Navigator.pop(context),
+                              child: const Text('Close'),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF9C27B0),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              ),
+                              onPressed: _gemsBalance >= _spinCost
+                                  ? () {
+                                      setState(() => _hasSpun = false);
+                                      _spin();
+                                    }
+                                  : null,
+                              child: const Text('Spin Again'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  )
+                else
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _isSpinning ? Colors.grey : Colors.white.withValues(alpha: 0.1),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                      onPressed: _isSpinning || _gemsBalance < _spinCost ? null : _spin,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            _isSpinning ? 'Spinning...' : 'SPIN',
+                            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                          ),
+                          if (!_isSpinning) ...[
+                            const SizedBox(width: 10),
+                            Row(
+                              children: [
+                                Icon(Icons.diamond_outlined, color: Colors.white.withValues(alpha: 0.7), size: 16),
+                                const SizedBox(width: 4),
+                                const Text('50', style: TextStyle(fontWeight: FontWeight.w600)),
+                              ],
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -6506,172 +6633,185 @@ class _LuckyHandDialog extends StatelessWidget {
     return Dialog(
       backgroundColor: const Color(0xFF121212),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Header
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.75,
+          maxWidth: 360,
+        ),
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Text(luckyHand.emoji, style: const TextStyle(fontSize: 32)),
-                const SizedBox(width: 12),
-                const Text(
-                  'Lucky Hand',
-                  style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w600),
+                // Header
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(luckyHand.emoji, style: const TextStyle(fontSize: 32)),
+                    const SizedBox(width: 12),
+                    const Text(
+                      'Lucky Hand',
+                      style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Resets daily at midnight',
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 12),
+                ),
+                const SizedBox(height: 24),
+
+                // Today's Lucky Hand Card
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        const Color(0xFFD4AF37).withValues(alpha: 0.2),
+                        const Color(0xFFD4AF37).withValues(alpha: 0.05),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFFD4AF37).withValues(alpha: 0.3)),
+                  ),
+                  child: Column(
+                    children: [
+                      Text(
+                        "TODAY'S LUCKY HAND",
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.5),
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 1.5,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        luckyHand.name,
+                        style: const TextStyle(color: Color(0xFFD4AF37), fontSize: 24, fontWeight: FontWeight.w700),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        luckyHand.description,
+                        style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 13),
+                      ),
+                      const SizedBox(height: 16),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Text('🪙', style: TextStyle(fontSize: 18)),
+                            const SizedBox(width: 8),
+                            Text(
+                              '+${UserPreferences.formatChips(luckyHand.bonusReward)}',
+                              style:
+                                  const TextStyle(color: Color(0xFF22C55E), fontSize: 20, fontWeight: FontWeight.w700),
+                            ),
+                            Text(' per win',
+                                style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 14)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Today's Stats
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.03),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      Column(
+                        children: [
+                          Text(
+                            winsToday.toString(),
+                            style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w700),
+                          ),
+                          Text('Wins Today',
+                              style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 11)),
+                        ],
+                      ),
+                      Container(width: 1, height: 40, color: Colors.white.withValues(alpha: 0.1)),
+                      Column(
+                        children: [
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Text('🪙', style: TextStyle(fontSize: 16)),
+                              const SizedBox(width: 4),
+                              Text(
+                                UserPreferences.formatChips(totalEarned),
+                                style: const TextStyle(
+                                    color: Color(0xFF22C55E), fontSize: 24, fontWeight: FontWeight.w700),
+                              ),
+                            ],
+                          ),
+                          Text('Earned Today',
+                              style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 11)),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // How it works
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF2196F3).withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFF2196F3).withValues(alpha: 0.2)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.info_outline, color: Color(0xFF2196F3), size: 18),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Win any game with a ${luckyHand.name} to earn the bonus!',
+                          style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 12),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // Close button
+                SizedBox(
+                  width: double.infinity,
+                  child: TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    child: Text('Got it!', style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 14)),
+                  ),
                 ),
               ],
             ),
-            const SizedBox(height: 6),
-            Text(
-              'Resets daily at midnight',
-              style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 12),
-            ),
-            const SizedBox(height: 24),
-
-            // Today's Lucky Hand Card
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    const Color(0xFFD4AF37).withValues(alpha: 0.2),
-                    const Color(0xFFD4AF37).withValues(alpha: 0.05),
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0xFFD4AF37).withValues(alpha: 0.3)),
-              ),
-              child: Column(
-                children: [
-                  Text(
-                    "TODAY'S LUCKY HAND",
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.5),
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 1.5,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    luckyHand.name,
-                    style: const TextStyle(color: Color(0xFFD4AF37), fontSize: 24, fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    luckyHand.description,
-                    style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 13),
-                  ),
-                  const SizedBox(height: 16),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Text('🪙', style: TextStyle(fontSize: 18)),
-                        const SizedBox(width: 8),
-                        Text(
-                          '+${UserPreferences.formatChips(luckyHand.bonusReward)}',
-                          style: const TextStyle(color: Color(0xFF22C55E), fontSize: 20, fontWeight: FontWeight.w700),
-                        ),
-                        Text(' per win', style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 14)),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // Today's Stats
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.03),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  Column(
-                    children: [
-                      Text(
-                        winsToday.toString(),
-                        style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w700),
-                      ),
-                      Text('Wins Today', style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 11)),
-                    ],
-                  ),
-                  Container(width: 1, height: 40, color: Colors.white.withValues(alpha: 0.1)),
-                  Column(
-                    children: [
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Text('🪙', style: TextStyle(fontSize: 16)),
-                          const SizedBox(width: 4),
-                          Text(
-                            UserPreferences.formatChips(totalEarned),
-                            style: const TextStyle(color: Color(0xFF22C55E), fontSize: 24, fontWeight: FontWeight.w700),
-                          ),
-                        ],
-                      ),
-                      Text('Earned Today', style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 11)),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // How it works
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: const Color(0xFF2196F3).withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFF2196F3).withValues(alpha: 0.2)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.info_outline, color: Color(0xFF2196F3), size: 18),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      'Win any game with a ${luckyHand.name} to earn the bonus!',
-                      style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 12),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // Close button
-            SizedBox(
-              width: double.infinity,
-              child: TextButton(
-                onPressed: () => Navigator.pop(context),
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-                child: Text('Got it!', style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 14)),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
