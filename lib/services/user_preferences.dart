@@ -160,6 +160,14 @@ class UserPreferences {
     await setChips(current + amount);
   }
 
+  /// Spend chips (deduct from balance)
+  static Future<bool> spendChips(int amount) async {
+    final current = chips;
+    if (current < amount) return false;
+    await setChips(current - amount);
+    return true;
+  }
+
   /// Get current gem balance
   static int get gems {
     return _prefs?.getInt(_gemsKey) ?? _defaultGems;

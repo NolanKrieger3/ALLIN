@@ -4,12 +4,16 @@ import 'dart:async';
 import '../widgets/mobile_wrapper.dart';
 import '../widgets/friends_widgets.dart';
 import '../models/friend.dart';
+import '../models/team.dart';
 import '../services/friends_service.dart';
+import '../services/team_service.dart';
 import '../services/user_preferences.dart';
 import 'game_screen.dart';
 import 'lobby_screen.dart';
 import 'quick_play_screen.dart';
 import 'sit_and_go_screen.dart';
+import 'team_screen.dart';
+import 'tutorial_screen.dart';
 import 'multiplayer_game_screen.dart';
 import '../services/game_service.dart';
 import '../services/auth_service.dart';
@@ -23,13 +27,28 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 1;
+  // Keys to force rebuild when needed
+  final GlobalKey<_HomeTabState> _homeTabKey = GlobalKey<_HomeTabState>();
+  final GlobalKey<_ShopTabState> _shopTabKey = GlobalKey<_ShopTabState>();
+
+  void _refreshAllBalances() {
+    _homeTabKey.currentState?.refreshChips();
+    _shopTabKey.currentState?.refreshBalance();
+  }
 
   @override
   Widget build(BuildContext context) {
     return MobileWrapper(
       child: Scaffold(
         backgroundColor: const Color(0xFF0A0A0A),
-        body: IndexedStack(index: _currentIndex, children: const [_ShopTab(), _HomeTab(), _ProfileTab()]),
+        body: IndexedStack(
+          index: _currentIndex,
+          children: [
+            _ShopTab(key: _shopTabKey),
+            _HomeTab(key: _homeTabKey),
+            _ProfileTab(onChipsChanged: _refreshAllBalances),
+          ],
+        ),
         bottomNavigationBar: _buildBottomNav(),
       ),
     );
@@ -74,7 +93,7 @@ class _HomeScreenState extends State<HomeScreen> {
 // ============================================================================
 
 class _HomeTab extends StatefulWidget {
-  const _HomeTab();
+  const _HomeTab({super.key});
 
   @override
   State<_HomeTab> createState() => _HomeTabState();
@@ -83,13 +102,18 @@ class _HomeTab extends StatefulWidget {
 class _HomeTabState extends State<_HomeTab> {
   bool _clubExpanded = false;
   final FriendsService _friendsService = FriendsService();
+  final TeamService _teamService = TeamService();
+  final AuthService _authService = AuthService();
   List<Friend> _friends = [];
   int _unreadNotifications = 0;
   int _pendingFriendRequests = 0;
   int _chipBalance = 1000;
+  Team? _userTeam;
   StreamSubscription? _friendsSub;
   StreamSubscription? _notificationsSub;
   StreamSubscription? _requestsSub;
+  StreamSubscription? _teamSub;
+  StreamSubscription? _authSub;
 
   // Swipeable play card
   final PageController _playCardController = PageController(initialPage: 0);
@@ -101,6 +125,14 @@ class _HomeTabState extends State<_HomeTab> {
     _friendsService.initialize();
     _loadFriendsData();
     _loadChipBalance();
+    _loadUserTeam();
+
+    // Listen to auth state changes to reload team when user is confirmed
+    _authSub = _authService.authStateChanges.listen((user) {
+      if (user != null && _userTeam == null) {
+        _loadUserTeam();
+      }
+    });
 
     _friendsSub = _friendsService.friendsStream.listen((friends) {
       if (mounted) setState(() => _friends = friends);
@@ -117,13 +149,580 @@ class _HomeTabState extends State<_HomeTab> {
     });
   }
 
+  Future<void> _loadUserTeam() async {
+    try {
+      final team = await _teamService.getUserTeam();
+      if (mounted) {
+        setState(() => _userTeam = team);
+        if (team != null) {
+          _teamSub?.cancel();
+          _teamSub = _teamService.watchTeam(team.id).listen((updatedTeam) {
+            if (mounted) setState(() => _userTeam = updatedTeam);
+          });
+        }
+      }
+    } catch (e) {
+      // Silently fail if team loading fails
+    }
+  }
+
   void _loadChipBalance() {
     setState(() => _chipBalance = UserPreferences.chips);
   }
 
+  // Public method to refresh chips from other widgets
+  void refreshChips() {
+    if (mounted) setState(() {});
+  }
+
+  void _navigateToTeamScreen() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const TeamScreen()),
+    ).then((_) {
+      // Refresh team data when returning from team screen
+      _loadUserTeam();
+      _loadChipBalance();
+    });
+  }
+
+  Widget _buildTeamChatDropdown() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Chat header with info button
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            border: Border(bottom: BorderSide(color: Colors.white.withValues(alpha: 0.05))),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.chat_bubble_outline_rounded, color: Colors.white.withValues(alpha: 0.5), size: 16),
+              const SizedBox(width: 8),
+              Text(
+                'Team Chat',
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 12, fontWeight: FontWeight.w500),
+              ),
+              const Spacer(),
+              GestureDetector(
+                onTap: () => _showTeamInfoPopup(),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(_userTeam!.emblem, style: const TextStyle(fontSize: 12)),
+                      const SizedBox(width: 4),
+                      Icon(Icons.info_outline_rounded, color: Colors.white.withValues(alpha: 0.4), size: 14),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        // Messages area
+        Container(
+          height: 140,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: StreamBuilder<List<TeamChatMessage>>(
+            stream: _teamService.watchChatMessages(_userTeam!.id),
+            builder: (context, snapshot) {
+              if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.chat_bubble_outline_rounded, color: Colors.white.withValues(alpha: 0.15), size: 28),
+                      const SizedBox(height: 6),
+                      Text(
+                        'No messages yet',
+                        style: TextStyle(color: Colors.white.withValues(alpha: 0.3), fontSize: 12),
+                      ),
+                    ],
+                  ),
+                );
+              }
+              final messages = snapshot.data!;
+              return ListView.builder(
+                reverse: true,
+                itemCount: messages.length > 15 ? 15 : messages.length,
+                itemBuilder: (context, index) {
+                  final msg = messages[messages.length - 1 - index];
+                  final isMe = msg.senderuid == _teamService.currentUserId;
+                  return Padding(
+                    padding: EdgeInsets.only(
+                      bottom: 8,
+                      left: isMe ? 24 : 0,
+                      right: isMe ? 0 : 24,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          isMe ? 'You' : msg.senderName,
+                          style: TextStyle(
+                            color: isMe ? const Color(0xFF00D46A) : Colors.white.withValues(alpha: 0.5),
+                            fontSize: 10,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: isMe
+                                ? const Color(0xFF00D46A).withValues(alpha: 0.15)
+                                : Colors.white.withValues(alpha: 0.05),
+                            borderRadius: BorderRadius.only(
+                              topLeft: Radius.circular(isMe ? 12 : 4),
+                              topRight: Radius.circular(isMe ? 4 : 12),
+                              bottomLeft: const Radius.circular(12),
+                              bottomRight: const Radius.circular(12),
+                            ),
+                          ),
+                          child: Text(
+                            msg.message,
+                            style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 12),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+        ),
+        // Chat input
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+          child: _buildChatInput(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildChatInput() {
+    final controller = TextEditingController();
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: controller,
+              style: const TextStyle(color: Colors.white, fontSize: 13),
+              decoration: InputDecoration(
+                hintText: 'Message your team...',
+                hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3), fontSize: 13),
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              ),
+              onSubmitted: (text) async {
+                if (text.trim().isNotEmpty && _userTeam != null) {
+                  await _teamService.sendChatMessage(_userTeam!.id, text.trim());
+                  controller.clear();
+                }
+              },
+            ),
+          ),
+          GestureDetector(
+            onTap: () async {
+              if (controller.text.trim().isNotEmpty && _userTeam != null) {
+                await _teamService.sendChatMessage(_userTeam!.id, controller.text.trim());
+                controller.clear();
+              }
+            },
+            child: Container(
+              margin: const EdgeInsets.only(right: 4),
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: const Color(0xFF00D46A),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: const Icon(Icons.arrow_upward_rounded, color: Colors.black, size: 18),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showTeamInfoPopup() {
+    if (_userTeam == null) return;
+    final isCaptain = _userTeam!.isCaptain(_teamService.currentUserId ?? '');
+
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.8),
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+        child: Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.7,
+            maxWidth: 400,
+          ),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1A1A1A),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFF00D46A).withValues(alpha: 0.2)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header with close button and settings for captain
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 12, 0),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 50,
+                      height: 50,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF00D46A).withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Center(
+                        child: Text(_userTeam!.emblem, style: const TextStyle(fontSize: 28)),
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _userTeam!.name,
+                            style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '${_userTeam!.memberCount} members',
+                            style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (isCaptain)
+                      GestureDetector(
+                        onTap: () {
+                          Navigator.pop(context);
+                          _showTeamSettingsPopup();
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.05),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(Icons.settings_rounded, color: Colors.white.withValues(alpha: 0.5), size: 20),
+                        ),
+                      ),
+                    const SizedBox(width: 4),
+                    GestureDetector(
+                      onTap: () => Navigator.pop(context),
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.05),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(Icons.close_rounded, color: Colors.white.withValues(alpha: 0.5), size: 20),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Description
+              if (_userTeam!.description.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.03),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      _userTeam!.description,
+                      style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 13),
+                    ),
+                  ),
+                ),
+              // Members list header
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+                child: Row(
+                  children: [
+                    Text(
+                      'Members',
+                      style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.5), fontSize: 12, fontWeight: FontWeight.w600),
+                    ),
+                    const Spacer(),
+                    Text(
+                      'Ranked by MMR',
+                      style: TextStyle(color: Colors.white.withValues(alpha: 0.3), fontSize: 10),
+                    ),
+                  ],
+                ),
+              ),
+              // Members list
+              Flexible(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+                  itemCount: _userTeam!.sortedMembers.length,
+                  itemBuilder: (context, index) {
+                    final member = _userTeam!.sortedMembers[index];
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 6),
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.03),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        children: [
+                          // Rank number
+                          Container(
+                            width: 22,
+                            height: 22,
+                            decoration: BoxDecoration(
+                              color: index < 3
+                                  ? const Color(0xFFD4AF37).withValues(alpha: 0.2)
+                                  : Colors.white.withValues(alpha: 0.05),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Center(
+                              child: Text(
+                                '${index + 1}',
+                                style: TextStyle(
+                                  color: index < 3 ? const Color(0xFFD4AF37) : Colors.white.withValues(alpha: 0.5),
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          // Name
+                          Expanded(
+                            child: Row(
+                              children: [
+                                Text(
+                                  member.displayName,
+                                  style:
+                                      const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500),
+                                ),
+                                if (member.rankIcon.isNotEmpty) ...[
+                                  const SizedBox(width: 5),
+                                  Text(member.rankIcon, style: const TextStyle(fontSize: 11)),
+                                ],
+                              ],
+                            ),
+                          ),
+                          // Rank title
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: member.rank == 'captain'
+                                  ? const Color(0xFFD4AF37).withValues(alpha: 0.15)
+                                  : member.rank == 'officer'
+                                      ? const Color(0xFF3B82F6).withValues(alpha: 0.15)
+                                      : Colors.white.withValues(alpha: 0.05),
+                              borderRadius: BorderRadius.circular(5),
+                            ),
+                            child: Text(
+                              member.rankDisplayName,
+                              style: TextStyle(
+                                color: member.rank == 'captain'
+                                    ? const Color(0xFFD4AF37)
+                                    : member.rank == 'officer'
+                                        ? const Color(0xFF3B82F6)
+                                        : Colors.white.withValues(alpha: 0.5),
+                                fontSize: 9,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          // MMR/Winnings
+                          Text(
+                            '${member.totalWinnings}',
+                            style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 11),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showTeamSettingsPopup() {
+    if (_userTeam == null) return;
+    final descController = TextEditingController(text: _userTeam!.description);
+    int selectedEmblemIndex = _userTeam!.emblemIndex;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setSheetState) => Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+          child: Container(
+            decoration: const BoxDecoration(
+              color: Color(0xFF1A1A1A),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Handle bar
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    const Text(
+                      'Team Settings',
+                      style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 24),
+                    // Emblem selector
+                    Text(
+                      'Team Emblem',
+                      style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.6), fontSize: 13, fontWeight: FontWeight.w500),
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      height: 60,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: TeamEmblem.emblems.length,
+                        itemBuilder: (context, index) {
+                          final isSelected = index == selectedEmblemIndex;
+                          return GestureDetector(
+                            onTap: () => setSheetState(() => selectedEmblemIndex = index),
+                            child: Container(
+                              width: 50,
+                              height: 50,
+                              margin: const EdgeInsets.only(right: 8),
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? const Color(0xFF00D46A).withValues(alpha: 0.15)
+                                    : const Color(0xFF2A2A2A),
+                                borderRadius: BorderRadius.circular(12),
+                                border: isSelected ? Border.all(color: const Color(0xFF00D46A), width: 2) : null,
+                              ),
+                              child: Center(
+                                child: Text(TeamEmblem.emblems[index], style: const TextStyle(fontSize: 24)),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    // Description
+                    Text(
+                      'Description',
+                      style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.6), fontSize: 13, fontWeight: FontWeight.w500),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: descController,
+                      maxLines: 3,
+                      maxLength: 200,
+                      style: const TextStyle(color: Colors.white, fontSize: 14),
+                      decoration: InputDecoration(
+                        hintText: 'Enter team description...',
+                        hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3)),
+                        filled: true,
+                        fillColor: const Color(0xFF2A2A2A),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                        counterStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3)),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    // Save button
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          try {
+                            if (selectedEmblemIndex != _userTeam!.emblemIndex) {
+                              await _teamService.updateEmblem(_userTeam!.id, selectedEmblemIndex);
+                            }
+                            if (descController.text != _userTeam!.description) {
+                              await _teamService.updateDescription(_userTeam!.id, descController.text);
+                            }
+                            _loadUserTeam();
+                            if (mounted) Navigator.pop(context);
+                          } catch (e) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+                            );
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF00D46A),
+                          foregroundColor: Colors.black,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        child: const Text('Save Changes', style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _addTestChips() async {
-    await UserPreferences.addChips(10000);
-    _loadChipBalance();
+    await UserPreferences.addChips(100000);
+    setState(() {}); // Trigger rebuild to show updated balance
   }
 
   @override
@@ -131,6 +730,8 @@ class _HomeTabState extends State<_HomeTab> {
     _friendsSub?.cancel();
     _notificationsSub?.cancel();
     _requestsSub?.cancel();
+    _teamSub?.cancel();
+    _authSub?.cancel();
     _playCardController.dispose();
     super.dispose();
   }
@@ -230,14 +831,14 @@ class _HomeTabState extends State<_HomeTab> {
                       _DevMenuItem(
                         icon: Icons.add_box,
                         color: const Color(0xFF4CAF50),
-                        title: 'Add 10K Chips',
+                        title: 'Add 100K Chips',
                         onTap: () async {
                           Navigator.pop(dialogContext);
                           await _addTestChips();
                           parentScaffoldMessenger.showSnackBar(
                             SnackBar(
                               content: Text(
-                                'Added 10,000 chips! Balance: ${UserPreferences.formatChips(UserPreferences.chips)}',
+                                'Added 100,000 chips! Balance: ${UserPreferences.formatChips(UserPreferences.chips)}',
                               ),
                             ),
                           );
@@ -473,7 +1074,7 @@ class _HomeTabState extends State<_HomeTab> {
                       homeState?.setState(() => homeState._currentIndex = 0);
                     },
                     child: Text(
-                      '\$${_chipBalance.toString().replaceAllMapped(
+                      '\$${UserPreferences.chips.toString().replaceAllMapped(
                             RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
                             (Match m) => '${m[1]},',
                           )}',
@@ -485,9 +1086,9 @@ class _HomeTabState extends State<_HomeTab> {
                       ),
                     ),
                   ),
-                  // Notification button
+                  // Friends button
                   GestureDetector(
-                    onTap: _showNotificationPanel,
+                    onTap: _showFriendsListDialog,
                     child: Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
@@ -497,14 +1098,14 @@ class _HomeTabState extends State<_HomeTab> {
                       child: Stack(
                         children: [
                           Icon(
-                            Icons.notifications_outlined,
+                            Icons.people_rounded,
                             color: Colors.white.withValues(alpha: 0.7),
                             size: 24,
                           ),
-                          if (_unreadNotifications > 0)
+                          if (_pendingFriendRequests > 0)
                             Positioned(
-                              right: 0,
-                              top: 0,
+                              right: -2,
+                              top: -2,
                               child: Container(
                                 padding: const EdgeInsets.all(4),
                                 decoration: const BoxDecoration(
@@ -513,7 +1114,7 @@ class _HomeTabState extends State<_HomeTab> {
                                 ),
                                 constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
                                 child: Text(
-                                  _unreadNotifications > 9 ? '9+' : _unreadNotifications.toString(),
+                                  _pendingFriendRequests > 9 ? '9+' : _pendingFriendRequests.toString(),
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontSize: 10,
@@ -614,110 +1215,99 @@ class _HomeTabState extends State<_HomeTab> {
             ),
           ),
 
-          // Friends Button
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
-              child: GestureDetector(
-                onTap: () {
-                  _showFriendsListDialog();
-                },
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.03),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.people_rounded, color: Colors.white.withValues(alpha: 0.6), size: 24),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Friends',
-                              style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
-                            ),
-                            Text(
-                              'Add and manage friends',
-                              style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 12),
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (_pendingFriendRequests > 0)
-                        Container(
-                          margin: const EdgeInsets.only(right: 8),
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFEF4444),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Text(
-                            '$_pendingFriendRequests',
-                            style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
-                          ),
-                        ),
-                      Icon(Icons.chevron_right_rounded, color: Colors.white.withValues(alpha: 0.3), size: 24),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-
           // Teams Section
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
+              padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   GestureDetector(
-                    onTap: () => setState(() => _clubExpanded = !_clubExpanded),
+                    onTap: () {
+                      if (_userTeam != null) {
+                        setState(() => _clubExpanded = !_clubExpanded);
+                      } else {
+                        _navigateToTeamScreen();
+                      }
+                    },
                     child: Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.03),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+                        color: _userTeam != null
+                            ? const Color(0xFF00D46A).withValues(alpha: 0.08)
+                            : Colors.white.withValues(alpha: 0.03),
+                        borderRadius: _clubExpanded && _userTeam != null
+                            ? const BorderRadius.vertical(top: Radius.circular(14))
+                            : BorderRadius.circular(14),
+                        border: Border.all(
+                          color: _userTeam != null
+                              ? const Color(0xFF00D46A).withValues(alpha: 0.2)
+                              : Colors.white.withValues(alpha: 0.06),
+                        ),
                       ),
                       child: Row(
                         children: [
-                          Icon(Icons.groups_rounded, color: Colors.white.withValues(alpha: 0.6), size: 24),
+                          if (_userTeam != null) ...[
+                            Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF00D46A).withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Center(
+                                child: Text(_userTeam!.emblem, style: const TextStyle(fontSize: 20)),
+                              ),
+                            ),
+                          ] else ...[
+                            Icon(Icons.groups_rounded, color: Colors.white.withValues(alpha: 0.6), size: 24),
+                          ],
                           const SizedBox(width: 12),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text(
-                                  'Teams',
-                                  style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
+                                Text(
+                                  _userTeam?.name ?? 'Teams',
+                                  style:
+                                      const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
                                 ),
                                 Text(
-                                  'Join or create a team',
+                                  _userTeam != null ? '${_userTeam!.memberCount} members' : 'Join or create a team',
                                   style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 12),
                                 ),
                               ],
                             ),
                           ),
-                          AnimatedRotation(
-                            turns: _clubExpanded ? 0.5 : 0,
-                            duration: const Duration(milliseconds: 200),
-                            child: Icon(
-                              Icons.keyboard_arrow_down_rounded,
-                              color: Colors.white.withValues(alpha: 0.4),
-                              size: 20,
-                            ),
+                          Icon(
+                            _userTeam != null
+                                ? (_clubExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded)
+                                : Icons.chevron_right_rounded,
+                            color: Colors.white.withValues(alpha: 0.3),
+                            size: 24,
                           ),
                         ],
                       ),
                     ),
                   ),
-                  if (_clubExpanded) ...[
+                  // Team dropdown (when user has a team)
+                  AnimatedSize(
+                    duration: const Duration(milliseconds: 250),
+                    curve: Curves.easeInOut,
+                    alignment: Alignment.topCenter,
+                    child: _clubExpanded && _userTeam != null
+                        ? Container(
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF00D46A).withValues(alpha: 0.04),
+                              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(14)),
+                              border: Border.all(color: const Color(0xFF00D46A).withValues(alpha: 0.2)),
+                            ),
+                            child: _buildTeamChatDropdown(),
+                          )
+                        : const SizedBox.shrink(),
+                  ),
+                  // No team state
+                  if (_clubExpanded && _userTeam == null) ...[
                     const SizedBox(height: 12),
                     Container(
                       padding: const EdgeInsets.all(20),
@@ -744,25 +1334,36 @@ class _HomeTabState extends State<_HomeTab> {
                             children: [
                               Expanded(
                                 child: OutlinedButton(
-                                  onPressed: () {},
+                                  onPressed: () => _navigateToTeamScreen(),
                                   style: OutlinedButton.styleFrom(
                                     side: BorderSide(color: Colors.white.withValues(alpha: 0.15)),
                                     padding: const EdgeInsets.symmetric(vertical: 12),
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                   ),
-                                  child: Text('Create', style: TextStyle(color: Colors.white.withValues(alpha: 0.7))),
+                                  child: Column(
+                                    children: [
+                                      Text('Create', style: TextStyle(color: Colors.white.withValues(alpha: 0.7))),
+                                      Text('1M chips',
+                                          style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 10)),
+                                    ],
+                                  ),
                                 ),
                               ),
                               const SizedBox(width: 12),
                               Expanded(
                                 child: FilledButton(
-                                  onPressed: () {},
+                                  onPressed: () => _navigateToTeamScreen(),
                                   style: FilledButton.styleFrom(
                                     backgroundColor: Colors.white.withValues(alpha: 0.1),
                                     padding: const EdgeInsets.symmetric(vertical: 12),
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                   ),
-                                  child: const Text('Join', style: TextStyle(color: Colors.white)),
+                                  child: const Column(
+                                    children: [
+                                      Text('Browse', style: TextStyle(color: Colors.white)),
+                                      Text('1K to join', style: TextStyle(color: Colors.white70, fontSize: 10)),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ],
@@ -784,7 +1385,7 @@ class _HomeTabState extends State<_HomeTab> {
                 onTap: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => const GameScreen(gameMode: 'Tutorial')),
+                    MaterialPageRoute(builder: (_) => const TutorialScreen()),
                   );
                 },
                 child: Container(
@@ -1137,7 +1738,7 @@ class _HomeTabState extends State<_HomeTab> {
 // ============================================================================
 
 class _ShopTab extends StatefulWidget {
-  const _ShopTab();
+  const _ShopTab({super.key});
 
   @override
   State<_ShopTab> createState() => _ShopTabState();
@@ -1153,6 +1754,10 @@ class _ShopTabState extends State<_ShopTab> with SingleTickerProviderStateMixin 
     {'icon': '🎨', 'name': 'Cosmetics'},
     {'icon': '📦', 'name': 'Chests'},
   ];
+
+  void refreshBalance() {
+    setState(() {});
+  }
 
   @override
   void initState() {
@@ -1188,9 +1793,15 @@ class _ShopTabState extends State<_ShopTab> with SingleTickerProviderStateMixin 
                 ),
                 Row(
                   children: [
-                    _BalanceChip(emoji: '🪙', amount: '1,000', color: Colors.white.withValues(alpha: 0.6)),
+                    _BalanceChip(
+                        emoji: '🪙',
+                        amount: UserPreferences.formatChips(UserPreferences.chips),
+                        color: Colors.white.withValues(alpha: 0.6)),
                     const SizedBox(width: 8),
-                    _BalanceChip(emoji: '💎', amount: '100', color: Colors.white.withValues(alpha: 0.6)),
+                    _BalanceChip(
+                        emoji: '💎',
+                        amount: UserPreferences.gems.toString(),
+                        color: Colors.white.withValues(alpha: 0.6)),
                   ],
                 ),
               ],
@@ -1782,16 +2393,16 @@ class _ShopTabState extends State<_ShopTab> with SingleTickerProviderStateMixin 
     );
   }
 
-  static void _showDailySpinDialog(BuildContext context) {
-    showDialog(context: context, builder: (context) => const _DailySpinDialog());
+  void _showDailySpinDialog(BuildContext context) {
+    showDialog(context: context, builder: (context) => const _DailySpinDialog()).then((_) => refreshBalance());
   }
 
-  static void _showGemWheelDialog(BuildContext context) {
-    showDialog(context: context, builder: (context) => const _GemWheelDialog());
+  void _showGemWheelDialog(BuildContext context) {
+    showDialog(context: context, builder: (context) => const _GemWheelDialog()).then((_) => refreshBalance());
   }
 
-  static void _showLuckyHandDialog(BuildContext context) {
-    showDialog(context: context, builder: (context) => const _LuckyHandDialog());
+  void _showLuckyHandDialog(BuildContext context) {
+    showDialog(context: context, builder: (context) => const _LuckyHandDialog()).then((_) => refreshBalance());
   }
 }
 
@@ -2788,7 +3399,9 @@ class _ModernChestCard extends StatelessWidget {
 // ============================================================================
 
 class _ProfileTab extends StatefulWidget {
-  const _ProfileTab();
+  final VoidCallback? onChipsChanged;
+
+  const _ProfileTab({super.key, this.onChipsChanged});
 
   @override
   State<_ProfileTab> createState() => _ProfileTabState();
@@ -2889,14 +3502,15 @@ class _ProfileTabState extends State<_ProfileTab> {
                       _DevMenuItem(
                         icon: Icons.add_box,
                         color: const Color(0xFF4CAF50),
-                        title: 'Add 10K Chips',
+                        title: 'Add 100K Chips',
                         onTap: () async {
                           Navigator.pop(dialogContext);
-                          await UserPreferences.addChips(10000);
+                          await UserPreferences.addChips(100000);
+                          widget.onChipsChanged?.call();
                           parentScaffoldMessenger.showSnackBar(
                             SnackBar(
                               content: Text(
-                                'Added 10,000 chips! Balance: ${UserPreferences.formatChips(UserPreferences.chips)}',
+                                'Added 100,000 chips! Balance: ${UserPreferences.formatChips(UserPreferences.chips)}',
                               ),
                             ),
                           );
@@ -4740,7 +5354,11 @@ class _DailySpinDialogState extends State<_DailySpinDialog> with SingleTickerPro
     final random = Random();
     final prizeIndex = random.nextInt(_prizes.length);
     final rotations = 5 + random.nextDouble() * 3;
-    final targetAngle = rotations * 2 * pi + (prizeIndex / _prizes.length) * 2 * pi;
+    // Calculate angle so that segment prizeIndex lands at the TOP (where pointer is)
+    // Wheel draws segment 0 at top (-pi/2), and rotates clockwise
+    // To land on segment N, we need to rotate so that segment is at top
+    final segmentAngle = 2 * pi / _prizes.length;
+    final targetAngle = rotations * 2 * pi - (prizeIndex * segmentAngle) - (segmentAngle / 2);
 
     _animation = Tween<double>(
       begin: 0,
@@ -4763,7 +5381,7 @@ class _DailySpinDialogState extends State<_DailySpinDialog> with SingleTickerPro
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       child: ConstrainedBox(
         constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(context).size.height * 0.75,
+          maxHeight: MediaQuery.of(context).size.height * 0.85,
           maxWidth: 360,
         ),
         child: SingleChildScrollView(
@@ -4891,8 +5509,9 @@ class _GemWheelDialogState extends State<_GemWheelDialog> with SingleTickerProvi
   bool _isSpinning = false;
   bool _hasSpun = false;
   int _wonAmount = 0;
-  int _gemsBalance = 100;
   static const int _spinCost = 50;
+
+  int get _gemsBalance => UserPreferences.gems;
 
   final List<int> _prizes = [1000, 2500, 5000, 10000, 2500, 25000, 5000, 50000, 1000, 100000];
   final List<Color> _colors = [
@@ -4923,10 +5542,13 @@ class _GemWheelDialogState extends State<_GemWheelDialog> with SingleTickerProvi
 
   void _spin() {
     if (_isSpinning || _gemsBalance < _spinCost) return;
+
+    // Deduct gems using UserPreferences
+    UserPreferences.addGems(-_spinCost);
+
     setState(() {
       _isSpinning = true;
       _hasSpun = false;
-      _gemsBalance -= _spinCost;
     });
     _controller.reset();
 
@@ -4941,10 +5563,12 @@ class _GemWheelDialogState extends State<_GemWheelDialog> with SingleTickerProvi
     ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
 
     _controller.forward().then((_) {
+      final wonChips = _prizes[prizeIndex];
+      UserPreferences.addChips(wonChips);
       setState(() {
         _isSpinning = false;
         _hasSpun = true;
-        _wonAmount = _prizes[prizeIndex];
+        _wonAmount = wonChips;
       });
     });
   }

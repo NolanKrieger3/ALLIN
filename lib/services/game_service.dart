@@ -533,7 +533,7 @@ class GameService {
     // Multi-way: Player after dealer posts SB, next posts BB
     final sbIndex = isHeadsUp ? room.dealerIndex : (room.dealerIndex + 1) % numPlayers;
     final bbIndex = isHeadsUp ? (room.dealerIndex + 1) % numPlayers : (room.dealerIndex + 2) % numPlayers;
-    
+
     // First to act: Heads-up = SB, Multi-way = UTG (left of BB)
     var firstToAct = isHeadsUp ? sbIndex : (bbIndex + 1) % numPlayers;
 
@@ -721,7 +721,7 @@ class GameService {
         if (newTotalBet > currentBet) {
           final raiseBy = newTotalBet - currentBet;
           final isFullRaise = raiseBy >= lastRaiseAmount;
-          
+
           if (isFullRaise) {
             lastRaiseAmount = raiseBy;
             // Full raise - reset hasActed for all other players
@@ -782,7 +782,7 @@ class GameService {
     // BB option only applies preflop
     if (currentPhase == GamePhase.preflop) {
       bbOptionUsed = !room.bbHasOption; // Already used if bbHasOption is false
-      
+
       if (room.bbHasOption) {
         final numPlayers = updatedPlayers.length;
         final isHeadsUp = numPlayers == 2;
@@ -813,13 +813,15 @@ class GameService {
     // BB option only matters on preflop - on flop/turn/river, betting completes when all have acted and bets match
     final allPlayersActed = playersWhoCanAct.every((p) => p.hasActed);
     final allBetsEqual = playersWhoCanAct.every((p) => p.currentBet == currentBet);
-    
+
     // BB option only applies preflop
     final isPreflop = currentPhase == GamePhase.preflop;
     final bettingComplete = allPlayersActed && allBetsEqual && (isPreflop ? bbOptionUsed : true);
-    
-    print('🎯 BETTING CHECK: phase=$currentPhase, allActed=$allPlayersActed, betsEqual=$allBetsEqual, bbOptionUsed=$bbOptionUsed, complete=$bettingComplete');
-    print('   Players: ${playersWhoCanAct.map((p) => '${p.displayName}(acted=${p.hasActed}, bet=${p.currentBet})').join(', ')}');
+
+    print(
+        '🎯 BETTING CHECK: phase=$currentPhase, allActed=$allPlayersActed, betsEqual=$allBetsEqual, bbOptionUsed=$bbOptionUsed, complete=$bettingComplete');
+    print(
+        '   Players: ${playersWhoCanAct.map((p) => '${p.displayName}(acted=${p.hasActed}, bet=${p.currentBet})').join(', ')}');
 
     if (bettingComplete) {
       print('✅ Advancing to next phase from ${room.phase}');
@@ -889,7 +891,7 @@ class GameService {
     // Determine winner(s) and distribute pot (handles side pots)
     final activePlayers = players.where((p) => !p.hasFolded).toList();
     final finalPlayers = _distributePots(players, communityCards, pot);
-    
+
     // Get winning hand info for display
     final winnerIndices = HandEvaluator.determineWinners(activePlayers, communityCards);
     if (winnerIndices.isEmpty) {
@@ -997,7 +999,7 @@ class GameService {
         // Showdown - determine winner using proper hand evaluation
         nextPhase = GamePhase.showdown;
         final activePlayers = updatedPlayers.where((p) => !p.hasFolded).toList();
-        
+
         // Distribute pot (handles side pots)
         final finalPlayers = _distributePots(updatedPlayers, communityCards, pot);
 
@@ -1070,8 +1072,16 @@ class GameService {
     }
 
     // Reset player states and make them ready
-    final resetPlayers =
-        activePlayers.map((p) => p.copyWith(cards: [], hasFolded: false, currentBet: 0, totalContributed: 0, isReady: true, hasActed: false, lastAction: null)).toList();
+    final resetPlayers = activePlayers
+        .map((p) => p.copyWith(
+            cards: [],
+            hasFolded: false,
+            currentBet: 0,
+            totalContributed: 0,
+            isReady: true,
+            hasActed: false,
+            lastAction: null))
+        .toList();
 
     // Move dealer button
     final newDealerIndex = (room.dealerIndex + 1) % resetPlayers.length;
@@ -1110,25 +1120,25 @@ class GameService {
 
     // Get unique contribution amounts sorted (using totalContributed for the whole hand)
     final contributionAmounts = contributors.map((p) => p.totalContributed).toSet().toList()..sort();
-    
+
     final sidePots = <({int amount, List<String> eligibleUids})>[];
     var previousLevel = 0;
 
     for (final level in contributionAmounts) {
       if (level <= previousLevel) continue;
-      
+
       // Calculate how much goes into this pot level
       final levelContribution = level - previousLevel;
-      
+
       // Find all players who contributed at least this amount
       final eligiblePlayers = contributors.where((p) => p.totalContributed >= level && !p.hasFolded).toList();
       final allContributors = contributors.where((p) => p.totalContributed >= level).toList();
-      
+
       if (eligiblePlayers.isNotEmpty) {
         final potAmount = levelContribution * allContributors.length;
         sidePots.add((amount: potAmount, eligibleUids: eligiblePlayers.map((p) => p.uid).toList()));
       }
-      
+
       previousLevel = level;
     }
 
@@ -1143,7 +1153,7 @@ class GameService {
   ) {
     final finalPlayers = List<GamePlayer>.from(players);
     final activePlayers = players.where((p) => !p.hasFolded).toList();
-    
+
     if (activePlayers.length == 1) {
       // Only one player left - they win everything
       final winnerIdx = finalPlayers.indexWhere((p) => p.uid == activePlayers.first.uid);
@@ -1157,15 +1167,15 @@ class GameService {
 
     // Calculate side pots
     final sidePots = _calculateSidePots(players);
-    
+
     if (sidePots.isEmpty) {
       // No side pots - simple distribution
       final winnerIndices = HandEvaluator.determineWinners(activePlayers, communityCards);
       if (winnerIndices.isEmpty) return finalPlayers;
-      
+
       final potPerWinner = totalPot ~/ winnerIndices.length;
       final remainder = totalPot % winnerIndices.length;
-      
+
       for (var i = 0; i < winnerIndices.length; i++) {
         final winner = activePlayers[winnerIndices[i]];
         final winnerIdx = finalPlayers.indexWhere((p) => p.uid == winner.uid);
@@ -1182,19 +1192,17 @@ class GameService {
     // Distribute each side pot separately
     for (final sidePot in sidePots) {
       // Find eligible active players for this pot
-      final eligiblePlayers = activePlayers
-          .where((p) => sidePot.eligibleUids.contains(p.uid))
-          .toList();
-      
+      final eligiblePlayers = activePlayers.where((p) => sidePot.eligibleUids.contains(p.uid)).toList();
+
       if (eligiblePlayers.isEmpty) continue;
-      
+
       // Determine winners among eligible players
       final winnerIndices = HandEvaluator.determineWinners(eligiblePlayers, communityCards);
       if (winnerIndices.isEmpty) continue;
-      
+
       final potPerWinner = sidePot.amount ~/ winnerIndices.length;
       final remainder = sidePot.amount % winnerIndices.length;
-      
+
       // Get winner UIDs and sort by position (for odd chip distribution)
       // In standard poker, odd chip goes to first winner left of dealer
       // For simplicity, we give to first winner in the list (could enhance with dealer position)
