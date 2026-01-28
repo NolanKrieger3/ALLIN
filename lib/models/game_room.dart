@@ -59,10 +59,8 @@ class GamePlayer {
       uid: json['uid'] as String,
       displayName: json['displayName'] as String,
       chips: json['chips'] as int,
-      cards: (json['cards'] as List<dynamic>?)
-              ?.map((c) => PlayingCard.fromJson(c as Map<String, dynamic>))
-              .toList() ??
-          [],
+      cards:
+          (json['cards'] as List<dynamic>?)?.map((c) => PlayingCard.fromJson(c as Map<String, dynamic>)).toList() ?? [],
       hasFolded: json['hasFolded'] as bool? ?? false,
       currentBet: json['currentBet'] as int? ?? 0,
       isReady: json['isReady'] as bool? ?? false,
@@ -122,6 +120,8 @@ class GameRoom {
   final bool isPrivate; // Whether this is a private room with room code sharing
   final bool bbHasOption; // Big blind's option to raise preflop if no raises
   final String? winningHandName; // Description of the winning hand at showdown
+  final int? turnStartTime; // Timestamp when current turn started (for turn timer)
+  final int turnTimeLimit; // Seconds allowed per turn (default 30)
 
   GameRoom({
     required this.id,
@@ -145,6 +145,8 @@ class GameRoom {
     this.lastRaiseAmount = 0,
     this.bbHasOption = true,
     this.winningHandName,
+    this.turnStartTime,
+    this.turnTimeLimit = 30,
   });
 
   Map<String, dynamic> toJson() => {
@@ -169,6 +171,8 @@ class GameRoom {
         'isPrivate': isPrivate,
         'bbHasOption': bbHasOption,
         'winningHandName': winningHandName,
+        'turnStartTime': turnStartTime,
+        'turnTimeLimit': turnTimeLimit,
       };
 
   factory GameRoom.fromJson(Map<String, dynamic> json, String docId) {
@@ -199,6 +203,8 @@ class GameRoom {
       isPrivate: json['isPrivate'] as bool? ?? false,
       bbHasOption: json['bbHasOption'] as bool? ?? true,
       winningHandName: json['winningHandName'] as String?,
+      turnStartTime: json['turnStartTime'] as int?,
+      turnTimeLimit: json['turnTimeLimit'] as int? ?? 30,
     );
   }
 
@@ -224,6 +230,8 @@ class GameRoom {
     bool? isPrivate,
     bool? bbHasOption,
     String? winningHandName,
+    int? turnStartTime,
+    int? turnTimeLimit,
   }) {
     return GameRoom(
       id: id ?? this.id,
@@ -247,17 +255,19 @@ class GameRoom {
       isPrivate: isPrivate ?? this.isPrivate,
       bbHasOption: bbHasOption ?? this.bbHasOption,
       winningHandName: winningHandName ?? this.winningHandName,
+      turnStartTime: turnStartTime ?? this.turnStartTime,
+      turnTimeLimit: turnTimeLimit ?? this.turnTimeLimit,
     );
   }
 
   bool get isFull => players.length >= maxPlayers;
-  
+
   /// Game can start when there are 2+ players and all non-host players are ready
   bool get canStart {
     if (players.length < 2) return false;
     // All players except the host must be ready (host is always considered ready)
     return players.where((p) => p.uid != hostId).every((p) => p.isReady);
   }
-  
+
   bool get isSitAndGo => gameType == 'sitandgo';
 }

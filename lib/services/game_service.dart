@@ -494,6 +494,7 @@ class GameService {
         'currentBet': bbAmount,
         'minRaise': room.bigBlind, // Minimum raise is BB preflop
         'currentTurnPlayerId': updatedPlayers[firstToAct].uid,
+        'turnStartTime': DateTime.now().millisecondsSinceEpoch,
         'communityCards': [],
         'lastRaiseAmount': room.bigBlind,
         'bbHasOption': true, // Big blind gets option to raise preflop
@@ -547,6 +548,7 @@ class GameService {
           'currentBet': 0,
           'minRaise': room.bigBlind,
           'currentTurnPlayerId': updatedPlayers[0].uid,
+          'turnStartTime': DateTime.now().millisecondsSinceEpoch,
           'communityCards': [],
           'lastRaiseAmount': room.bigBlind,
           'bbHasOption': false,
@@ -594,6 +596,7 @@ class GameService {
         'currentBet': bbAmount,
         'minRaise': room.bigBlind,
         'currentTurnPlayerId': updatedPlayers[firstToAct].uid,
+        'turnStartTime': DateTime.now().millisecondsSinceEpoch,
         'communityCards': [],
         'lastRaiseAmount': room.bigBlind,
         'bbHasOption': true,
@@ -672,6 +675,7 @@ class GameService {
         'currentBet': bbAmount,
         'minRaise': room.bigBlind,
         'currentTurnPlayerId': updatedPlayers[firstToAct].uid,
+        'turnStartTime': DateTime.now().millisecondsSinceEpoch,
         'communityCards': [],
         'lastRaiseAmount': room.bigBlind,
         'bbHasOption': true,
@@ -887,6 +891,7 @@ class GameService {
           'currentBet': currentBet,
           'lastRaiseAmount': lastRaiseAmount,
           'currentTurnPlayerId': updatedPlayers[nextPlayerIndex].uid,
+          'turnStartTime': DateTime.now().millisecondsSinceEpoch,
           'bbHasOption': !bbOptionUsed,
         }),
       );
@@ -1120,6 +1125,7 @@ class GameService {
         'currentBet': 0,
         'lastRaiseAmount': room.bigBlind, // Reset min raise to big blind
         'currentTurnPlayerId': updatedPlayers[firstToActIdx].uid,
+        'turnStartTime': DateTime.now().millisecondsSinceEpoch,
       }),
     );
   }
