@@ -337,13 +337,15 @@ class _LobbyScreenState extends State<LobbyScreen> {
       final rooms = await _gameService.fetchAvailableSitAndGoRooms();
 
       // Filter for rooms at this buy-in level
-      final matchingRooms = rooms.where((r) => r.bigBlind == buyIn.buyIn || (buyIn.buyIn == 0 && r.bigBlind == 100)).toList();
-      
+      final matchingRooms =
+          rooms.where((r) => r.bigBlind == buyIn.buyIn || (buyIn.buyIn == 0 && r.bigBlind == 100)).toList();
+
       // Prioritize rooms that already have players (non-empty lobbies)
       final nonEmptyRooms = matchingRooms.where((r) => r.players.isNotEmpty).toList();
       nonEmptyRooms.sort((a, b) => b.players.length.compareTo(a.players.length));
 
-      final roomToJoin = nonEmptyRooms.isNotEmpty ? nonEmptyRooms.first : (matchingRooms.isNotEmpty ? matchingRooms.first : null);
+      final roomToJoin =
+          nonEmptyRooms.isNotEmpty ? nonEmptyRooms.first : (matchingRooms.isNotEmpty ? matchingRooms.first : null);
 
       if (roomToJoin != null) {
         await _gameService.joinRoom(roomToJoin.id, startingChips: buyIn.prizePool ~/ 2);
@@ -1480,20 +1482,20 @@ class _TournamentCard extends StatelessWidget {
                   end: Alignment.bottomRight,
                 )
               : isWeekend
-              ? const LinearGradient(
-                  colors: [Color(0xFF3A1A3A), Color(0xFF20102A)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                )
-              : null,
+                  ? const LinearGradient(
+                      colors: [Color(0xFF3A1A3A), Color(0xFF20102A)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    )
+                  : null,
           color: isFeatured || isWeekend ? null : Colors.white.withValues(alpha: 0.04),
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
             color: isFeatured
                 ? const Color(0xFF4CAF50).withValues(alpha: 0.3)
                 : isWeekend
-                ? const Color(0xFF9C27B0).withValues(alpha: 0.3)
-                : Colors.white.withValues(alpha: 0.06),
+                    ? const Color(0xFF9C27B0).withValues(alpha: 0.3)
+                    : Colors.white.withValues(alpha: 0.06),
           ),
         ),
         child: Column(
@@ -1508,8 +1510,8 @@ class _TournamentCard extends StatelessWidget {
                     color: isFeatured
                         ? const Color(0xFF4CAF50).withValues(alpha: 0.2)
                         : isWeekend
-                        ? const Color(0xFF9C27B0).withValues(alpha: 0.2)
-                        : const Color(0xFFD4AF37).withValues(alpha: 0.15),
+                            ? const Color(0xFF9C27B0).withValues(alpha: 0.2)
+                            : const Color(0xFFD4AF37).withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Center(
@@ -1517,8 +1519,8 @@ class _TournamentCard extends StatelessWidget {
                       isFeatured
                           ? '🎁'
                           : isWeekend
-                          ? '👑'
-                          : '🏆',
+                              ? '👑'
+                              : '🏆',
                       style: const TextStyle(fontSize: 24),
                     ),
                   ),

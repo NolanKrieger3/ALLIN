@@ -37,26 +37,31 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> {
     final isHost = room.hostId == _gameService.currentUserId;
 
     // Case 1: Room is in 'waiting' status with only 1 player - wait a bit for others to join
-    if (room.status == 'waiting' && isHost && room.players.length == 1) {
+    if (room.status == 'waiting' && room.players.length == 1) {
       // Don't auto-start immediately - wait for another player
       // The room will stay in 'waiting' status so others can find it
       print('⏳ Waiting for more players to join room ${widget.roomId}...');
       return;
     }
 
-    // Case 2: Room is in 'waiting' status with 2+ players - start the game!
-    if (room.status == 'waiting' && isHost && room.players.length >= 2) {
-      _hasAutoStarted = true;
-      setState(() => _isLoading = true);
-      print('🎮 Starting game with ${room.players.length} players!');
-      try {
-        // Skip ready check for auto-matched games - players are auto-ready when joining
-        await _gameService.startGame(widget.roomId, skipReadyCheck: true);
-      } catch (e) {
-        print('❌ Failed to start game: $e');
-        _hasAutoStarted = false; // Allow retry
+    // Case 2: Room is in 'waiting' status with 2+ players - HOST starts the game!
+    if (room.status == 'waiting' && room.players.length >= 2) {
+      if (isHost) {
+        _hasAutoStarted = true;
+        setState(() => _isLoading = true);
+        print('🎮 HOST starting game with ${room.players.length} players!');
+        try {
+          // Skip ready check for auto-matched games - players are auto-ready when joining
+          await _gameService.startGame(widget.roomId, skipReadyCheck: true);
+        } catch (e) {
+          print('❌ Failed to start game: $e');
+          _hasAutoStarted = false; // Allow retry
+        }
+        if (mounted) setState(() => _isLoading = false);
+      } else {
+        // Non-host: Just wait, the host will start the game
+        print('⏳ Waiting for host to start game...');
       }
-      if (mounted) setState(() => _isLoading = false);
       return;
     }
 
@@ -65,9 +70,11 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> {
     if (room.status == 'playing' && room.phase == 'waiting_for_players' && room.players.length >= 2 && isHost) {
       _hasAutoStarted = true;
       setState(() => _isLoading = true);
+      print('🎮 Starting game from waiting_for_players phase!');
       try {
         await _gameService.startGameFromWaiting(widget.roomId);
       } catch (e) {
+        print('❌ Failed to start from waiting: $e');
         _hasAutoStarted = false; // Allow retry
       }
       if (mounted) setState(() => _isLoading = false);
@@ -804,10 +811,11 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> {
   }
 
   Widget _buildPlayersRow(GameRoom room, List<GamePlayer> opponents, GamePlayer currentPlayer) {
-    final allPlayers = [...opponents];
+    // Show ALL players including yourself
+    final allPlayers = room.players;
 
     return Container(
-      height: 110,
+      height: 130,
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
         children: [
@@ -817,7 +825,9 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> {
               itemCount: allPlayers.length + 1, // +1 for add button
               itemBuilder: (context, index) {
                 if (index < allPlayers.length) {
-                  return _buildPlayerAvatar(allPlayers[index], room);
+                  final player = allPlayers[index];
+                  final isCurrentUser = player.uid == _gameService.currentUserId;
+                  return _buildPlayerAvatar(player, room, isCurrentUser: isCurrentUser);
                 }
                 // Add player button
                 return Container(
@@ -846,7 +856,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> {
     );
   }
 
-  Widget _buildPlayerAvatar(GamePlayer player, GameRoom room) {
+  Widget _buildPlayerAvatar(GamePlayer player, GameRoom room, {bool isCurrentUser = false}) {
     final isTheirTurn = room.currentTurnPlayerId == player.uid;
     final hasFolded = player.hasFolded;
 
@@ -885,6 +895,14 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> {
       return avatars[firstChar] ?? '👤';
     }
 
+    // Border color: gold if their turn, blue if current user, none otherwise
+    Color? borderColor;
+    if (isTheirTurn) {
+      borderColor = const Color(0xFFD4AF37);
+    } else if (isCurrentUser) {
+      borderColor = const Color(0xFF3B82F6);
+    }
+
     return Container(
       width: 80,
       margin: const EdgeInsets.only(right: 12),
@@ -900,7 +918,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: hasFolded ? Colors.grey.shade800 : Colors.white.withValues(alpha: 0.1),
-                  border: isTheirTurn ? Border.all(color: const Color(0xFFD4AF37), width: 3) : null,
+                  border: borderColor != null ? Border.all(color: borderColor, width: 3) : null,
                 ),
                 child: Center(
                   child: Text(
@@ -934,46 +952,49 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> {
                     ),
                   ),
                 ),
+              // "You" badge for current user
+              if (isCurrentUser)
+                Positioned(
+                  top: 0,
+                  right: 0,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF3B82F6),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Text('YOU',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 8,
+                          fontWeight: FontWeight.bold,
+                        )),
+                  ),
+                ),
             ],
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
           // Name
           Text(
             player.displayName.length > 8 ? '${player.displayName.substring(0, 8)}' : player.displayName,
             style: TextStyle(
-              color: hasFolded ? Colors.grey : Colors.white,
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
+              color: hasFolded ? Colors.grey : (isCurrentUser ? const Color(0xFF3B82F6) : Colors.white),
+              fontSize: 11,
+              fontWeight: isCurrentUser ? FontWeight.w700 : FontWeight.w500,
             ),
             overflow: TextOverflow.ellipsis,
           ),
-          // Chips
+          // Chips (with bet inline if present)
           Text(
-            _formatChips(player.chips),
+            player.currentBet > 0
+                ? '${_formatChips(player.chips)} (${_formatChips(player.currentBet)})'
+                : _formatChips(player.chips),
             style: TextStyle(
               color: hasFolded ? Colors.grey : Colors.yellow.shade600,
-              fontSize: 12,
+              fontSize: 11,
               fontWeight: FontWeight.w600,
             ),
           ),
-          // Current bet badge
-          if (player.currentBet > 0)
-            Container(
-              margin: const EdgeInsets.only(top: 4),
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(
-                color: Colors.yellow.shade800,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Text(
-                _formatChips(player.currentBet),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
         ],
       ),
     );

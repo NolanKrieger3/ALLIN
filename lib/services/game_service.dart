@@ -44,7 +44,8 @@ class GameService {
   // ============================================================================
 
   /// Create a new game room
-  Future<GameRoom> createRoom({int bigBlind = 100, int startingChips = 1000, bool isPrivate = false, String gameType = 'cash'}) async {
+  Future<GameRoom> createRoom(
+      {int bigBlind = 100, int startingChips = 1000, bool isPrivate = false, String gameType = 'cash'}) async {
     final userId = currentUserId;
     if (userId == null) throw Exception('Must be logged in to create a room');
 
@@ -292,7 +293,13 @@ class GameService {
       print(
           '🔍 Room ${room.id}: blind=${room.bigBlind}, gameType=${room.gameType}, status=${room.status}, players=${room.players.length}, needsPlayer=$needsPlayer, userNotInRoom=$userNotInRoom');
 
-      return isCorrectBlind && isCorrectGameType && isNotFull && isNotPrivate && userNotInRoom && isJoinable && needsPlayer;
+      return isCorrectBlind &&
+          isCorrectGameType &&
+          isNotFull &&
+          isNotPrivate &&
+          userNotInRoom &&
+          isJoinable &&
+          needsPlayer;
     }).toList();
 
     // Sort by most recently created (newest first) - these are more likely to have active players
