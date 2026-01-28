@@ -1353,27 +1353,45 @@ class _GameScreenState extends State<GameScreen> {
         isPlayer: true,
         isDealer: _dealerPosition == 0,
       ),
-      ...List.generate(_bots.length, (i) => _Participant(
-        name: _bots[i].name,
-        chips: _bots[i].chips,
-        currentBet: _bots[i].currentBet,
-        hasFolded: _bots[i].hasFolded,
-        isCurrentTurn: _currentActorIndex == i + 1 && _gamePhase != 'showdown',
-        isPlayer: false,
-        isDealer: _dealerPosition == i + 1,
-      )),
+      ...List.generate(
+          _bots.length,
+          (i) => _Participant(
+                name: _bots[i].name,
+                chips: _bots[i].chips,
+                currentBet: _bots[i].currentBet,
+                hasFolded: _bots[i].hasFolded,
+                isCurrentTurn: _currentActorIndex == i + 1 && _gamePhase != 'showdown',
+                isPlayer: false,
+                isDealer: _dealerPosition == i + 1,
+              )),
     ];
 
     return Container(
-      height: 130,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        itemCount: allParticipants.length,
-        itemBuilder: (context, index) {
-          final p = allParticipants[index];
-          return _buildParticipantAvatar(p);
+      height: 100,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      child: ShaderMask(
+        shaderCallback: (Rect bounds) {
+          return LinearGradient(
+            begin: Alignment.centerLeft,
+            end: Alignment.centerRight,
+            colors: [
+              Colors.transparent,
+              Colors.black,
+              Colors.black,
+              Colors.transparent,
+            ],
+            stops: const [0.0, 0.02, 0.98, 1.0],
+          ).createShader(bounds);
         },
+        blendMode: BlendMode.dstIn,
+        child: ListView.builder(
+          scrollDirection: Axis.horizontal,
+          itemCount: allParticipants.length,
+          itemBuilder: (context, index) {
+            final p = allParticipants[index];
+            return _buildParticipantAvatar(p);
+          },
+        ),
       ),
     );
   }
@@ -1395,27 +1413,28 @@ class _GameScreenState extends State<GameScreen> {
     }
 
     return Container(
-      width: 80,
-      margin: const EdgeInsets.only(right: 12),
+      width: 58,
+      margin: const EdgeInsets.only(right: 8),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Stack(
             alignment: Alignment.center,
+            clipBehavior: Clip.none,
             children: [
               Container(
-                width: 56,
-                height: 56,
+                width: 44,
+                height: 44,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: p.hasFolded ? Colors.grey.shade800 : Colors.white.withValues(alpha: 0.1),
-                  border: borderColor != null ? Border.all(color: borderColor, width: 3) : null,
+                  border: borderColor != null ? Border.all(color: borderColor, width: 2) : null,
                 ),
                 child: Center(
                   child: Text(
                     getAvatar(p.name),
                     style: TextStyle(
-                      fontSize: 28,
+                      fontSize: 22,
                       color: p.hasFolded ? Colors.grey : null,
                     ),
                   ),
@@ -1424,11 +1443,11 @@ class _GameScreenState extends State<GameScreen> {
               // Dealer badge
               if (p.isDealer)
                 Positioned(
-                  bottom: 0,
-                  right: 0,
+                  bottom: -2,
+                  right: -2,
                   child: Container(
-                    width: 20,
-                    height: 20,
+                    width: 16,
+                    height: 16,
                     decoration: const BoxDecoration(
                       color: Colors.white,
                       shape: BoxShape.circle,
@@ -1437,7 +1456,7 @@ class _GameScreenState extends State<GameScreen> {
                       child: Text('D',
                           style: TextStyle(
                             color: Colors.black,
-                            fontSize: 12,
+                            fontSize: 10,
                             fontWeight: FontWeight.bold,
                           )),
                     ),
@@ -1446,18 +1465,18 @@ class _GameScreenState extends State<GameScreen> {
               // "You" badge
               if (p.isPlayer)
                 Positioned(
-                  top: 0,
-                  right: 0,
+                  top: -4,
+                  right: -6,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                    padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
                     decoration: BoxDecoration(
                       color: const Color(0xFF3B82F6),
-                      borderRadius: BorderRadius.circular(6),
+                      borderRadius: BorderRadius.circular(4),
                     ),
                     child: const Text('YOU',
                         style: TextStyle(
                           color: Colors.white,
-                          fontSize: 8,
+                          fontSize: 7,
                           fontWeight: FontWeight.bold,
                         )),
                   ),
@@ -1467,19 +1486,17 @@ class _GameScreenState extends State<GameScreen> {
           const SizedBox(height: 4),
           // Name
           Text(
-            p.name,
+            p.name.length > 6 ? '${p.name.substring(0, 6)}' : p.name,
             style: TextStyle(
               color: p.hasFolded ? Colors.grey : (p.isPlayer ? const Color(0xFF3B82F6) : Colors.white),
-              fontSize: 11,
+              fontSize: 10,
               fontWeight: p.isPlayer ? FontWeight.w700 : FontWeight.w500,
             ),
             overflow: TextOverflow.ellipsis,
           ),
           // Chips
           Text(
-            p.currentBet > 0
-                ? '${_formatChips(p.chips)} (${_formatChips(p.currentBet)})'
-                : _formatChips(p.chips),
+            p.currentBet > 0 ? '${_formatChips(p.chips)} (${_formatChips(p.currentBet)})' : _formatChips(p.chips),
             style: TextStyle(
               color: p.hasFolded ? Colors.grey : Colors.yellow.shade600,
               fontSize: 11,
@@ -1500,9 +1517,7 @@ class _GameScreenState extends State<GameScreen> {
             for (var i = 0; i < 5; i++)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: i < _communityCards.length
-                    ? _buildMinimalCard(_communityCards[i])
-                    : _buildEmptyCardSlot(),
+                child: i < _communityCards.length ? _buildMinimalCard(_communityCards[i]) : _buildEmptyCardSlot(),
               ),
             const SizedBox(width: 16),
             // Pot amount
@@ -1567,7 +1582,7 @@ class _GameScreenState extends State<GameScreen> {
     if (_playerHasFolded || _gamePhase == 'showdown') {
       return _buildWaitMessage();
     }
-    
+
     // If player is all-in
     if (_playerChips == 0) {
       return _buildWaitMessage(message: 'All In');
