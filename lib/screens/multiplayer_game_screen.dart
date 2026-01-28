@@ -8,11 +8,13 @@ import '../widgets/mobile_wrapper.dart';
 class MultiplayerGameScreen extends StatefulWidget {
   final String roomId;
   final bool autoStart;
+  final int requiredPlayers;
 
   const MultiplayerGameScreen({
     super.key,
     required this.roomId,
     this.autoStart = false,
+    this.requiredPlayers = 2,
   });
 
   @override
@@ -153,17 +155,16 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
     if (_hasAutoStarted || _isLoading) return;
 
     final isHost = room.hostId == _gameService.currentUserId;
+    final requiredPlayers = widget.requiredPlayers;
 
-    // Case 1: Room is in 'waiting' status with only 1 player - wait a bit for others to join
-    if (room.status == 'waiting' && room.players.length == 1) {
-      // Don't auto-start immediately - wait for another player
-      // The room will stay in 'waiting' status so others can find it
-      print('⏳ Waiting for more players to join room ${widget.roomId}...');
+    // Case 1: Room doesn't have enough players yet - wait for more
+    if (room.status == 'waiting' && room.players.length < requiredPlayers) {
+      print('⏳ Waiting for more players (${room.players.length}/$requiredPlayers)...');
       return;
     }
 
-    // Case 2: Room is in 'waiting' status with 2+ players - HOST starts the game!
-    if (room.status == 'waiting' && room.players.length >= 2) {
+    // Case 2: Room is in 'waiting' status with required players - HOST starts the game!
+    if (room.status == 'waiting' && room.players.length >= requiredPlayers) {
       if (isHost) {
         _hasAutoStarted = true;
         setState(() => _isLoading = true);
@@ -183,9 +184,12 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
       return;
     }
 
-    // Case 3: Room is 'playing' but in 'waiting_for_players' phase and has 2+ players
-    // This means a second player joined a solo-started game - start the real game
-    if (room.status == 'playing' && room.phase == 'waiting_for_players' && room.players.length >= 2 && isHost) {
+    // Case 3: Room is 'playing' but in 'waiting_for_players' phase and has required players
+    // This means enough players joined - start the real game
+    if (room.status == 'playing' &&
+        room.phase == 'waiting_for_players' &&
+        room.players.length >= requiredPlayers &&
+        isHost) {
       _hasAutoStarted = true;
       setState(() => _isLoading = true);
       print('🎮 Starting game from waiting_for_players phase!');
