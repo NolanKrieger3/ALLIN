@@ -109,7 +109,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> {
 
           // Auto-start the game immediately (skip waiting room)
           // Also handle when 2nd player joins a 'waiting_for_players' room
-          if (room.status == 'waiting' || 
+          if (room.status == 'waiting' ||
               (room.status == 'playing' && room.phase == 'waiting_for_players' && room.players.length >= 2)) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
               _tryAutoStart(room);
@@ -794,7 +794,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> {
 
   Widget _buildPlayersRow(GameRoom room, List<GamePlayer> opponents, GamePlayer currentPlayer) {
     final allPlayers = [...opponents];
-    
+
     return Container(
       height: 110,
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -838,17 +838,38 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> {
   Widget _buildPlayerAvatar(GamePlayer player, GameRoom room) {
     final isTheirTurn = room.currentTurnPlayerId == player.uid;
     final hasFolded = player.hasFolded;
-    
+
     // Avatar emojis based on display name first letter
     String getAvatar(String name) {
       if (name.isEmpty) return '👤';
       final firstChar = name[0].toLowerCase();
       final avatars = {
-        'a': '👨', 'b': '🧔', 'c': '👩', 'd': '🧑', 'e': '👴',
-        'f': '👵', 'g': '🦊', 'h': '🦄', 'i': '🐸', 'j': '🐵',
-        'k': '🐻', 'l': '🐼', 'm': '🦁', 'n': '🐯', 'o': '🐨',
-        'p': '🐷', 'q': '🐰', 'r': '🐶', 's': '🐱', 't': '🐲',
-        'u': '🦋', 'v': '🦅', 'w': '🐺', 'x': '🦈', 'y': '🦜', 'z': '🦎',
+        'a': '👨',
+        'b': '🧔',
+        'c': '👩',
+        'd': '🧑',
+        'e': '👴',
+        'f': '👵',
+        'g': '🦊',
+        'h': '🦄',
+        'i': '🐸',
+        'j': '🐵',
+        'k': '🐻',
+        'l': '🐼',
+        'm': '🦁',
+        'n': '🐯',
+        'o': '🐨',
+        'p': '🐷',
+        'q': '🐰',
+        'r': '🐶',
+        's': '🐱',
+        't': '🐲',
+        'u': '🦋',
+        'v': '🦅',
+        'w': '🐺',
+        'x': '🦈',
+        'y': '🦜',
+        'z': '🦎',
       };
       return avatars[firstChar] ?? '👤';
     }
@@ -868,9 +889,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: hasFolded ? Colors.grey.shade800 : Colors.white.withValues(alpha: 0.1),
-                  border: isTheirTurn 
-                      ? Border.all(color: const Color(0xFFD4AF37), width: 3)
-                      : null,
+                  border: isTheirTurn ? Border.all(color: const Color(0xFFD4AF37), width: 3) : null,
                 ),
                 child: Center(
                   child: Text(
@@ -895,11 +914,12 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> {
                       shape: BoxShape.circle,
                     ),
                     child: const Center(
-                      child: Text('D', style: TextStyle(
-                        color: Colors.black,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      )),
+                      child: Text('D',
+                          style: TextStyle(
+                            color: Colors.black,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          )),
                     ),
                   ),
                 ),
@@ -908,9 +928,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> {
           const SizedBox(height: 6),
           // Name
           Text(
-            player.displayName.length > 8 
-                ? '${player.displayName.substring(0, 8)}' 
-                : player.displayName,
+            player.displayName.length > 8 ? '${player.displayName.substring(0, 8)}' : player.displayName,
             style: TextStyle(
               color: hasFolded ? Colors.grey : Colors.white,
               fontSize: 12,
@@ -1206,11 +1224,9 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> {
                     const SizedBox(height: 4),
                     Row(
                       children: [
-                        if (player.cards.isNotEmpty)
-                          _buildMinimalCard(player.cards[0]),
+                        if (player.cards.isNotEmpty) _buildMinimalCard(player.cards[0]),
                         const SizedBox(width: 8),
-                        if (player.cards.length > 1)
-                          _buildMinimalCard(player.cards[1]),
+                        if (player.cards.length > 1) _buildMinimalCard(player.cards[1]),
                       ],
                     ),
                   ],
@@ -1255,11 +1271,9 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> {
               // Player's cards
               Row(
                 children: [
-                  if (player.cards.isNotEmpty)
-                    _buildMinimalCard(player.cards[0]),
+                  if (player.cards.isNotEmpty) _buildMinimalCard(player.cards[0]),
                   const SizedBox(width: 8),
-                  if (player.cards.length > 1)
-                    _buildMinimalCard(player.cards[1]),
+                  if (player.cards.length > 1) _buildMinimalCard(player.cards[1]),
                 ],
               ),
               const Spacer(),
@@ -1276,11 +1290,32 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> {
       if (name.isEmpty) return '👤';
       final firstChar = name[0].toLowerCase();
       final avatars = {
-        'a': '👨', 'b': '🧔', 'c': '👩', 'd': '🧑', 'e': '👴',
-        'f': '👵', 'g': '🦊', 'h': '🦄', 'i': '🐸', 'j': '🐵',
-        'k': '🐻', 'l': '🐼', 'm': '🦁', 'n': '🐯', 'o': '🐨',
-        'p': '🐷', 'q': '🐰', 'r': '🐶', 's': '🐱', 't': '🐲',
-        'u': '🦋', 'v': '🦅', 'w': '🐺', 'x': '🦈', 'y': '🦜', 'z': '🦎',
+        'a': '👨',
+        'b': '🧔',
+        'c': '👩',
+        'd': '🧑',
+        'e': '👴',
+        'f': '👵',
+        'g': '🦊',
+        'h': '🦄',
+        'i': '🐸',
+        'j': '🐵',
+        'k': '🐻',
+        'l': '🐼',
+        'm': '🦁',
+        'n': '🐯',
+        'o': '🐨',
+        'p': '🐷',
+        'q': '🐰',
+        'r': '🐶',
+        's': '🐱',
+        't': '🐲',
+        'u': '🦋',
+        'v': '🦅',
+        'w': '🐺',
+        'x': '🦈',
+        'y': '🦜',
+        'z': '🦎',
       };
       return avatars[firstChar] ?? '👤';
     }

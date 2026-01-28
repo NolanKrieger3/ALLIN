@@ -206,9 +206,8 @@ class GameService {
     final data = jsonDecode(response.body) as Map<String, dynamic>;
     print('🔍 Total rooms in database: ${data.length}');
 
-    final allRooms = data.entries
-        .map((e) => GameRoom.fromJson(Map<String, dynamic>.from(e.value as Map), e.key))
-        .toList();
+    final allRooms =
+        data.entries.map((e) => GameRoom.fromJson(Map<String, dynamic>.from(e.value as Map), e.key)).toList();
 
     // Filter for joinable rooms:
     // - Same blind level
@@ -221,11 +220,11 @@ class GameService {
       final isNotFull = !room.isFull;
       final isNotPrivate = !room.isPrivate;
       final userNotInRoom = !room.players.any((p) => p.uid == userId);
-      final isJoinable = room.status == 'waiting' || 
-          (room.status == 'playing' && room.phase == 'waiting_for_players');
-      
-      print('🔍 Room ${room.id}: blind=${room.bigBlind}, status=${room.status}, phase=${room.phase}, players=${room.players.length}, joinable=$isJoinable');
-      
+      final isJoinable = room.status == 'waiting' || (room.status == 'playing' && room.phase == 'waiting_for_players');
+
+      print(
+          '🔍 Room ${room.id}: blind=${room.bigBlind}, status=${room.status}, phase=${room.phase}, players=${room.players.length}, joinable=$isJoinable');
+
       return isCorrectBlind && isNotFull && isNotPrivate && userNotInRoom && isJoinable;
     }).toList();
 
@@ -258,9 +257,8 @@ class GameService {
     final data = jsonDecode(response.body) as Map<String, dynamic>;
     print('🔍 Total rooms in database: ${data.length}');
 
-    final allRooms = data.entries
-        .map((e) => GameRoom.fromJson(Map<String, dynamic>.from(e.value as Map), e.key))
-        .toList();
+    final allRooms =
+        data.entries.map((e) => GameRoom.fromJson(Map<String, dynamic>.from(e.value as Map), e.key)).toList();
 
     for (final room in allRooms) {
       print(
@@ -452,7 +450,7 @@ class GameService {
     }).toList();
 
     final numPlayers = updatedPlayers.length;
-    
+
     // Handle solo player case
     if (numPlayers == 1) {
       // Solo mode - no blinds needed, just show the game table
@@ -1062,9 +1060,8 @@ class GameService {
     }
 
     // Reset player states and make them ready
-    final resetPlayers = activePlayers
-        .map((p) => p.copyWith(cards: [], hasFolded: false, currentBet: 0, isReady: true))
-        .toList();
+    final resetPlayers =
+        activePlayers.map((p) => p.copyWith(cards: [], hasFolded: false, currentBet: 0, isReady: true)).toList();
 
     // Move dealer button
     final newDealerIndex = (room.dealerIndex + 1) % resetPlayers.length;
