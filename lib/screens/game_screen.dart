@@ -12,7 +12,7 @@ class Bot {
   bool hasFolded;
   bool hasActed;
   String? lastAction;
-  
+
   Bot({
     required this.id,
     required this.name,
@@ -23,7 +23,7 @@ class Bot {
     this.hasActed = false,
     this.lastAction,
   }) : cards = cards ?? [];
-  
+
   void reset() {
     cards = [];
     currentBet = 0;
@@ -31,14 +31,14 @@ class Bot {
     hasActed = false;
     lastAction = null;
   }
-  
+
   bool get isAllIn => chips == 0 && !hasFolded;
   bool get isActive => !hasFolded && chips >= 0;
 }
 
 class GameScreen extends StatefulWidget {
   final String gameMode;
-  
+
   const GameScreen({
     super.key,
     required this.gameMode,
@@ -53,7 +53,7 @@ class _GameScreenState extends State<GameScreen> {
   bool _gameStarted = false;
   int _numberOfBots = 1;
   String _difficulty = 'Medium'; // Easy, Medium, Hard
-  
+
   // Game state
   int _pot = 0;
   int _playerChips = 50000;
@@ -68,12 +68,12 @@ class _GameScreenState extends State<GameScreen> {
   bool _playerHasActed = false; // Track if player has acted this betting round
   bool _playerHasFolded = false; // Track if player has folded
   int _currentActorIndex = 0; // Index of current actor (0 = player, 1+ = bot index + 1)
-  
+
   // Cards
   List<PlayingCard> _playerCards = [];
   List<PlayingCard> _communityCards = [];
   List<PlayingCard> _deck = [];
-  
+
   // Bots
   List<Bot> _bots = [];
   bool _showBotCards = false;
@@ -88,7 +88,7 @@ class _GameScreenState extends State<GameScreen> {
   void _showGameSettingsDialog() {
     int selectedBots = _numberOfBots;
     String selectedDifficulty = _difficulty;
-    
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -141,14 +141,10 @@ class _GameScreenState extends State<GameScreen> {
                       width: 44,
                       height: 44,
                       decoration: BoxDecoration(
-                        color: isSelected
-                            ? const Color(0xFFD4AF37)
-                            : Colors.white.withValues(alpha: 0.1),
+                        color: isSelected ? const Color(0xFFD4AF37) : Colors.white.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: isSelected
-                              ? const Color(0xFFD4AF37)
-                              : Colors.white.withValues(alpha: 0.2),
+                          color: isSelected ? const Color(0xFFD4AF37) : Colors.white.withValues(alpha: 0.2),
                           width: 2,
                         ),
                       ),
@@ -203,14 +199,10 @@ class _GameScreenState extends State<GameScreen> {
                         margin: const EdgeInsets.symmetric(horizontal: 4),
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         decoration: BoxDecoration(
-                          color: isSelected
-                              ? diffColor.withValues(alpha: 0.3)
-                              : Colors.white.withValues(alpha: 0.05),
+                          color: isSelected ? diffColor.withValues(alpha: 0.3) : Colors.white.withValues(alpha: 0.05),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: isSelected
-                                ? diffColor
-                                : Colors.white.withValues(alpha: 0.2),
+                            color: isSelected ? diffColor : Colors.white.withValues(alpha: 0.2),
                             width: 2,
                           ),
                         ),
@@ -314,11 +306,13 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   void _initializeBots() {
-    _bots = List.generate(_numberOfBots, (index) => Bot(
-      id: index,
-      name: 'Bot ${index + 1}',
-      chips: 50000,
-    ));
+    _bots = List.generate(
+        _numberOfBots,
+        (index) => Bot(
+              id: index,
+              name: 'Bot ${index + 1}',
+              chips: 50000,
+            ));
   }
 
   int _getTotalPlayers() => 1 + _bots.length; // Player + bots
@@ -354,13 +348,13 @@ class _GameScreenState extends State<GameScreen> {
     setState(() {
       _deck = _createDeck();
       _deck.shuffle(Random());
-      
+
       // Reset player state
       _playerCards = [_deck.removeLast(), _deck.removeLast()];
       _playerBet = 0;
       _playerHasActed = false;
       _playerHasFolded = false;
-      
+
       // Reset and deal to bots
       for (var bot in _bots) {
         bot.reset();
@@ -368,16 +362,16 @@ class _GameScreenState extends State<GameScreen> {
           bot.cards = [_deck.removeLast(), _deck.removeLast()];
         }
       }
-      
+
       _communityCards = [];
-      
+
       // Rotate dealer position each hand
       _dealerPosition = (_dealerPosition + 1) % _getTotalPlayers();
-      
+
       // Post blinds based on positions
       final smallBlind = _bigBlind ~/ 2;
       final totalPlayers = _getTotalPlayers();
-      
+
       // In heads-up (2 players): dealer = SB, other = BB
       // In 3+ players: dealer, then SB, then BB
       int sbSeat, bbSeat;
@@ -388,7 +382,7 @@ class _GameScreenState extends State<GameScreen> {
         sbSeat = (_dealerPosition + 1) % totalPlayers;
         bbSeat = (_dealerPosition + 2) % totalPlayers;
       }
-      
+
       // Post small blind
       if (sbSeat == 0) {
         int sb = smallBlind > _playerChips ? _playerChips : smallBlind;
@@ -402,7 +396,7 @@ class _GameScreenState extends State<GameScreen> {
         bot.chips -= sb;
         _pot = sb;
       }
-      
+
       // Post big blind
       if (bbSeat == 0) {
         int bb = _bigBlind > _playerChips ? _playerChips : _bigBlind;
@@ -418,16 +412,16 @@ class _GameScreenState extends State<GameScreen> {
         _pot += bb;
         _currentBet = bb;
       }
-      
+
       // Ensure currentBet is at least the big blind
       if (_currentBet < _bigBlind) _currentBet = _bigBlind;
-      
+
       _lastRaiseAmount = _bigBlind;
       _gamePhase = 'preflop';
       _showBotCards = false;
       _winnerDescription = '';
       _bbHasOption = true;
-      
+
       // First to act preflop is left of BB (UTG)
       // In heads-up: SB (dealer) acts first preflop
       int firstToAct;
@@ -436,10 +430,10 @@ class _GameScreenState extends State<GameScreen> {
       } else {
         firstToAct = (bbSeat + 1) % totalPlayers;
       }
-      
+
       _currentActorIndex = firstToAct;
       _isPlayerTurn = firstToAct == 0;
-      
+
       // If it's a bot's turn, start their action
       if (!_isPlayerTurn) {
         Future.delayed(const Duration(milliseconds: 500), () {
@@ -481,7 +475,7 @@ class _GameScreenState extends State<GameScreen> {
         _communityCards.add(_deck.removeLast());
         _gamePhase = 'river';
       }
-      
+
       // Reset bets and action flags for new betting round
       _currentBet = 0;
       _playerBet = 0;
@@ -492,11 +486,11 @@ class _GameScreenState extends State<GameScreen> {
         bot.lastAction = null;
       }
       _lastRaiseAmount = _bigBlind; // Reset min raise to big blind
-      
+
       // Post-flop: first active player left of dealer acts first
       final totalPlayers = _getTotalPlayers();
       int firstToAct = (_dealerPosition + 1) % totalPlayers;
-      
+
       // Find first active player
       for (int i = 0; i < totalPlayers; i++) {
         int seat = (firstToAct + i) % totalPlayers;
@@ -518,10 +512,10 @@ class _GameScreenState extends State<GameScreen> {
 
   void _playerAction(String action, {int? amount}) {
     if (!_isPlayerTurn || _playerHasFolded) return;
-    
+
     setState(() {
       _playerHasActed = true; // Mark player as having acted
-      
+
       switch (action) {
         case 'fold':
           _playerHasFolded = true;
@@ -618,11 +612,11 @@ class _GameScreenState extends State<GameScreen> {
 
   void _moveToNextPlayer() {
     final totalPlayers = _getTotalPlayers();
-    
+
     // Find next active player who needs to act
     for (int i = 1; i <= totalPlayers; i++) {
       int nextSeat = (_currentActorIndex + i) % totalPlayers;
-      
+
       if (nextSeat == 0) {
         // Player's turn
         if (!_playerHasFolded && _playerChips > 0) {
@@ -651,40 +645,44 @@ class _GameScreenState extends State<GameScreen> {
         }
       }
     }
-    
+
     // If we get here, betting round is complete
     _checkBettingRoundComplete();
   }
 
   void _botTurn(int botIndex) {
     if (botIndex < 0 || botIndex >= _bots.length) return;
-    
+
     final bot = _bots[botIndex];
     if (bot.hasFolded || bot.isAllIn) {
       _moveToNextPlayer();
       return;
     }
-    
+
     setState(() {
       _isPlayerTurn = false;
       bot.lastAction = null; // Clear previous action while thinking
     });
-    
+
     // Simulate bot thinking - harder bots think faster
-    final thinkTime = _difficulty == 'Easy' ? 1200 : _difficulty == 'Medium' ? 800 : 500;
-    
+    final thinkTime = _difficulty == 'Easy'
+        ? 1200
+        : _difficulty == 'Medium'
+            ? 800
+            : 500;
+
     Future.delayed(Duration(milliseconds: thinkTime), () {
       if (!mounted) return;
-      
+
       final random = Random();
       final callAmount = _currentBet - bot.currentBet;
       final canCheck = callAmount <= 0;
-      
+
       // AI decision based on difficulty
       int foldThreshold;
       int callThreshold;
       int raiseMultiplierMax;
-      
+
       switch (_difficulty) {
         case 'Easy':
           foldThreshold = 20;
@@ -701,12 +699,12 @@ class _GameScreenState extends State<GameScreen> {
           callThreshold = 60;
           raiseMultiplierMax = 3;
       }
-      
+
       final decision = random.nextInt(100);
-      
+
       setState(() {
         bot.hasActed = true;
-        
+
         if (decision < foldThreshold && !canCheck) {
           // Fold
           bot.lastAction = 'FOLD';
@@ -740,7 +738,7 @@ class _GameScreenState extends State<GameScreen> {
           }
           int addAmount = totalBet - bot.currentBet;
           int raiseBy = totalBet - _currentBet;
-          
+
           bot.chips -= addAmount;
           bot.currentBet = totalBet;
           _pot += addAmount;
@@ -749,7 +747,7 @@ class _GameScreenState extends State<GameScreen> {
           }
           _currentBet = totalBet;
           _bbHasOption = false;
-          
+
           // Reset all other players' acted flags
           _playerHasActed = false;
           for (var otherBot in _bots) {
@@ -757,23 +755,23 @@ class _GameScreenState extends State<GameScreen> {
               otherBot.hasActed = false;
             }
           }
-          
+
           if (bot.chips == 0) {
             bot.lastAction = 'ALL-IN';
           } else {
             bot.lastAction = 'RAISE';
           }
-          
+
           _moveToNextPlayer();
         }
       });
     });
   }
-  
+
   void _checkBettingRoundComplete() {
     // Check if all active players are all-in or have matched the bet
     final activePlayers = _getActivePlayers();
-    
+
     if (activePlayers.length <= 1) {
       // Only one player left, they win
       if (activePlayers.isNotEmpty) {
@@ -781,11 +779,11 @@ class _GameScreenState extends State<GameScreen> {
       }
       return;
     }
-    
+
     // Check if everyone is all-in or has matched
     bool allMatched = true;
     int playersCanAct = 0;
-    
+
     for (int seat in activePlayers) {
       if (seat == 0) {
         if (_playerChips > 0) playersCanAct++;
@@ -806,23 +804,21 @@ class _GameScreenState extends State<GameScreen> {
         }
       }
     }
-    
+
     // If everyone is all-in (no one can act), go to showdown
     if (playersCanAct == 0) {
       _dealToShowdown();
       return;
     }
-    
+
     if (allMatched) {
       // Special case: preflop BB option
       if (_gamePhase == 'preflop' && _bbHasOption) {
         _bbHasOption = false;
         // Find BB and give them option
         final totalPlayers = _getTotalPlayers();
-        int bbSeat = totalPlayers == 2 
-            ? (_dealerPosition + 1) % totalPlayers 
-            : (_dealerPosition + 2) % totalPlayers;
-        
+        int bbSeat = totalPlayers == 2 ? (_dealerPosition + 1) % totalPlayers : (_dealerPosition + 2) % totalPlayers;
+
         if (bbSeat == 0 && !_playerHasFolded && _playerChips > 0) {
           setState(() {
             _currentActorIndex = 0;
@@ -840,12 +836,12 @@ class _GameScreenState extends State<GameScreen> {
           return;
         }
       }
-      
+
       // Advance to next phase
       _advancePhase();
     }
   }
-  
+
   void _dealToShowdown() {
     setState(() {
       // Deal remaining community cards based on current phase
@@ -882,7 +878,7 @@ class _GameScreenState extends State<GameScreen> {
       _showBotCards = true;
       _gamePhase = 'showdown';
     });
-    
+
     // Short delay then go to showdown
     Future.delayed(const Duration(milliseconds: 500), () {
       if (mounted) _showdown();
@@ -901,11 +897,11 @@ class _GameScreenState extends State<GameScreen> {
     setState(() {
       _showBotCards = true;
       _gamePhase = 'showdown';
-      
+
       // Evaluate all active hands
       final activePlayers = _getActivePlayers();
       Map<int, _EvaluatedHand> hands = {};
-      
+
       for (int seat in activePlayers) {
         if (seat == 0) {
           hands[0] = _evaluateBestHand(_playerCards, _communityCards);
@@ -914,12 +910,12 @@ class _GameScreenState extends State<GameScreen> {
           hands[seat] = _evaluateBestHand(bot.cards, _communityCards);
         }
       }
-      
+
       // Find best hand(s)
       int? bestSeat;
       _EvaluatedHand? bestHand;
       List<int> winners = [];
-      
+
       for (var entry in hands.entries) {
         if (bestHand == null || entry.value.compareTo(bestHand) > 0) {
           bestHand = entry.value;
@@ -929,7 +925,7 @@ class _GameScreenState extends State<GameScreen> {
           winners.add(entry.key);
         }
       }
-      
+
       if (winners.length == 1) {
         final winner = winners[0];
         if (winner == 0) {
@@ -940,7 +936,7 @@ class _GameScreenState extends State<GameScreen> {
       } else {
         _winnerDescription = 'Split pot! ${winners.length} players tie with ${bestHand!.description}';
       }
-      
+
       Future.delayed(const Duration(seconds: 3), () {
         if (mounted) {
           if (winners.length == 1) {
@@ -952,16 +948,16 @@ class _GameScreenState extends State<GameScreen> {
       });
     });
   }
-  
+
   void _splitPot(List<int> winners) {
     setState(() {
       final share = _pot ~/ winners.length;
       final oddChips = _pot % winners.length;
-      
+
       for (int i = 0; i < winners.length; i++) {
         int seat = winners[i];
         int amount = share + (i == 0 ? oddChips : 0); // First winner gets odd chips
-        
+
         if (seat == 0) {
           _playerChips += amount;
         } else {
@@ -970,7 +966,7 @@ class _GameScreenState extends State<GameScreen> {
       }
       _pot = 0;
     });
-    
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(_winnerDescription),
@@ -978,7 +974,7 @@ class _GameScreenState extends State<GameScreen> {
         duration: const Duration(seconds: 2),
       ),
     );
-    
+
     Future.delayed(const Duration(seconds: 2), () {
       if (mounted) {
         _checkGameOver();
@@ -995,7 +991,7 @@ class _GameScreenState extends State<GameScreen> {
       }
       _pot = 0;
     });
-    
+
     // Show result and start new hand
     String message;
     if (winnerSeat == 0) {
@@ -1006,7 +1002,7 @@ class _GameScreenState extends State<GameScreen> {
     if (_winnerDescription.isNotEmpty) {
       message = _winnerDescription;
     }
-    
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
@@ -1014,18 +1010,18 @@ class _GameScreenState extends State<GameScreen> {
         duration: const Duration(seconds: 2),
       ),
     );
-    
+
     Future.delayed(const Duration(seconds: 2), () {
       if (mounted) {
         _checkGameOver();
       }
     });
   }
-  
+
   void _checkGameOver() {
     // Remove bots with no chips
     final activeBots = _bots.where((b) => b.chips > 0).toList();
-    
+
     if (_playerChips <= 0) {
       _showGameOver(false);
     } else if (activeBots.isEmpty) {
@@ -1034,7 +1030,7 @@ class _GameScreenState extends State<GameScreen> {
       _startNewHand();
     }
   }
-  
+
   void _showGameOver(bool playerWon) {
     showDialog(
       context: context,
@@ -1051,9 +1047,7 @@ class _GameScreenState extends State<GameScreen> {
           textAlign: TextAlign.center,
         ),
         content: Text(
-          playerWon
-              ? 'Congratulations! You\'ve eliminated all opponents!'
-              : 'You\'ve run out of chips.',
+          playerWon ? 'Congratulations! You\'ve eliminated all opponents!' : 'You\'ve run out of chips.',
           style: const TextStyle(color: Colors.white70),
           textAlign: TextAlign.center,
         ),
@@ -1090,10 +1084,10 @@ class _GameScreenState extends State<GameScreen> {
     // Difficulty labels for display
     final difficultyLabels = {
       'Easy': 'BEGINNER',
-      'Medium': 'INTERMEDIATE', 
+      'Medium': 'INTERMEDIATE',
       'Hard': 'EXPERT',
     };
-    
+
     return MobileWrapper(
       child: Scaffold(
         backgroundColor: const Color(0xFF0A0A0A),
@@ -1227,9 +1221,7 @@ class _GameScreenState extends State<GameScreen> {
                         width: 80,
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         decoration: BoxDecoration(
-                          color: isSelected
-                              ? Colors.white
-                              : Colors.white.withValues(alpha: 0.06),
+                          color: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.06),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Center(
@@ -1293,21 +1285,30 @@ class _GameScreenState extends State<GameScreen> {
     if (!_gameStarted) {
       return _buildSetupScreen();
     }
-    
+
     return MobileWrapper(
       child: Scaffold(
-        backgroundColor: const Color(0xFF0D0D0D),
+        backgroundColor: Colors.black,
         body: SafeArea(
           child: Column(
             children: [
               // Top bar
               _buildTopBar(),
-              
-              // Game table
-              _buildGameTable(),
-              
-              // Player cards and actions
-              _buildPlayerArea(),
+
+              // Players row
+              _buildPlayersRow(),
+
+              const Spacer(flex: 2),
+
+              // Community cards with pot
+              _buildCommunityCardsWithPot(),
+
+              const Spacer(flex: 3),
+
+              // Action area
+              _buildActionArea(),
+
+              const SizedBox(height: 16),
             ],
           ),
         ),
@@ -1316,42 +1317,173 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   Widget _buildTopBar() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         children: [
           GestureDetector(
             onTap: () => Navigator.pop(context),
-            child: const Icon(
-              Icons.arrow_back_ios,
-              color: Colors.white54,
-              size: 20,
-            ),
+            child: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
           ),
           const Spacer(),
-          // Pot display
+          // Online/AI indicator
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            width: 24,
+            height: 24,
             decoration: BoxDecoration(
-              color: const Color(0xFF1A1A1A),
-              borderRadius: BorderRadius.circular(20),
+              color: const Color(0xFF22C55E).withValues(alpha: 0.2),
+              shape: BoxShape.circle,
             ),
-            child: Text(
-              _formatChips(_pot),
-              style: const TextStyle(
-                color: Color(0xFFD4AF37),
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            child: const Icon(Icons.smart_toy, color: Color(0xFF22C55E), size: 14),
           ),
-          const Spacer(),
-          // Player chips
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPlayersRow() {
+    // Build list with player first, then bots
+    final allParticipants = <_Participant>[
+      _Participant(
+        name: 'You',
+        chips: _playerChips,
+        currentBet: _playerBet,
+        hasFolded: _playerHasFolded,
+        isCurrentTurn: _isPlayerTurn && _gamePhase != 'showdown',
+        isPlayer: true,
+        isDealer: _dealerPosition == 0,
+      ),
+      ...List.generate(_bots.length, (i) => _Participant(
+        name: _bots[i].name,
+        chips: _bots[i].chips,
+        currentBet: _bots[i].currentBet,
+        hasFolded: _bots[i].hasFolded,
+        isCurrentTurn: _currentActorIndex == i + 1 && _gamePhase != 'showdown',
+        isPlayer: false,
+        isDealer: _dealerPosition == i + 1,
+      )),
+    ];
+
+    return Container(
+      height: 130,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        itemCount: allParticipants.length,
+        itemBuilder: (context, index) {
+          final p = allParticipants[index];
+          return _buildParticipantAvatar(p);
+        },
+      ),
+    );
+  }
+
+  Widget _buildParticipantAvatar(_Participant p) {
+    // Avatar emoji based on name
+    String getAvatar(String name) {
+      if (name == 'You') return '👤';
+      final avatars = ['🤖', '🦊', '🐸', '🦁', '🐼'];
+      final index = int.tryParse(name.replaceAll(RegExp(r'[^0-9]'), '')) ?? 1;
+      return avatars[(index - 1) % avatars.length];
+    }
+
+    Color? borderColor;
+    if (p.isCurrentTurn) {
+      borderColor = const Color(0xFFD4AF37);
+    } else if (p.isPlayer) {
+      borderColor = const Color(0xFF3B82F6);
+    }
+
+    return Container(
+      width: 80,
+      margin: const EdgeInsets.only(right: 12),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: p.hasFolded ? Colors.grey.shade800 : Colors.white.withValues(alpha: 0.1),
+                  border: borderColor != null ? Border.all(color: borderColor, width: 3) : null,
+                ),
+                child: Center(
+                  child: Text(
+                    getAvatar(p.name),
+                    style: TextStyle(
+                      fontSize: 28,
+                      color: p.hasFolded ? Colors.grey : null,
+                    ),
+                  ),
+                ),
+              ),
+              // Dealer badge
+              if (p.isDealer)
+                Positioned(
+                  bottom: 0,
+                  right: 0,
+                  child: Container(
+                    width: 20,
+                    height: 20,
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Center(
+                      child: Text('D',
+                          style: TextStyle(
+                            color: Colors.black,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          )),
+                    ),
+                  ),
+                ),
+              // "You" badge
+              if (p.isPlayer)
+                Positioned(
+                  top: 0,
+                  right: 0,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF3B82F6),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Text('YOU',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 8,
+                          fontWeight: FontWeight.bold,
+                        )),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          // Name
           Text(
-            _formatChips(_playerChips),
-            style: const TextStyle(
-              color: Colors.white54,
-              fontSize: 14,
+            p.name,
+            style: TextStyle(
+              color: p.hasFolded ? Colors.grey : (p.isPlayer ? const Color(0xFF3B82F6) : Colors.white),
+              fontSize: 11,
+              fontWeight: p.isPlayer ? FontWeight.w700 : FontWeight.w500,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+          // Chips
+          Text(
+            p.currentBet > 0
+                ? '${_formatChips(p.chips)} (${_formatChips(p.currentBet)})'
+                : _formatChips(p.chips),
+            style: TextStyle(
+              color: p.hasFolded ? Colors.grey : Colors.yellow.shade600,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ],
@@ -1359,159 +1491,53 @@ class _GameScreenState extends State<GameScreen> {
     );
   }
 
-  Widget _buildGameTable() {
-    return Expanded(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-        child: Column(
+  Widget _buildCommunityCardsWithPot() {
+    return Column(
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Bots area
-            Expanded(
-              flex: 3,
-              child: _buildBotsArea(),
-            ),
-            
-            // Community cards
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              child: _buildCommunityCards(),
-            ),
-            
-            const SizedBox(height: 8),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBotsArea() {
-    if (_bots.isEmpty) return const SizedBox();
-    
-    final activeBots = _bots.where((b) => b.chips > 0 || !b.hasFolded).toList();
-    
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return Wrap(
-          alignment: WrapAlignment.center,
-          spacing: 8,
-          runSpacing: 8,
-          children: activeBots.map((bot) => _buildBotWidget(bot)).toList(),
-        );
-      },
-    );
-  }
-
-  Widget _buildBotWidget(Bot bot) {
-    final isCurrentTurn = _currentActorIndex == bot.id + 1 && !_isPlayerTurn;
-    final isDealer = _dealerPosition == bot.id + 1;
-    
-    return Opacity(
-      opacity: bot.hasFolded ? 0.3 : 1.0,
-      child: Container(
-        width: 72,
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-        decoration: BoxDecoration(
-          color: isCurrentTurn 
-              ? const Color(0xFFD4AF37).withValues(alpha: 0.15)
-              : const Color(0xFF1A1A1A),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isCurrentTurn
-                ? const Color(0xFFD4AF37).withValues(alpha: 0.5)
-                : Colors.white.withValues(alpha: 0.05),
-            width: 1,
-          ),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Cards
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                if (bot.cards.isNotEmpty) ...[
-                  _buildMiniCard(bot.cards[0], faceDown: !_showBotCards),
-                  const SizedBox(width: 2),
-                  _buildMiniCard(bot.cards[1], faceDown: !_showBotCards),
-                ],
-              ],
-            ),
-            const SizedBox(height: 6),
-            // Name + Dealer
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (isDealer)
-                  Container(
-                    width: 14,
-                    height: 14,
-                    margin: const EdgeInsets.only(right: 3),
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFD4AF37),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Center(
-                      child: Text(
-                        'D',
-                        style: TextStyle(
-                          color: Colors.black,
-                          fontSize: 8,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-                Text(
-                  'B${bot.id + 1}',
-                  style: TextStyle(
-                    color: bot.hasFolded ? Colors.red.shade300 : Colors.white70,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-            // Chips
-            Text(
-              _formatChips(bot.chips),
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.4),
-                fontSize: 9,
-              ),
-            ),
-            // Action indicator
-            if (bot.lastAction != null && !bot.hasFolded)
+            for (var i = 0; i < 5; i++)
               Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: _buildMiniAction(bot.lastAction!),
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: i < _communityCards.length
+                    ? _buildMinimalCard(_communityCards[i])
+                    : _buildEmptyCardSlot(),
               ),
+            const SizedBox(width: 16),
+            // Pot amount
+            Text(
+              _pot.toString(),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 24,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ],
         ),
-      ),
+      ],
     );
   }
 
-  Widget _buildMiniCard(PlayingCard card, {bool faceDown = false}) {
-    if (faceDown) {
-      return Container(
-        width: 24,
-        height: 32,
-        decoration: BoxDecoration(
-          color: const Color(0xFF2A2A3E),
-          borderRadius: BorderRadius.circular(3),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-        ),
-      );
-    }
-    
+  Widget _buildMinimalCard(PlayingCard card) {
+    const width = 56.0;
+    const height = 78.0;
     final isRed = card.suit == '♥' || card.suit == '♦';
+
     return Container(
-      width: 24,
-      height: 32,
+      width: width,
+      height: height,
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(3),
+        borderRadius: BorderRadius.circular(8),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.3),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -1520,17 +1546,15 @@ class _GameScreenState extends State<GameScreen> {
             card.rank,
             style: TextStyle(
               color: isRed ? Colors.red.shade700 : Colors.black,
-              fontSize: 9,
+              fontSize: 20,
               fontWeight: FontWeight.bold,
-              height: 1,
             ),
           ),
           Text(
             card.suit,
             style: TextStyle(
               color: isRed ? Colors.red.shade700 : Colors.black,
-              fontSize: 8,
-              height: 1,
+              fontSize: 22,
             ),
           ),
         ],
@@ -1538,202 +1562,271 @@ class _GameScreenState extends State<GameScreen> {
     );
   }
 
-  Widget _buildMiniAction(String action) {
-    Color color;
-    switch (action) {
-      case 'FOLD': color = Colors.red; break;
-      case 'CHECK': color = Colors.blue; break;
-      case 'CALL': color = Colors.green; break;
-      case 'RAISE': color = Colors.orange; break;
-      case 'ALL-IN': color = Colors.purple; break;
-      default: color = Colors.grey;
+  Widget _buildActionArea() {
+    // If player folded or game is in showdown
+    if (_playerHasFolded || _gamePhase == 'showdown') {
+      return _buildWaitMessage();
     }
     
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.2),
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Text(
-        action,
-        style: TextStyle(
-          color: color,
-          fontSize: 7,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-    );
+    // If player is all-in
+    if (_playerChips == 0) {
+      return _buildWaitMessage(message: 'All In');
+    }
+
+    // If it's player's turn, show action buttons
+    if (_isPlayerTurn) {
+      return _buildPlayerActionArea();
+    }
+
+    // Waiting for bots
+    return _buildPlayerAreaWithCards();
   }
 
-  Widget _buildOpponentArea() {
-    return _buildBotsArea();
-  }
+  Widget _buildWaitMessage({String? message}) {
+    String displayMessage = message ?? (_playerHasFolded ? 'You folded' : 'Hand complete');
 
-  Widget _buildActionIndicator(String action) {
-    return _buildMiniAction(action);
-  }
-
-  Widget _buildCommunityCards() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        for (int i = 0; i < 5; i++) ...[
-          if (i > 0) const SizedBox(width: 6),
-          if (i < _communityCards.length)
-            _buildCard(_communityCards[i])
-          else
-            _buildEmptyCardSlot(),
-        ],
-      ],
-    );
-  }
-
-  Widget _buildPlayerArea() {
-    final isDealer = _dealerPosition == 0;
-    
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF111111),
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-      ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Column(
-        mainAxisSize: MainAxisSize.min,
         children: [
-          // Player cards with dealer badge
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            decoration: BoxDecoration(
+              color: Colors.transparent,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+            ),
+            child: Center(
+              child: Text(
+                displayMessage,
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.6),
+                  fontSize: 16,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
           Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              if (isDealer)
-                Container(
-                  width: 20,
-                  height: 20,
-                  margin: const EdgeInsets.only(right: 12),
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFD4AF37),
-                    shape: BoxShape.circle,
+              // Player's cards
+              Row(
+                children: [
+                  _buildCardBack(width: 70, height: 98),
+                  Transform.translate(
+                    offset: const Offset(-20, 0),
+                    child: _buildCardBack(width: 70, height: 98),
                   ),
-                  child: const Center(
-                    child: Text(
-                      'D',
-                      style: TextStyle(
-                        color: Colors.black,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
+                ],
+              ),
+              const Spacer(),
+              _buildPlayerInfoMinimal(),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPlayerActionArea() {
+    final callAmount = _currentBet - _playerBet;
+    final canCheck = callAmount <= 0;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Column(
+        children: [
+          // Action buttons row
+          Row(
+            children: [
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => _playerAction(canCheck ? 'check' : 'call'),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    decoration: BoxDecoration(
+                      color: Colors.transparent,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
+                    ),
+                    child: Center(
+                      child: Text(
+                        canCheck ? 'Check' : 'Call ${_formatChips(callAmount)}',
+                        style: const TextStyle(color: Colors.white, fontSize: 16),
                       ),
                     ),
                   ),
                 ),
-              Opacity(
-                opacity: _playerHasFolded ? 0.3 : 1.0,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (_playerCards.isNotEmpty) ...[
-                      _buildCard(_playerCards[0], isLarge: true),
-                      const SizedBox(width: 8),
-                      _buildCard(_playerCards[1], isLarge: true),
-                    ],
-                  ],
-                ),
               ),
-              if (_playerHasFolded)
-                Container(
-                  margin: const EdgeInsets.only(left: 12),
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.red.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    'FOLD',
-                    style: TextStyle(
-                      color: Colors.red.shade300,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
+              const SizedBox(width: 12),
+              Expanded(
+                child: GestureDetector(
+                  onTap: () {
+                    final minRaise = _currentBet + _lastRaiseAmount;
+                    _showRaiseSlider(minRaise);
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Center(
+                      child: Text(
+                        'Raise',
+                        style: TextStyle(color: Colors.black, fontSize: 16, fontWeight: FontWeight.w600),
+                      ),
                     ),
                   ),
                 ),
+              ),
             ],
           ),
           const SizedBox(height: 16),
-          // Action buttons or status
-          if (_playerChips == 0 && _gamePhase != 'showdown' && !_playerHasFolded)
-            Text(
-              'ALL IN',
-              style: TextStyle(
-                color: const Color(0xFFD4AF37),
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 2,
+          // Cards area
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              // Player cards with fold tap
+              GestureDetector(
+                onDoubleTap: () => _playerAction('fold'),
+                child: Column(
+                  children: [
+                    Text(
+                      'Double tap to fold',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.4),
+                        fontSize: 11,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        if (_playerCards.isNotEmpty) _buildMinimalCard(_playerCards[0]),
+                        const SizedBox(width: 8),
+                        if (_playerCards.length > 1) _buildMinimalCard(_playerCards[1]),
+                      ],
+                    ),
+                  ],
+                ),
               ),
-            )
-          else if (_isPlayerTurn && _gamePhase != 'showdown' && !_playerHasFolded)
-            _buildActionButtons()
-          else if (!_isPlayerTurn && _gamePhase != 'showdown' && !_playerHasFolded)
-            Text(
-              '• • •',
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.3),
-                fontSize: 20,
-                letterSpacing: 4,
-              ),
-            ),
+              const Spacer(),
+              _buildPlayerInfoMinimal(),
+            ],
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildActionButtons() {
-    final callAmount = _currentBet - _playerBet;
-    final canCheck = callAmount <= 0;
-    final minRaise = _currentBet + _lastRaiseAmount;
-    
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
+  Widget _buildPlayerAreaWithCards() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Column(
+        children: [
+          // Waiting indicator
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            decoration: BoxDecoration(
+              color: Colors.transparent,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white.withValues(alpha: 0.6),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  'Bot thinking...',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.6),
+                    fontSize: 16,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Row(
+                children: [
+                  if (_playerCards.isNotEmpty) _buildMinimalCard(_playerCards[0]),
+                  const SizedBox(width: 8),
+                  if (_playerCards.length > 1) _buildMinimalCard(_playerCards[1]),
+                ],
+              ),
+              const Spacer(),
+              _buildPlayerInfoMinimal(),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPlayerInfoMinimal() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
       children: [
-        _buildActionBtn('Fold', Colors.red.shade400, () => _playerAction('fold')),
-        const SizedBox(width: 8),
-        if (canCheck)
-          _buildActionBtn('Check', Colors.white, () => _playerAction('check'))
-        else
-          _buildActionBtn('Call ${_formatChips(callAmount)}', Colors.green, () => _playerAction('call')),
-        const SizedBox(width: 8),
-        _buildActionBtn('Raise', Colors.orange, () => _showRaiseSlider(minRaise)),
-        const SizedBox(width: 8),
-        _buildActionBtn('All In', const Color(0xFFD4AF37), () => _playerAction('allin')),
+        Text(
+          'You',
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: 0.6),
+            fontSize: 14,
+          ),
+        ),
+        Text(
+          _formatChips(_playerChips),
+          style: TextStyle(
+            color: Colors.yellow.shade600,
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
       ],
     );
   }
 
-  Widget _buildActionBtn(String label, Color color, VoidCallback onTap) {
-    final isWhite = color == Colors.white;
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(
-          color: isWhite ? Colors.white : color.withValues(alpha: 0.15),
-          borderRadius: BorderRadius.circular(20),
-          border: isWhite ? null : Border.all(color: color.withValues(alpha: 0.3)),
+  Widget _buildCardBack({double width = 56, double height = 78}) {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFFE57373), Color(0xFFEF5350)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: isWhite ? Colors.black : color,
-            fontWeight: FontWeight.w600,
-            fontSize: 12,
-          ),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.white, width: 2),
+      ),
+      child: Center(
+        child: Icon(
+          Icons.radio_button_checked,
+          color: Colors.white.withValues(alpha: 0.6),
+          size: 28,
         ),
       ),
     );
   }
-  
+
   void _showRaiseSlider(int minRaise) {
     int raiseAmount = minRaise;
     final maxRaise = _playerChips + _playerBet;
-    
+
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -1796,9 +1889,17 @@ class _GameScreenState extends State<GameScreen> {
 
   Widget _buildCard(PlayingCard card, {bool faceDown = false, bool isLarge = false, bool isSmall = false}) {
     final isRed = card.suit == '♥' || card.suit == '♦';
-    double width = isLarge ? 56.0 : isSmall ? 32.0 : 42.0;
-    double height = isLarge ? 80.0 : isSmall ? 46.0 : 60.0;
-    
+    double width = isLarge
+        ? 56.0
+        : isSmall
+            ? 32.0
+            : 42.0;
+    double height = isLarge
+        ? 80.0
+        : isSmall
+            ? 46.0
+            : 60.0;
+
     if (faceDown) {
       return Container(
         width: width,
@@ -1819,7 +1920,7 @@ class _GameScreenState extends State<GameScreen> {
         ),
       );
     }
-    
+
     return Container(
       width: width,
       height: height,
@@ -1841,7 +1942,11 @@ class _GameScreenState extends State<GameScreen> {
             card.rank,
             style: TextStyle(
               color: isRed ? Colors.red.shade700 : Colors.black87,
-              fontSize: isLarge ? 18 : isSmall ? 11 : 14,
+              fontSize: isLarge
+                  ? 18
+                  : isSmall
+                      ? 11
+                      : 14,
               fontWeight: FontWeight.bold,
               height: 1,
             ),
@@ -1850,7 +1955,11 @@ class _GameScreenState extends State<GameScreen> {
             card.suit,
             style: TextStyle(
               color: isRed ? Colors.red.shade700 : Colors.black87,
-              fontSize: isLarge ? 16 : isSmall ? 10 : 12,
+              fontSize: isLarge
+                  ? 16
+                  : isSmall
+                      ? 10
+                      : 12,
               height: 1.2,
             ),
           ),
@@ -1897,7 +2006,7 @@ class _ActionButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isWhite = color == Colors.white;
-    
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -1920,12 +2029,33 @@ class _ActionButton extends StatelessWidget {
   }
 }
 
+// Helper class for participant display
+class _Participant {
+  final String name;
+  final int chips;
+  final int currentBet;
+  final bool hasFolded;
+  final bool isCurrentTurn;
+  final bool isPlayer;
+  final bool isDealer;
+
+  _Participant({
+    required this.name,
+    required this.chips,
+    required this.currentBet,
+    required this.hasFolded,
+    required this.isCurrentTurn,
+    required this.isPlayer,
+    required this.isDealer,
+  });
+}
+
 class PlayingCard {
   final String rank;
   final String suit;
 
   PlayingCard({required this.rank, required this.suit});
-  
+
   @override
   String toString() => '$rank$suit';
 }
@@ -1951,13 +2081,13 @@ class _EvaluatedHand {
   final _HandRank rank;
   final List<int> tiebreakers;
   final String description;
-  
+
   _EvaluatedHand({
     required this.rank,
     required this.tiebreakers,
     required this.description,
   });
-  
+
   int compareTo(_EvaluatedHand other) {
     if (rank.index != other.rank.index) {
       return rank.index - other.rank.index;
@@ -1973,11 +2103,11 @@ class _EvaluatedHand {
 
 _EvaluatedHand _evaluateBestHand(List<PlayingCard> holeCards, List<PlayingCard> communityCards) {
   final allCards = [...holeCards, ...communityCards];
-  
+
   // Generate all 5-card combinations from 7 cards
   final combinations = <List<PlayingCard>>[];
   _getCombinations(allCards, 5, 0, [], combinations);
-  
+
   _EvaluatedHand? bestHand;
   for (final combo in combinations) {
     final hand = _evaluateFiveCards(combo);
@@ -1985,7 +2115,7 @@ _EvaluatedHand _evaluateBestHand(List<PlayingCard> holeCards, List<PlayingCard> 
       bestHand = hand;
     }
   }
-  
+
   return bestHand!;
 }
 
@@ -2009,37 +2139,51 @@ void _getCombinations(
 
 int _getRankValue(String rank) {
   switch (rank) {
-    case 'A': return 14;
-    case 'K': return 13;
-    case 'Q': return 12;
-    case 'J': return 11;
-    case '10': return 10;
-    case '9': return 9;
-    case '8': return 8;
-    case '7': return 7;
-    case '6': return 6;
-    case '5': return 5;
-    case '4': return 4;
-    case '3': return 3;
-    case '2': return 2;
-    default: return 0;
+    case 'A':
+      return 14;
+    case 'K':
+      return 13;
+    case 'Q':
+      return 12;
+    case 'J':
+      return 11;
+    case '10':
+      return 10;
+    case '9':
+      return 9;
+    case '8':
+      return 8;
+    case '7':
+      return 7;
+    case '6':
+      return 6;
+    case '5':
+      return 5;
+    case '4':
+      return 4;
+    case '3':
+      return 3;
+    case '2':
+      return 2;
+    default:
+      return 0;
   }
 }
 
 _EvaluatedHand _evaluateFiveCards(List<PlayingCard> cards) {
   final ranks = cards.map((c) => _getRankValue(c.rank)).toList()..sort((a, b) => b - a);
   final suits = cards.map((c) => c.suit).toList();
-  
+
   final isFlush = suits.toSet().length == 1;
   final isStraight = _isStraight(ranks);
   final isLowStraight = _isLowStraight(ranks);
-  
+
   final rankCounts = <int, int>{};
   for (final r in ranks) {
     rankCounts[r] = (rankCounts[r] ?? 0) + 1;
   }
   final counts = rankCounts.values.toList()..sort((a, b) => b - a);
-  
+
   // Royal Flush
   if (isFlush && isStraight && ranks[0] == 14 && ranks[1] == 13) {
     return _EvaluatedHand(
@@ -2048,7 +2192,7 @@ _EvaluatedHand _evaluateFiveCards(List<PlayingCard> cards) {
       description: 'Royal Flush',
     );
   }
-  
+
   // Straight Flush
   if (isFlush && (isStraight || isLowStraight)) {
     final highCard = isLowStraight ? 5 : ranks[0];
@@ -2058,7 +2202,7 @@ _EvaluatedHand _evaluateFiveCards(List<PlayingCard> cards) {
       description: 'Straight Flush, ${_rankName(highCard)} high',
     );
   }
-  
+
   // Four of a Kind
   if (counts[0] == 4) {
     final quadRank = rankCounts.entries.firstWhere((e) => e.value == 4).key;
@@ -2069,7 +2213,7 @@ _EvaluatedHand _evaluateFiveCards(List<PlayingCard> cards) {
       description: 'Four of a Kind, ${_rankName(quadRank)}s',
     );
   }
-  
+
   // Full House
   if (counts[0] == 3 && counts[1] == 2) {
     final tripRank = rankCounts.entries.firstWhere((e) => e.value == 3).key;
@@ -2080,7 +2224,7 @@ _EvaluatedHand _evaluateFiveCards(List<PlayingCard> cards) {
       description: 'Full House, ${_rankName(tripRank)}s full of ${_rankName(pairRank)}s',
     );
   }
-  
+
   // Flush
   if (isFlush) {
     return _EvaluatedHand(
@@ -2089,7 +2233,7 @@ _EvaluatedHand _evaluateFiveCards(List<PlayingCard> cards) {
       description: 'Flush, ${_rankName(ranks[0])} high',
     );
   }
-  
+
   // Straight
   if (isStraight || isLowStraight) {
     final highCard = isLowStraight ? 5 : ranks[0];
@@ -2099,7 +2243,7 @@ _EvaluatedHand _evaluateFiveCards(List<PlayingCard> cards) {
       description: 'Straight, ${_rankName(highCard)} high',
     );
   }
-  
+
   // Three of a Kind
   if (counts[0] == 3) {
     final tripRank = rankCounts.entries.firstWhere((e) => e.value == 3).key;
@@ -2110,7 +2254,7 @@ _EvaluatedHand _evaluateFiveCards(List<PlayingCard> cards) {
       description: 'Three of a Kind, ${_rankName(tripRank)}s',
     );
   }
-  
+
   // Two Pair
   if (counts[0] == 2 && counts[1] == 2) {
     final pairs = rankCounts.entries.where((e) => e.value == 2).map((e) => e.key).toList()..sort((a, b) => b - a);
@@ -2121,7 +2265,7 @@ _EvaluatedHand _evaluateFiveCards(List<PlayingCard> cards) {
       description: 'Two Pair, ${_rankName(pairs[0])}s and ${_rankName(pairs[1])}s',
     );
   }
-  
+
   // One Pair
   if (counts[0] == 2) {
     final pairRank = rankCounts.entries.firstWhere((e) => e.value == 2).key;
@@ -2132,7 +2276,7 @@ _EvaluatedHand _evaluateFiveCards(List<PlayingCard> cards) {
       description: 'Pair of ${_rankName(pairRank)}s',
     );
   }
-  
+
   // High Card
   return _EvaluatedHand(
     rank: _HandRank.highCard,
@@ -2157,19 +2301,33 @@ bool _isLowStraight(List<int> ranks) {
 
 String _rankName(int rank) {
   switch (rank) {
-    case 14: return 'Ace';
-    case 13: return 'King';
-    case 12: return 'Queen';
-    case 11: return 'Jack';
-    case 10: return 'Ten';
-    case 9: return 'Nine';
-    case 8: return 'Eight';
-    case 7: return 'Seven';
-    case 6: return 'Six';
-    case 5: return 'Five';
-    case 4: return 'Four';
-    case 3: return 'Three';
-    case 2: return 'Two';
-    default: return '$rank';
+    case 14:
+      return 'Ace';
+    case 13:
+      return 'King';
+    case 12:
+      return 'Queen';
+    case 11:
+      return 'Jack';
+    case 10:
+      return 'Ten';
+    case 9:
+      return 'Nine';
+    case 8:
+      return 'Eight';
+    case 7:
+      return 'Seven';
+    case 6:
+      return 'Six';
+    case 5:
+      return 'Five';
+    case 4:
+      return 'Four';
+    case 3:
+      return 'Three';
+    case 2:
+      return 'Two';
+    default:
+      return '$rank';
   }
 }
