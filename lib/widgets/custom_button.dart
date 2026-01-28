@@ -1,5 +1,46 @@
 import 'package:flutter/material.dart';
 
+/// Animated tap wrapper that scales down on press
+class AnimatedTapWrapper extends StatefulWidget {
+  final Widget child;
+  final VoidCallback? onTap;
+  final double scaleDown;
+  final Duration duration;
+
+  const AnimatedTapWrapper({
+    super.key,
+    required this.child,
+    this.onTap,
+    this.scaleDown = 0.95,
+    this.duration = const Duration(milliseconds: 100),
+  });
+
+  @override
+  State<AnimatedTapWrapper> createState() => _AnimatedTapWrapperState();
+}
+
+class _AnimatedTapWrapperState extends State<AnimatedTapWrapper> {
+  bool _isPressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _isPressed = true),
+      onTapUp: (_) {
+        setState(() => _isPressed = false);
+        widget.onTap?.call();
+      },
+      onTapCancel: () => setState(() => _isPressed = false),
+      child: AnimatedScale(
+        scale: _isPressed ? widget.scaleDown : 1.0,
+        duration: widget.duration,
+        curve: Curves.easeInOut,
+        child: widget.child,
+      ),
+    );
+  }
+}
+
 /// Reusable custom button widget with loading state
 class CustomButton extends StatelessWidget {
   final String text;

@@ -363,6 +363,7 @@ class _TeamScreenState extends State<TeamScreen> with SingleTickerProviderStateM
     final nameController = TextEditingController();
     final descController = TextEditingController();
     int selectedEmblem = 0;
+    bool isOpenTeam = true;
     final canAfford = UserPreferences.chips >= TeamService.createTeamCost;
 
     showModalBottomSheet(
@@ -498,11 +499,75 @@ class _TeamScreenState extends State<TeamScreen> with SingleTickerProviderStateM
                       child: Center(
                         child: Text(
                           TeamEmblem.emblems[index],
-                          style: TextStyle(fontSize: selectedEmblem == index ? 26 : 22),
+                          style: TextStyle(
+                            fontSize: selectedEmblem == index ? 26 : 22,
+                            color: TeamEmblem.getEmblemColor(index),
+                          ),
                         ),
                       ),
                     ),
                   ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              // Team Privacy Toggle
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.04),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      isOpenTeam ? Icons.lock_open_rounded : Icons.lock_rounded,
+                      color: isOpenTeam ? const Color(0xFF00D46A) : Colors.white.withValues(alpha: 0.5),
+                      size: 20,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            isOpenTeam ? 'Open Team' : 'Invite Only',
+                            style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            isOpenTeam ? 'Anyone can join' : 'Only invited players can join',
+                            style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 11),
+                          ),
+                        ],
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: () => setDialogState(() => isOpenTeam = !isOpenTeam),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        width: 48,
+                        height: 28,
+                        padding: const EdgeInsets.all(3),
+                        decoration: BoxDecoration(
+                          color: isOpenTeam ? const Color(0xFF00D46A) : Colors.white.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: AnimatedAlign(
+                          duration: const Duration(milliseconds: 200),
+                          alignment: isOpenTeam ? Alignment.centerRight : Alignment.centerLeft,
+                          child: Container(
+                            width: 22,
+                            height: 22,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(11),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: 24),
@@ -534,7 +599,7 @@ class _TeamScreenState extends State<TeamScreen> with SingleTickerProviderStateM
                       onTap: canAfford
                           ? () async {
                               Navigator.pop(context);
-                              await _createTeam(nameController.text, descController.text, selectedEmblem);
+                              await _createTeam(nameController.text, descController.text, selectedEmblem, isOpenTeam);
                             }
                           : null,
                       child: Container(
@@ -607,10 +672,10 @@ class _TeamScreenState extends State<TeamScreen> with SingleTickerProviderStateM
     );
   }
 
-  Future<void> _createTeam(String name, String desc, int emblem) async {
+  Future<void> _createTeam(String name, String desc, int emblem, bool isOpen) async {
     setState(() => _isLoading = true);
     try {
-      await _teamService.createTeam(name: name, description: desc, emblemIndex: emblem);
+      await _teamService.createTeam(name: name, description: desc, emblemIndex: emblem, isOpen: isOpen);
       await _loadTeam();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1708,7 +1773,13 @@ class _TeamSettingsTab extends StatelessWidget {
                         border: Border.all(color: const Color(0xFF00D46A).withValues(alpha: 0.4)),
                       ),
                       child: Center(
-                        child: Text(TeamEmblem.emblems[selectedEmblem], style: const TextStyle(fontSize: 28)),
+                        child: Text(
+                          TeamEmblem.emblems[selectedEmblem],
+                          style: TextStyle(
+                            fontSize: 28,
+                            color: TeamEmblem.getEmblemColor(selectedEmblem),
+                          ),
+                        ),
                       ),
                     ),
                     const SizedBox(width: 16),
@@ -1771,7 +1842,15 @@ class _TeamSettingsTab extends StatelessWidget {
                           width: selectedEmblem == index ? 2 : 1,
                         ),
                       ),
-                      child: Center(child: Text(TeamEmblem.emblems[index], style: const TextStyle(fontSize: 22))),
+                      child: Center(
+                        child: Text(
+                          TeamEmblem.emblems[index],
+                          style: TextStyle(
+                            fontSize: 22,
+                            color: TeamEmblem.getEmblemColor(index),
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 ),

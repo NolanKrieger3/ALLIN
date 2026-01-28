@@ -46,6 +46,7 @@ class TeamService {
     required String name,
     String description = '',
     int emblemIndex = 0,
+    bool isOpen = true,
   }) async {
     final userId = currentUserId;
     if (userId == null) throw Exception('Must be logged in to create a team');
@@ -89,6 +90,7 @@ class TeamService {
       captainId: userId,
       members: [captain],
       createdAt: DateTime.now(),
+      isOpen: isOpen,
     );
 
     final response = await http.put(
@@ -293,6 +295,22 @@ class TeamService {
     );
   }
 
+  /// Update team open/invite-only status (Captain only)
+  Future<void> updateIsOpen(String teamId, bool isOpen) async {
+    final userId = currentUserId;
+    if (userId == null) throw Exception('Must be logged in');
+
+    final team = await getTeam(teamId);
+    if (team == null) throw Exception('Team not found');
+    if (!team.isCaptain(userId)) throw Exception('Only captain can change team privacy');
+
+    final token = await _getAuthToken();
+    await http.patch(
+      Uri.parse('$_databaseUrl/teams/$teamId.json?auth=$token'),
+      body: jsonEncode({'isOpen': isOpen}),
+    );
+  }
+
   /// Promote member to officer (Captain only)
   Future<void> promoteMember(String teamId, String memberuid) async {
     final userId = currentUserId;
@@ -435,6 +453,126 @@ class TeamService {
     );
   }
 
+  // ============================================================================
+  // TEAM INVITES
+  // ============================================================================
+
+  /// Send a team invite to a friend
+  Future<void> sendTeamInvite(String teamId, String toUserId) async {
+    final userId = currentUserId;
+    if (userId == null) throw Exception('Must be logged in');
+
+    final team = await getTeam(teamId);
+    if (team == null) throw Exception('Team not found');
+    if (!team.isOfficer(userId)) throw Exception('Only officers and captain can invite members');
+    if (team.isFull) throw Exception('Team is full');
+    if (team.isMember(toUserId)) throw Exception('This player is already in the team');
+
+    final token = await _getAuthToken();
+    final inviteId = '${teamId}_${toUserId}_${DateTime.now().millisecondsSinceEpoch}';
+
+    final invite = TeamInvite(
+      id: inviteId,
+      teamId: teamId,
+      teamName: team.name,
+      teamEmblem: team.emblem,
+      fromUserId: userId,
+      fromUsername: currentUserName,
+      toUserId: toUserId,
+      createdAt: DateTime.now(),
+      expiresAt: DateTime.now().add(const Duration(days: 7)),
+    );
+
+    await http.put(
+      Uri.parse('$_databaseUrl/team_invites/$toUserId/$inviteId.json?auth=$token'),
+      body: jsonEncode(invite.toJson()),
+    );
+  }
+
+  /// Get pending team invites for current user
+  Future<List<TeamInvite>> getPendingInvites() async {
+    final userId = currentUserId;
+    if (userId == null) return [];
+
+    final token = await _getAuthToken();
+    final response = await http.get(
+      Uri.parse('$_databaseUrl/team_invites/$userId.json?auth=$token'),
+    );
+
+    if (response.statusCode != 200 || response.body == 'null') {
+      return [];
+    }
+
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    final invites = data.entries
+        .map((e) => TeamInvite.fromJson(Map<String, dynamic>.from(e.value as Map)))
+        .where((i) => i.status == TeamInviteStatus.pending && !i.isExpired)
+        .toList();
+
+    return invites;
+  }
+
+  /// Accept a team invite
+  Future<void> acceptTeamInvite(TeamInvite invite) async {
+    final userId = currentUserId;
+    if (userId == null) throw Exception('Must be logged in');
+    if (invite.toUserId != userId) throw Exception('This invite is not for you');
+
+    // Check if user is already in a team
+    final existingTeam = await getUserTeam();
+    if (existingTeam != null) {
+      throw Exception('You must leave your current team first');
+    }
+
+    // Check if user has enough chips
+    final currentChips = UserPreferences.chips;
+    if (currentChips < joinTeamCost) {
+      throw Exception('Need ${_formatChips(joinTeamCost)} chips to join a team');
+    }
+
+    final token = await _getAuthToken();
+    final team = await getTeam(invite.teamId);
+    if (team == null) throw Exception('Team no longer exists');
+    if (team.isFull) throw Exception('Team is now full');
+
+    // Add member to team
+    final newMember = TeamMember(
+      odeid: userId,
+      displayName: currentUserName,
+      rank: 'member',
+      joinedAt: DateTime.now(),
+    );
+
+    final updatedMembers = [...team.members, newMember];
+
+    await http.patch(
+      Uri.parse('$_databaseUrl/teams/${invite.teamId}.json?auth=$token'),
+      body: jsonEncode({'members': updatedMembers.map((m) => m.toJson()).toList()}),
+    );
+
+    // Deduct chips
+    await UserPreferences.spendChips(joinTeamCost);
+
+    // Save team ID to user's profile
+    await _saveUserTeamId(invite.teamId);
+
+    // Delete the invite
+    await http.delete(
+      Uri.parse('$_databaseUrl/team_invites/$userId/${invite.id}.json?auth=$token'),
+    );
+  }
+
+  /// Decline a team invite
+  Future<void> declineTeamInvite(TeamInvite invite) async {
+    final userId = currentUserId;
+    if (userId == null) throw Exception('Must be logged in');
+
+    final token = await _getAuthToken();
+    await http.delete(
+      Uri.parse('$_databaseUrl/team_invites/$userId/${invite.id}.json?auth=$token'),
+    );
+  }
+
   /// Get chat messages (last 100)
   Future<List<TeamChatMessage>> getChatMessages(String teamId) async {
     final token = await _getAuthToken();
@@ -457,7 +595,7 @@ class TeamService {
 
   /// Stream chat messages (polling-based)
   Stream<List<TeamChatMessage>> watchChatMessages(String teamId) {
-    return Stream.periodic(const Duration(seconds: 2)).asyncMap((_) => getChatMessages(teamId));
+    return Stream.periodic(const Duration(milliseconds: 500)).asyncMap((_) => getChatMessages(teamId));
   }
 
   // ============================================================================

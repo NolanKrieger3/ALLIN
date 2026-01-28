@@ -1,3 +1,5 @@
+import 'dart:ui' show Color;
+
 /// Team member with their rank
 class TeamMember {
   final String odeid;
@@ -108,14 +110,81 @@ class TeamChatMessage {
   }
 }
 
+/// Team invite model
+class TeamInvite {
+  final String id;
+  final String teamId;
+  final String teamName;
+  final String teamEmblem;
+  final String fromUserId;
+  final String fromUsername;
+  final String toUserId;
+  final DateTime createdAt;
+  final DateTime expiresAt;
+  final TeamInviteStatus status;
+
+  TeamInvite({
+    required this.id,
+    required this.teamId,
+    required this.teamName,
+    required this.teamEmblem,
+    required this.fromUserId,
+    required this.fromUsername,
+    required this.toUserId,
+    required this.createdAt,
+    required this.expiresAt,
+    this.status = TeamInviteStatus.pending,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'teamId': teamId,
+        'teamName': teamName,
+        'teamEmblem': teamEmblem,
+        'fromUserId': fromUserId,
+        'fromUsername': fromUsername,
+        'toUserId': toUserId,
+        'createdAt': createdAt.toIso8601String(),
+        'expiresAt': expiresAt.toIso8601String(),
+        'status': status.name,
+      };
+
+  factory TeamInvite.fromJson(Map<String, dynamic> json) {
+    return TeamInvite(
+      id: json['id'] as String,
+      teamId: json['teamId'] as String,
+      teamName: json['teamName'] as String,
+      teamEmblem: json['teamEmblem'] as String? ?? '🃏',
+      fromUserId: json['fromUserId'] as String,
+      fromUsername: json['fromUsername'] as String,
+      toUserId: json['toUserId'] as String,
+      createdAt: DateTime.parse(json['createdAt'] as String),
+      expiresAt: DateTime.parse(json['expiresAt'] as String),
+      status: TeamInviteStatus.values.firstWhere(
+        (e) => e.name == json['status'],
+        orElse: () => TeamInviteStatus.pending,
+      ),
+    );
+  }
+
+  bool get isExpired => DateTime.now().isAfter(expiresAt);
+}
+
+enum TeamInviteStatus {
+  pending,
+  accepted,
+  declined,
+  expired,
+}
+
 /// Team emblems (index-based for simplicity)
 class TeamEmblem {
   static const List<String> emblems = [
-    '🃏', // Joker
-    '♠️', // Spade
-    '♥️', // Heart
-    '♦️', // Diamond
-    '♣️', // Club
+    '🃏', // Joker - red
+    '♠️', // Spade - purple
+    '♥️', // Heart - red
+    '♦️', // Diamond - red
+    '♣️', // Club - purple
     '🎰', // Slot machine
     '🎲', // Dice
     '🏆', // Trophy
@@ -133,9 +202,25 @@ class TeamEmblem {
     '🛡️', // Shield
   ];
 
+  // Indices that should be red (joker, heart, diamond)
+  static const List<int> _redIndices = [0, 2, 3];
+  // Indices that should be purple (spade, club)
+  static const List<int> _purpleIndices = [1, 4];
+
   static String getEmblem(int index) {
     if (index < 0 || index >= emblems.length) return emblems[0];
     return emblems[index];
+  }
+
+  /// Returns the color for the emblem at the given index
+  /// Red for joker, hearts, diamonds; Purple for spades, clubs; null for others
+  static Color? getEmblemColor(int index) {
+    if (_redIndices.contains(index)) {
+      return const Color(0xFFE53935); // Red
+    } else if (_purpleIndices.contains(index)) {
+      return const Color(0xFF9C27B0); // Purple
+    }
+    return null; // Default - no color override
   }
 }
 
@@ -149,6 +234,7 @@ class Team {
   final List<TeamMember> members;
   final DateTime createdAt;
   final int maxMembers;
+  final bool isOpen;
 
   Team({
     required this.id,
@@ -159,6 +245,7 @@ class Team {
     required this.members,
     required this.createdAt,
     this.maxMembers = 50,
+    this.isOpen = true,
   });
 
   Map<String, dynamic> toJson() => {
@@ -170,6 +257,7 @@ class Team {
         'members': members.map((m) => m.toJson()).toList(),
         'createdAt': createdAt.millisecondsSinceEpoch,
         'maxMembers': maxMembers,
+        'isOpen': isOpen,
       };
 
   factory Team.fromJson(Map<String, dynamic> json, String docId) {
@@ -185,6 +273,7 @@ class Team {
           [],
       createdAt: DateTime.fromMillisecondsSinceEpoch(json['createdAt'] as int? ?? 0),
       maxMembers: json['maxMembers'] as int? ?? 50,
+      isOpen: json['isOpen'] as bool? ?? true,
     );
   }
 
@@ -197,6 +286,7 @@ class Team {
     List<TeamMember>? members,
     DateTime? createdAt,
     int? maxMembers,
+    bool? isOpen,
   }) {
     return Team(
       id: id ?? this.id,
@@ -207,6 +297,7 @@ class Team {
       members: members ?? this.members,
       createdAt: createdAt ?? this.createdAt,
       maxMembers: maxMembers ?? this.maxMembers,
+      isOpen: isOpen ?? this.isOpen,
     );
   }
 
