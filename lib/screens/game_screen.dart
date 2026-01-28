@@ -48,7 +48,7 @@ class GameScreen extends StatefulWidget {
   State<GameScreen> createState() => _GameScreenState();
 }
 
-class _GameScreenState extends State<GameScreen> {
+class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   // Game settings
   bool _gameStarted = false;
   int _numberOfBots = 1;
@@ -79,10 +79,53 @@ class _GameScreenState extends State<GameScreen> {
   bool _showBotCards = false;
   String _winnerDescription = '';
 
+  // Fold animation
+  late AnimationController _foldAnimationController;
+  late Animation<Offset> _foldSlideAnimation;
+  late Animation<double> _foldOpacityAnimation;
+  bool _isFolding = false;
+  double _dragOffset = 0.0;
+
   @override
   void initState() {
     super.initState();
-    // Setup screen is shown until user taps Play
+    _foldAnimationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 400),
+    );
+    _foldSlideAnimation = Tween<Offset>(
+      begin: Offset.zero,
+      end: const Offset(0, -2),
+    ).animate(CurvedAnimation(
+      parent: _foldAnimationController,
+      curve: Curves.easeInBack,
+    ));
+    _foldOpacityAnimation = Tween<double>(
+      begin: 1.0,
+      end: 0.0,
+    ).animate(CurvedAnimation(
+      parent: _foldAnimationController,
+      curve: Curves.easeOut,
+    ));
+  }
+
+  @override
+  void dispose() {
+    _foldAnimationController.dispose();
+    super.dispose();
+  }
+
+  /// Animate cards flying away then trigger fold action
+  Future<void> _animateFold() async {
+    if (_isFolding) return;
+    setState(() => _isFolding = true);
+
+    await _foldAnimationController.forward();
+    _playerAction('fold');
+
+    // Reset animation for next hand
+    _foldAnimationController.reset();
+    if (mounted) setState(() => _isFolding = false);
   }
 
   void _showGameSettingsDialog() {
@@ -1342,17 +1385,8 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   Widget _buildPlayersRow() {
-    // Build list with player first, then bots
+    // Build list with only bots (opponents) - player is shown at bottom
     final allParticipants = <_Participant>[
-      _Participant(
-        name: 'You',
-        chips: _playerChips,
-        currentBet: _playerBet,
-        hasFolded: _playerHasFolded,
-        isCurrentTurn: _isPlayerTurn && _gamePhase != 'showdown',
-        isPlayer: true,
-        isDealer: _dealerPosition == 0,
-      ),
       ...List.generate(
           _bots.length,
           (i) => _Participant(
@@ -1637,7 +1671,7 @@ class _GameScreenState extends State<GameScreen> {
                 ],
               ),
               const Spacer(),
-              _buildPlayerInfoMinimal(),
+              _buildPlayerAvatar(),
             ],
           ),
         ],
@@ -1700,39 +1734,71 @@ class _GameScreenState extends State<GameScreen> {
             ],
           ),
           const SizedBox(height: 16),
-          // Cards area
+          // Cards area with swipe to fold
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              // Player cards with fold tap
+              // Swipeable cards with fold animation
               GestureDetector(
-                onDoubleTap: () => _playerAction('fold'),
-                child: Column(
-                  children: [
-                    Text(
-                      'Double tap to fold',
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.4),
-                        fontSize: 11,
+                onVerticalDragUpdate: (details) {
+                  setState(() {
+                    _dragOffset += details.delta.dy;
+                    // Clamp to only allow upward drag
+                    if (_dragOffset > 0) _dragOffset = 0;
+                  });
+                },
+                onVerticalDragEnd: (details) {
+                  // If swiped up enough (past threshold), trigger fold
+                  if (_dragOffset < -80) {
+                    _animateFold();
+                  }
+                  // Reset drag offset
+                  setState(() => _dragOffset = 0);
+                },
+                child: _isFolding
+                    ? SlideTransition(
+                        position: _foldSlideAnimation,
+                        child: FadeTransition(
+                          opacity: _foldOpacityAnimation,
+                          child: _buildPlayerCards(),
+                        ),
+                      )
+                    : Transform.translate(
+                        offset: Offset(0, _dragOffset * 0.5),
+                        child: Opacity(
+                          opacity: (1.0 + _dragOffset / 200).clamp(0.3, 1.0),
+                          child: Column(
+                            children: [
+                              Text(
+                                '↑ Swipe to fold',
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.4),
+                                  fontSize: 11,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              _buildPlayerCards(),
+                            ],
+                          ),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        if (_playerCards.isNotEmpty) _buildMinimalCard(_playerCards[0]),
-                        const SizedBox(width: 8),
-                        if (_playerCards.length > 1) _buildMinimalCard(_playerCards[1]),
-                      ],
-                    ),
-                  ],
-                ),
               ),
               const Spacer(),
-              _buildPlayerInfoMinimal(),
+              _buildPlayerAvatar(),
             ],
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildPlayerCards() {
+    return Row(
+      children: [
+        if (_playerCards.isNotEmpty) _buildMinimalCard(_playerCards[0]),
+        const SizedBox(width: 8),
+        if (_playerCards.length > 1) _buildMinimalCard(_playerCards[1]),
+      ],
     );
   }
 
@@ -1776,15 +1842,9 @@ class _GameScreenState extends State<GameScreen> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Row(
-                children: [
-                  if (_playerCards.isNotEmpty) _buildMinimalCard(_playerCards[0]),
-                  const SizedBox(width: 8),
-                  if (_playerCards.length > 1) _buildMinimalCard(_playerCards[1]),
-                ],
-              ),
+              _buildPlayerCards(),
               const Spacer(),
-              _buildPlayerInfoMinimal(),
+              _buildPlayerAvatar(),
             ],
           ),
         ],
@@ -1792,22 +1852,68 @@ class _GameScreenState extends State<GameScreen> {
     );
   }
 
-  Widget _buildPlayerInfoMinimal() {
+  Widget _buildPlayerAvatar() {
+    final isDealer = _dealerPosition == 0;
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
+        Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: 0.1),
+                border: Border.all(
+                  color: _isPlayerTurn ? const Color(0xFFD4AF37) : const Color(0xFF3B82F6),
+                  width: 2,
+                ),
+              ),
+              child: const Center(
+                child: Text('👤', style: TextStyle(fontSize: 24)),
+              ),
+            ),
+            // Dealer badge
+            if (isDealer)
+              Positioned(
+                bottom: -2,
+                right: -2,
+                child: Container(
+                  width: 18,
+                  height: 18,
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Center(
+                    child: Text('D',
+                        style: TextStyle(
+                          color: Colors.black,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        )),
+                  ),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 4),
         Text(
           'You',
           style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.6),
-            fontSize: 14,
+            color: const Color(0xFF3B82F6),
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
           ),
         ),
         Text(
           _formatChips(_playerChips),
           style: TextStyle(
             color: Colors.yellow.shade600,
-            fontSize: 16,
+            fontSize: 14,
             fontWeight: FontWeight.w600,
           ),
         ),
