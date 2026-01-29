@@ -55,43 +55,69 @@ class _SitAndGoScreenState extends State<SitAndGoScreen> {
 
       String? roomId;
 
-      // Search for a Sit & Go room with matching buy-in that isn't full
-      for (int attempt = 0; attempt < 3; attempt++) {
+      // Try to join an existing room (with retries for race conditions)
+      for (int attempt = 0; attempt < 5; attempt++) {
         final rooms = await _gameService.fetchJoinableRoomsByBlind(
-          entry, // Using entry fee as the "blind" matcher for Sit & Go
+          entry,
           gameType: 'sitandgo_8max',
+          maxPlayers: _tableSize,
         );
 
         if (rooms.isNotEmpty) {
+          // Try to join the oldest room first
           for (final room in rooms) {
-            // Check if room has space
-            if (room.players.length < _tableSize) {
-              try {
-                await _gameService.joinRoom(room.id, startingChips: startingChips);
-                roomId = room.id;
-                break;
-              } catch (e) {
-                continue;
-              }
+            try {
+              await _gameService.joinRoom(room.id, startingChips: startingChips);
+              roomId = room.id;
+              break;
+            } catch (e) {
+              // Room might have filled up, try next room
+              print('❌ Failed to join room ${room.id}: $e');
             }
           }
+          if (roomId != null) break;
         }
 
-        if (roomId != null) break;
-
-        if (attempt < 2) {
-          await Future.delayed(const Duration(milliseconds: 500));
+        // Wait before next attempt
+        if (attempt < 4) {
+          await Future.delayed(const Duration(milliseconds: 300));
         }
       }
 
-      // If no room found, create a new one
+      // If still no room, create one and immediately re-check for race condition
       if (roomId == null) {
-        final room = await _gameService.createRoom(
-          bigBlind: entry, // Store entry fee as bigBlind for matching
+        final newRoom = await _gameService.createRoom(
+          bigBlind: entry,
           startingChips: startingChips,
           gameType: 'sitandgo_8max',
+          maxPlayers: _tableSize, // 8 players for Sit & Go
         );
-        roomId = room.id;
+
+        // Wait a moment then check if an older room exists (race condition check)
+        await Future.delayed(const Duration(milliseconds: 200));
+        final rooms = await _gameService.fetchJoinableRoomsByBlind(
+          entry,
+          gameType: 'sitandgo_8max',
+          maxPlayers: _tableSize,
+        );
+
+        // If we find an older room, leave ours and join it
+        final olderRoom = rooms.where((r) => r.id != newRoom.id && r.createdAt.isBefore(newRoom.createdAt)).toList();
+
+        if (olderRoom.isNotEmpty) {
+          // Leave the room we just created and join the older one
+          await _gameService.leaveRoom(newRoom.id);
+          try {
+            await _gameService.joinRoom(olderRoom.first.id, startingChips: startingChips);
+            roomId = olderRoom.first.id;
+          } catch (e) {
+            // Older room filled up, stick with ours
+            await _gameService.joinRoom(newRoom.id, startingChips: startingChips);
+            roomId = newRoom.id;
+          }
+        } else {
+          roomId = newRoom.id;
+        }
       }
 
       if (mounted) {

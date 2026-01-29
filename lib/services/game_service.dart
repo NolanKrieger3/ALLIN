@@ -85,7 +85,11 @@ class GameService {
 
   /// Create a new game room
   Future<GameRoom> createRoom(
-      {int bigBlind = 100, int startingChips = 1000, bool isPrivate = false, String gameType = 'cash'}) async {
+      {int bigBlind = 100,
+      int startingChips = 1000,
+      bool isPrivate = false,
+      String gameType = 'cash',
+      int maxPlayers = 2}) async {
     final userId = currentUserId;
     if (userId == null) throw Exception('Must be logged in to create a room');
 
@@ -97,12 +101,20 @@ class GameService {
     final room = GameRoom(
       id: roomId,
       hostId: userId,
-      players: [GamePlayer(uid: userId, displayName: currentUserName, chips: startingChips)],
+      players: [
+        GamePlayer(
+          uid: userId,
+          displayName: currentUserName,
+          chips: startingChips,
+          lastActiveAt: DateTime.now(), // Include heartbeat timestamp
+        )
+      ],
       bigBlind: bigBlind,
       smallBlind: bigBlind ~/ 2,
       createdAt: DateTime.now(),
       isPrivate: isPrivate,
       gameType: gameType,
+      maxPlayers: maxPlayers,
     );
 
     final response = await http.put(
@@ -154,7 +166,14 @@ class GameService {
     final chips = startingChips ?? room.players.first.chips;
 
     // Auto-ready the player so game can start immediately when matched
-    final newPlayer = GamePlayer(uid: userId, displayName: currentUserName, chips: chips, isReady: true);
+    // Include lastActiveAt for heartbeat tracking
+    final newPlayer = GamePlayer(
+      uid: userId,
+      displayName: currentUserName,
+      chips: chips,
+      isReady: true,
+      lastActiveAt: DateTime.now(),
+    );
     print('ADDING PLAYER: ${newPlayer.displayName} (${newPlayer.uid}) with $chips chips - auto-ready');
 
     final updatedPlayers = [...room.players, newPlayer];
@@ -165,6 +184,100 @@ class GameService {
     );
 
     print('✅ Successfully joined room $roomId with ${updatedPlayers.length} players');
+  }
+
+  /// Send heartbeat to keep player active in room
+  Future<void> sendHeartbeat(String roomId) async {
+    final userId = currentUserId;
+    if (userId == null) return;
+
+    final token = await _getAuthToken();
+
+    // First get current room state
+    final response = await http.get(Uri.parse('$_databaseUrl/game_rooms/$roomId.json?auth=$token'));
+    if (response.statusCode != 200 || response.body == 'null') return;
+
+    final roomData = jsonDecode(response.body) as Map<String, dynamic>;
+    final room = GameRoom.fromJson(roomData, roomId);
+
+    // Find my player index
+    final myIndex = room.players.indexWhere((p) => p.uid == userId);
+    if (myIndex == -1) return; // Not in room
+
+    // Update ONLY my player's lastActiveAt using indexed path (avoids overwriting other players)
+    await http.patch(
+      Uri.parse('$_databaseUrl/game_rooms/$roomId/players/$myIndex.json?auth=$token'),
+      body: jsonEncode({'lastActiveAt': DateTime.now().toIso8601String()}),
+    );
+  }
+
+  /// Remove inactive players from a room (no heartbeat for 30+ seconds)
+  /// Only the HOST should call this to avoid race conditions
+  Future<void> removeInactivePlayers(String roomId) async {
+    final userId = currentUserId;
+    final token = await _getAuthToken();
+
+    final response = await http.get(Uri.parse('$_databaseUrl/game_rooms/$roomId.json?auth=$token'));
+    if (response.statusCode != 200 || response.body == 'null') return;
+
+    final roomData = jsonDecode(response.body) as Map<String, dynamic>;
+    final room = GameRoom.fromJson(roomData, roomId);
+
+    // Only the host should clean up to avoid race conditions
+    if (room.hostId != userId) return;
+
+    // Only clean up waiting rooms
+    if (room.status != 'waiting') return;
+
+    final now = DateTime.now();
+    final activePlayers = room.players.where((p) {
+      if (p.lastActiveAt == null) {
+        // No heartbeat ever - give 45 seconds grace period from room creation
+        return now.difference(room.createdAt).inSeconds < 45;
+      }
+      // Give 45 seconds without heartbeat before removal
+      return now.difference(p.lastActiveAt!).inSeconds < 45;
+    }).toList();
+
+    if (activePlayers.length < room.players.length) {
+      // Re-fetch to get latest state before modifying (reduces race conditions)
+      final freshResponse = await http.get(Uri.parse('$_databaseUrl/game_rooms/$roomId.json?auth=$token'));
+      if (freshResponse.statusCode != 200 || freshResponse.body == 'null') return;
+
+      final freshRoomData = jsonDecode(freshResponse.body) as Map<String, dynamic>;
+      final freshRoom = GameRoom.fromJson(freshRoomData, roomId);
+
+      // Recalculate with fresh data
+      final freshActivePlayers = freshRoom.players.where((p) {
+        if (p.lastActiveAt == null) {
+          return now.difference(freshRoom.createdAt).inSeconds < 45;
+        }
+        return now.difference(p.lastActiveAt!).inSeconds < 45;
+      }).toList();
+
+      if (freshActivePlayers.length >= freshRoom.players.length) return; // No cleanup needed now
+
+      final removed = freshRoom.players.length - freshActivePlayers.length;
+      print('🧹 Removing $removed inactive player(s) from room $roomId');
+
+      if (freshActivePlayers.isEmpty) {
+        // Delete room if no active players
+        await http.delete(Uri.parse('$_databaseUrl/game_rooms/$roomId.json?auth=$token'));
+        print('🗑️ Deleted empty room $roomId');
+      } else {
+        // Update host if needed
+        final newHostId =
+            freshActivePlayers.any((p) => p.uid == freshRoom.hostId) ? freshRoom.hostId : freshActivePlayers.first.uid;
+
+        await http.patch(
+          Uri.parse('$_databaseUrl/game_rooms/$roomId.json?auth=$token'),
+          body: jsonEncode({
+            'players': freshActivePlayers.map((p) => p.toJson()).toList(),
+            'hostId': newHostId,
+          }),
+        );
+      }
+    }
   }
 
   /// Leave a room
@@ -263,19 +376,12 @@ class GameService {
           shouldDelete = true;
           reason = 'empty room';
         }
-        // Delete if finished for more than 2 minutes
+        // Delete if finished
         else if (room.status == 'finished') {
           shouldDelete = true;
           reason = 'game finished';
         }
-        // Delete if 1 player waiting for more than 5 minutes
-        else if (room.players.length == 1 && room.status == 'waiting') {
-          final age = now.difference(room.createdAt);
-          if (age.inMinutes >= 5) {
-            shouldDelete = true;
-            reason = 'stale (${age.inMinutes} min old with 1 player)';
-          }
-        }
+        // Never delete waiting rooms with players in them
 
         if (shouldDelete) {
           print('🧹 Deleting room $roomId: $reason');
@@ -287,8 +393,21 @@ class GameService {
     }
   }
 
+  /// Delete ALL game rooms (for debugging/testing)
+  Future<void> deleteAllRooms() async {
+    final token = await _getAuthToken();
+    if (token == null) return;
+
+    try {
+      await http.delete(Uri.parse('$_databaseUrl/game_rooms.json?auth=$token'));
+      print('🗑️ Deleted ALL game rooms');
+    } catch (e) {
+      print('⚠️ Delete all rooms error: $e');
+    }
+  }
+
   /// Fetch joinable cash game rooms by blind level (includes rooms waiting for players)
-  Future<List<GameRoom>> fetchJoinableRoomsByBlind(int bigBlind, {String gameType = 'cash'}) async {
+  Future<List<GameRoom>> fetchJoinableRoomsByBlind(int bigBlind, {String gameType = 'cash', int? maxPlayers}) async {
     // Clean up stale rooms first
     await cleanupStaleRooms();
 
@@ -300,7 +419,10 @@ class GameService {
       Uri.parse('$_databaseUrl/game_rooms.json?auth=$token'),
     );
 
-    print('🔍 Fetching joinable rooms for bigBlind: $bigBlind, gameType: $gameType');
+    print('🔍 ========================================');
+    print('🔍 FETCHING JOINABLE ROOMS');
+    print('🔍 Looking for: bigBlind=$bigBlind, gameType=$gameType, maxPlayers=$maxPlayers');
+    print('🔍 Current userId: $userId');
 
     if (response.statusCode != 200 || response.body == 'null') {
       print('🔍 No rooms found or error');
@@ -313,6 +435,17 @@ class GameService {
     final allRooms =
         data.entries.map((e) => GameRoom.fromJson(Map<String, dynamic>.from(e.value as Map), e.key)).toList();
 
+    // Print all rooms for debugging
+    print('🔍 ALL ROOMS:');
+    for (final room in allRooms) {
+      print('   📦 ${room.id}: gameType=${room.gameType}, blind=${room.bigBlind}, '
+          'players=${room.players.length}/${room.maxPlayers}, status=${room.status}, '
+          'created=${room.createdAt.toIso8601String()}');
+      for (final p in room.players) {
+        print('      👤 ${p.displayName} (${p.uid})');
+      }
+    }
+
     // Filter for joinable rooms:
     // - Same blind level
     // - Same game type
@@ -320,7 +453,8 @@ class GameService {
     // - Not private
     // - User not already in room
     // - Either waiting OR playing with phase='waiting_for_players'
-    // - Has exactly 1 player (to join them)
+    // - For sit and go: join any room that isn't full
+    // - For quickplay (heads-up): only join rooms with exactly 1 player
     final joinableRooms = allRooms.where((room) {
       final isCorrectBlind = room.bigBlind == bigBlind;
       final isCorrectGameType = room.gameType == gameType;
@@ -328,10 +462,20 @@ class GameService {
       final isNotPrivate = !room.isPrivate;
       final userNotInRoom = !room.players.any((p) => p.uid == userId);
       final isJoinable = room.status == 'waiting' || (room.status == 'playing' && room.phase == 'waiting_for_players');
-      final needsPlayer = room.players.length == 1; // Only join rooms that have exactly 1 player waiting
+
+      // For sit and go: join any room that isn't full (up to maxPlayers)
+      // For quickplay/cash (heads-up 2 player): only join rooms with exactly 1 player
+      bool hasSpace;
+      if (gameType.startsWith('sitandgo')) {
+        // Sit & Go: join any room that has space (populate one lobby at a time)
+        hasSpace = room.players.isNotEmpty && room.players.length < (maxPlayers ?? room.maxPlayers);
+      } else {
+        // Quick Play / Cash: heads-up, only 1 player waiting
+        hasSpace = room.players.length == 1;
+      }
 
       print(
-          '🔍 Room ${room.id}: blind=${room.bigBlind}, gameType=${room.gameType}, status=${room.status}, players=${room.players.length}, needsPlayer=$needsPlayer, userNotInRoom=$userNotInRoom');
+          '🔍 Room ${room.id}: blind=${room.bigBlind}, gameType=${room.gameType}, status=${room.status}, players=${room.players.length}, hasSpace=$hasSpace, userNotInRoom=$userNotInRoom');
 
       return isCorrectBlind &&
           isCorrectGameType &&
@@ -339,15 +483,20 @@ class GameService {
           isNotPrivate &&
           userNotInRoom &&
           isJoinable &&
-          needsPlayer;
+          hasSpace;
     }).toList();
 
-    // Sort by most recently created (newest first) - these are more likely to have active players
-    joinableRooms.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    // Sort by oldest first for sit and go (fill up existing lobbies first)
+    // Sort by newest first for quickplay (most active player)
+    if (gameType.startsWith('sitandgo')) {
+      joinableRooms.sort((a, b) => a.createdAt.compareTo(b.createdAt)); // Oldest first
+    } else {
+      joinableRooms.sort((a, b) => b.createdAt.compareTo(a.createdAt)); // Newest first
+    }
 
     print('🔍 Joinable rooms for blind $bigBlind: ${joinableRooms.length}');
     if (joinableRooms.isNotEmpty) {
-      print('🎯 Best room to join: ${joinableRooms.first.id} (created ${joinableRooms.first.createdAt})');
+      print('🎯 Best room to join: ${joinableRooms.first.id} with ${joinableRooms.first.players.length} players');
     }
     return joinableRooms;
   }

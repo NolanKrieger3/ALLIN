@@ -1404,14 +1404,26 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       duration: const Duration(milliseconds: 300),
       height: isShowdown ? 170 : 110, // More height during showdown to show cards
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Center(
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final totalWidth = allParticipants.length * 88.0; // 80 width + 8 margin
+          final needsScroll = totalWidth > constraints.maxWidth;
+
+          final row = Row(
             mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
             children: allParticipants.map((p) => _buildParticipantAvatar(p)).toList(),
-          ),
-        ),
+          );
+
+          if (needsScroll) {
+            return SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: row,
+            );
+          } else {
+            return Center(child: row);
+          }
+        },
       ),
     );
   }

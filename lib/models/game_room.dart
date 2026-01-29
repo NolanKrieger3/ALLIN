@@ -30,6 +30,7 @@ class GamePlayer {
   final bool isReady;
   final bool hasActed; // Track if player has acted in current betting round
   final String? lastAction; // Track last action for UI indicator (CALL, CHECK, FOLD, RAISE, ALL-IN)
+  final DateTime? lastActiveAt; // Heartbeat timestamp for detecting disconnected players
 
   GamePlayer({
     required this.uid,
@@ -42,6 +43,7 @@ class GamePlayer {
     this.isReady = false,
     this.hasActed = false,
     this.lastAction,
+    this.lastActiveAt,
   });
 
   Map<String, dynamic> toJson() => {
@@ -55,6 +57,7 @@ class GamePlayer {
         'isReady': isReady,
         'hasActed': hasActed,
         'lastAction': lastAction,
+        'lastActiveAt': lastActiveAt?.toIso8601String(),
       };
 
   factory GamePlayer.fromJson(Map<String, dynamic> json) {
@@ -70,7 +73,14 @@ class GamePlayer {
       isReady: json['isReady'] as bool? ?? false,
       hasActed: json['hasActed'] as bool? ?? false,
       lastAction: json['lastAction'] as String?,
+      lastActiveAt: json['lastActiveAt'] != null ? DateTime.tryParse(json['lastActiveAt'] as String) : null,
     );
+  }
+
+  /// Check if player is considered inactive (no heartbeat for 30+ seconds)
+  bool get isInactive {
+    if (lastActiveAt == null) return true; // No heartbeat ever = inactive
+    return DateTime.now().difference(lastActiveAt!).inSeconds > 30;
   }
 
   GamePlayer copyWith({
@@ -84,6 +94,7 @@ class GamePlayer {
     bool? isReady,
     bool? hasActed,
     Object? lastAction = _sentinel,
+    Object? lastActiveAt = _sentinel,
   }) {
     return GamePlayer(
       uid: uid ?? this.uid,
@@ -96,6 +107,7 @@ class GamePlayer {
       isReady: isReady ?? this.isReady,
       hasActed: hasActed ?? this.hasActed,
       lastAction: lastAction == _sentinel ? this.lastAction : lastAction as String?,
+      lastActiveAt: lastActiveAt == _sentinel ? this.lastActiveAt : lastActiveAt as DateTime?,
     );
   }
 }

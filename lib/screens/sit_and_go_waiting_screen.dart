@@ -24,6 +24,7 @@ class SitAndGoWaitingScreen extends StatefulWidget {
 class _SitAndGoWaitingScreenState extends State<SitAndGoWaitingScreen> {
   final GameService _gameService = GameService();
   StreamSubscription? _roomSubscription;
+  Timer? _heartbeatTimer;
   GameRoom? _room;
   bool _isStarting = false;
 
@@ -31,12 +32,33 @@ class _SitAndGoWaitingScreenState extends State<SitAndGoWaitingScreen> {
   void initState() {
     super.initState();
     _subscribeToRoom();
+    _startHeartbeat();
   }
 
   @override
   void dispose() {
     _roomSubscription?.cancel();
+    _heartbeatTimer?.cancel();
+    // Leave room if we're still waiting (not starting game)
+    if (!_isStarting && _room != null && _room!.status == 'waiting') {
+      _gameService.leaveRoom(widget.roomId);
+    }
     super.dispose();
+  }
+
+  /// Start sending heartbeats every 10 seconds
+  void _startHeartbeat() {
+    // Send initial heartbeat
+    _gameService.sendHeartbeat(widget.roomId);
+    // NOTE: Disabled automatic inactive player cleanup - was causing issues
+    // _gameService.removeInactivePlayers(widget.roomId);
+
+    _heartbeatTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (!mounted || _isStarting) return;
+      _gameService.sendHeartbeat(widget.roomId);
+      // NOTE: Disabled automatic inactive player cleanup - was causing issues
+      // _gameService.removeInactivePlayers(widget.roomId);
+    });
   }
 
   void _subscribeToRoom() {
