@@ -1438,15 +1438,10 @@ class GameService {
     }
 
     // Reset player states and make them ready
+    // Keep existing cards temporarily to prevent flash during transition
     final resetPlayers = activePlayers
         .map((p) => p.copyWith(
-            cards: [],
-            hasFolded: false,
-            currentBet: 0,
-            totalContributed: 0,
-            isReady: true,
-            hasActed: false,
-            lastAction: null))
+            hasFolded: false, currentBet: 0, totalContributed: 0, isReady: true, hasActed: false, lastAction: null))
         .toList();
 
     // Move dealer button
