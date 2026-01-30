@@ -6,6 +6,7 @@ import '../models/game_room.dart';
 import '../services/game_service.dart';
 import '../services/hand_evaluator.dart';
 import '../services/user_preferences.dart';
+import '../services/friends_service.dart';
 import '../widgets/mobile_wrapper.dart';
 
 class MultiplayerGameScreen extends StatefulWidget {
@@ -1358,7 +1359,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF6366F1).withValues(alpha: 0.6),
+                          color: Colors.white.withValues(alpha: 0.4),
                           blurRadius: 12,
                           spreadRadius: 3,
                         ),
@@ -1394,31 +1395,35 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
                     height: 48,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      border: Border.all(color: const Color(0xFF6366F1), width: 3),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.9), width: 3),
                     ),
                   ),
-                Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: hasFolded ? Colors.grey.shade800 : Colors.white.withValues(alpha: 0.1),
-                    boxShadow: hasFolded
-                        ? [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.6),
-                              blurRadius: 8,
-                              spreadRadius: 2,
-                            ),
-                          ]
-                        : null,
-                  ),
-                  child: Center(
-                    child: Text(
-                      getAvatar(player.displayName),
-                      style: TextStyle(
-                        fontSize: 20,
-                        color: hasFolded ? Colors.grey : null,
+                // Avatar circle with tap handler
+                GestureDetector(
+                  onTap: isCurrentPlayer ? null : () => _showPlayerProfile(player),
+                  child: Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: hasFolded ? Colors.grey.shade800 : Colors.white.withValues(alpha: 0.1),
+                      boxShadow: hasFolded
+                          ? [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.6),
+                                blurRadius: 8,
+                                spreadRadius: 2,
+                              ),
+                            ]
+                          : null,
+                    ),
+                    child: Center(
+                      child: Text(
+                        getAvatar(player.displayName),
+                        style: TextStyle(
+                          fontSize: 20,
+                          color: hasFolded ? Colors.grey : null,
+                        ),
                       ),
                     ),
                   ),
@@ -1464,6 +1469,29 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
                           )),
                     ),
                   ),
+                // Fold badge
+                if (hasFolded && !isShowdown)
+                  Positioned(
+                    top: -4,
+                    left: -4,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade800,
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: Colors.grey.shade600,
+                          width: 1,
+                        ),
+                      ),
+                      child: Text('FOLD',
+                          style: TextStyle(
+                            color: Colors.grey.shade400,
+                            fontSize: 7,
+                            fontWeight: FontWeight.bold,
+                          )),
+                    ),
+                  ),
               ],
             ),
             const SizedBox(height: 4),
@@ -1477,19 +1505,25 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
               ),
               overflow: TextOverflow.ellipsis,
             ),
-            // Chips on one line
+            // Chips amount
             Text(
-              player.currentBet > 0
-                  ? '${_formatChips(player.chips)} (${_formatChips(player.currentBet)})'
-                  : _formatChips(player.chips),
+              _formatChips(player.chips),
               style: TextStyle(
                 color: hasFolded ? Colors.grey : Colors.white70,
                 fontSize: 10,
                 fontWeight: FontWeight.w600,
               ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
             ),
+            // Current bet underneath
+            if (player.currentBet > 0)
+              Text(
+                _formatChips(player.currentBet),
+                style: TextStyle(
+                  color: hasFolded ? Colors.grey.withValues(alpha: 0.6) : Colors.orange.shade400,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
             // Show hole cards during showdown
             if (isShowdown && !hasFolded && player.cards.isNotEmpty)
               Padding(
@@ -1553,7 +1587,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
         boxShadow: [
           if (isHighlighted) ...[
             BoxShadow(
-              color: const Color(0xFFFFD700).withValues(alpha: 0.8),
+              color: Colors.white.withValues(alpha: 0.6),
               blurRadius: 8,
               spreadRadius: 1,
             ),
@@ -1564,7 +1598,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
               offset: const Offset(0, 2),
             ),
         ],
-        border: isHighlighted ? Border.all(color: const Color(0xFFFFD700), width: 1.5) : null,
+        border: isHighlighted ? Border.all(color: Colors.white.withValues(alpha: 0.9), width: 1.5) : null,
       ),
       child: AnimatedOpacity(
         duration: const Duration(milliseconds: 300),
@@ -1605,13 +1639,13 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
     return Column(
       children: [
         // Community Cards Row
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              for (var i = 0; i < 5; i++)
-                () {
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            for (var i = 0; i < 5; i++)
+              Padding(
+                padding: EdgeInsets.only(left: i > 0 ? 2.0 : 0),
+                child: () {
                   final card = i < room.communityCards.length ? room.communityCards[i] : null;
                   final isHighlighted = isShowdown && card != null && _isCardInWinningHand(card, room);
                   final isDimmed = isShowdown && card != null && !_isCardInWinningHand(card, room);
@@ -1622,10 +1656,10 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
                     isDimmed: isDimmed,
                   );
                 }(),
-            ],
-          ),
+              ),
+          ],
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 8),
         // Pot amount below cards
         Text(
           room.pot.toString(),
@@ -1646,8 +1680,8 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
       bool isDimmed = false,
       bool isGhost = false}) {
     // Use larger size for hole cards (player's cards at bottom)
-    final width = isHoleCard ? 70.0 : 56.0;
-    final height = isHoleCard ? 98.0 : 78.0;
+    final width = isHoleCard ? 70.0 : 72.0;
+    final height = isHoleCard ? 98.0 : 100.0;
 
     if (isEmpty || card == null) {
       return Container(
@@ -1713,12 +1747,12 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
         boxShadow: [
           if (isHighlighted) ...[
             BoxShadow(
-              color: const Color(0xFF6366F1).withValues(alpha: 0.8),
+              color: Colors.white.withValues(alpha: 0.5),
               blurRadius: 12,
               spreadRadius: 2,
             ),
             BoxShadow(
-              color: const Color(0xFF6366F1).withValues(alpha: 0.4),
+              color: Colors.white.withValues(alpha: 0.2),
               blurRadius: 20,
               spreadRadius: 4,
             ),
@@ -1729,7 +1763,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
               offset: const Offset(0, 4),
             ),
         ],
-        border: isHighlighted ? Border.all(color: const Color(0xFF6366F1), width: 2) : null,
+        border: isHighlighted ? Border.all(color: Colors.white.withValues(alpha: 0.8), width: 2) : null,
       ),
       child: AnimatedOpacity(
         duration: const Duration(milliseconds: 300),
@@ -2040,12 +2074,12 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
             padding: const EdgeInsets.symmetric(vertical: 16),
             decoration: BoxDecoration(
               color: isShowdown && _showdownAnimationComplete && isPlayerWinner
-                  ? const Color(0xFF6366F1).withValues(alpha: 0.1)
+                  ? const Color(0xFFFFD700).withValues(alpha: 0.08)
                   : Colors.transparent,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
                 color: isShowdown && _showdownAnimationComplete && isPlayerWinner
-                    ? const Color(0xFF6366F1).withValues(alpha: 0.5)
+                    ? const Color(0xFFFFD700).withValues(alpha: 0.4)
                     : Colors.white.withValues(alpha: 0.2),
               ),
             ),
@@ -2054,7 +2088,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
                 isShowdown && _showdownAnimationComplete && isPlayerWinner ? 'You win!' : 'Waiting for opponent...',
                 style: TextStyle(
                   color: isShowdown && _showdownAnimationComplete && isPlayerWinner
-                      ? const Color(0xFF6366F1)
+                      ? const Color(0xFFFFD700)
                       : Colors.white.withValues(alpha: 0.6),
                   fontSize: 16,
                   fontWeight: isPlayerWinner ? FontWeight.bold : FontWeight.normal,
@@ -2073,7 +2107,27 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
                 // Player's large cards with overlapping layout
                 _buildPlayerCardsLarge(player),
                 const Spacer(),
-                _buildPlayerAvatarLarge(player, room: room),
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    // Hand strength indicator
+                    if (player.cards.length >= 2 && room.communityCards.length >= 3)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 4),
+                        child: Text(
+                          _getCurrentHandStrength(player.cards, room.communityCards),
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.5),
+                            fontSize: 10,
+                            fontWeight: FontWeight.w500,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ),
+                    _buildPlayerAvatarLarge(player, room: room),
+                  ],
+                ),
               ],
             ),
           ),
@@ -2125,7 +2179,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
         boxShadow: [
           if (isHighlighted) ...[
             BoxShadow(
-              color: const Color(0xFF6366F1).withValues(alpha: 0.8),
+              color: Colors.white.withValues(alpha: 0.6),
               blurRadius: 12,
               spreadRadius: 2,
             ),
@@ -2136,7 +2190,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
               offset: const Offset(0, 4),
             ),
         ],
-        border: isHighlighted ? Border.all(color: const Color(0xFF6366F1), width: 2) : null,
+        border: isHighlighted ? Border.all(color: Colors.white.withValues(alpha: 0.9), width: 2) : null,
       ),
       child: AnimatedOpacity(
         duration: const Duration(milliseconds: 300),
@@ -2177,16 +2231,17 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
     return GestureDetector(
       onVerticalDragUpdate: (details) {
         setState(() {
-          _statsPanelOffset += details.delta.dy;
-          // Clamp to only allow downward drag to reveal stats
-          _statsPanelOffset = _statsPanelOffset.clamp(-150.0, 0.0);
+          // Drag up to reveal stats (negative delta.dy = upward drag)
+          _statsPanelOffset -= details.delta.dy;
+          // Clamp to only allow upward drag to reveal stats
+          _statsPanelOffset = _statsPanelOffset.clamp(0.0, 126.0);
         });
       },
       onVerticalDragEnd: (details) {
         setState(() {
-          // If dragged down enough, snap open
-          if (_statsPanelOffset < -50) {
-            _statsPanelOffset = -150;
+          // If dragged up enough, snap to show stats
+          if (_statsPanelOffset > 50) {
+            _statsPanelOffset = 126;
             _showStatsPanel = true;
           } else {
             _statsPanelOffset = 0;
@@ -2197,7 +2252,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
       onTap: () {
         setState(() {
           _showStatsPanel = !_showStatsPanel;
-          _statsPanelOffset = _showStatsPanel ? -150 : 0;
+          _statsPanelOffset = _showStatsPanel ? 126 : 0;
         });
       },
       child: Column(
@@ -2206,79 +2261,100 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
           Stack(
             clipBehavior: Clip.none,
             children: [
-              // Stats panel background (appears below avatar)
-              AnimatedPositioned(
-                duration: const Duration(milliseconds: 200),
-                bottom: _statsPanelOffset.abs(),
-                right: 0,
-                child: AnimatedOpacity(
-                  duration: const Duration(milliseconds: 200),
-                  opacity: _showStatsPanel ? 1.0 : 0.0,
-                  child: Container(
-                    width: 100,
-                    height: 150,
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.8),
-                      borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(16),
-                        topRight: Radius.circular(16),
-                      ),
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        _buildStatRow('Hands', '${player.handsPlayed ?? 0}'),
-                        _buildStatRow('Won', '${player.handsWon ?? 0}'),
-                        _buildStatRow('Bet', _formatChips(player.currentBet)),
-                        _buildStatRow('Total', _formatChips(player.totalBet ?? 0)),
-                      ],
+              // Timer border progress around the box
+              if (isMyTurn && room != null && room.status == 'playing' && room.phase != 'showdown')
+                TweenAnimationBuilder<double>(
+                  duration: const Duration(milliseconds: 100),
+                  curve: Curves.linear,
+                  tween: Tween<double>(
+                    begin: _remainingSeconds / room.turnTimeLimit,
+                    end: _remainingSeconds / room.turnTimeLimit,
+                  ),
+                  builder: (context, value, child) => CustomPaint(
+                    size: const Size(100, 126),
+                    painter: _RoundedRectProgressPainter(
+                      progress: value,
+                      color: _remainingSeconds <= 2 ? Colors.red : Colors.white,
+                      strokeWidth: 4,
                     ),
                   ),
                 ),
-              ),
-              // Main avatar container
-              Transform.translate(
-                offset: Offset(0, _statsPanelOffset),
-                child: Container(
-                  width: 100,
-                  height: 126, // Match the large card height
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.white.withValues(alpha: 0.08),
-                        Colors.white.withValues(alpha: 0.02),
-                      ],
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: isMyTurn ? Colors.white.withValues(alpha: 0.9) : Colors.white.withValues(alpha: 0.1),
-                      width: isMyTurn ? 2 : 1,
-                    ),
-                    boxShadow: isMyTurn
-                        ? [
-                            BoxShadow(
-                              color: Colors.white.withValues(alpha: 0.3),
-                              blurRadius: 16,
-                              spreadRadius: 0,
-                            ),
-                          ]
-                        : null,
+              // Fixed container that stays in place
+              Container(
+                width: 100,
+                height: 126, // Fixed height
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.white.withValues(alpha: 0.08),
+                      Colors.white.withValues(alpha: 0.02),
+                    ],
                   ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: isMyTurn ? Colors.white.withValues(alpha: 0.9) : Colors.white.withValues(alpha: 0.1),
+                    width: isMyTurn ? 2 : 1,
+                  ),
+                  boxShadow: isMyTurn
+                      ? [
+                          BoxShadow(
+                            color: Colors.white.withValues(alpha: 0.3),
+                            blurRadius: 16,
+                            spreadRadius: 0,
+                          ),
+                        ]
+                      : null,
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: Stack(
                     children: [
-                      Text(playerAvatar, style: const TextStyle(fontSize: 40)),
-                      const SizedBox(height: 8),
-                      Text(
-                        _formatChips(player.chips),
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
+                      // Scrollable content inside
+                      AnimatedPositioned(
+                        duration: const Duration(milliseconds: 200),
+                        curve: Curves.easeOut,
+                        top: -_statsPanelOffset,
+                        left: 0,
+                        right: 0,
+                        child: Column(
+                          children: [
+                            // Avatar section (scrolls up)
+                            Container(
+                              height: 126,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(playerAvatar, style: const TextStyle(fontSize: 40)),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    _formatChips(player.chips),
+                                    style: const TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            // Stats section (revealed when scrolled up)
+                            Container(
+                              height: 126,
+                              padding: const EdgeInsets.all(12),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                children: [
+                                  _buildStatRow('Chips', _formatChips(player.chips)),
+                                  _buildStatRow('Bet', _formatChips(player.currentBet)),
+                                  _buildStatRow('Total', _formatChips(player.totalContributed)),
+                                  if (player.lastAction != null) _buildStatRow('Action', player.lastAction!),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -2363,6 +2439,160 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
     }
   }
 
+  String _getCurrentHandStrength(List<PlayingCard> holeCards, List<PlayingCard> communityCards) {
+    if (holeCards.length < 2 || communityCards.length < 3) return '';
+
+    final hand = HandEvaluator.evaluateBestHand(holeCards, communityCards);
+    return _getShortHandName(hand.rank);
+  }
+
+  void _showPlayerProfile(GamePlayer player) {
+    final friendsService = FriendsService();
+    final isBot = _gameService.isBot(player.uid);
+
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.85),
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 320),
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: const Color(0xFF0A0A0A),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.1),
+            ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Player avatar
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withValues(alpha: 0.1),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    width: 2,
+                  ),
+                ),
+                child: Center(
+                  child: Text(
+                    player.displayName.isNotEmpty ? player.displayName[0].toUpperCase() : '?',
+                    style: const TextStyle(
+                      fontSize: 40,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Player name
+              Text(
+                player.displayName,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              // Chips
+              Text(
+                '${_formatChips(player.chips)} chips',
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.6),
+                  fontSize: 14,
+                ),
+              ),
+              if (isBot) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Text(
+                    'BOT',
+                    style: TextStyle(
+                      color: Colors.orange,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 24),
+              // Actions
+              if (!isBot) ...[
+                GestureDetector(
+                  onTap: () async {
+                    Navigator.pop(context);
+                    final success = await friendsService.sendFriendRequest(player.uid);
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(success ? 'Friend request sent!' : 'Failed to send request'),
+                          backgroundColor: success ? Colors.green : Colors.red,
+                        ),
+                      );
+                    }
+                  },
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF6366F1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Center(
+                      child: Text(
+                        'Add Friend',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
+              GestureDetector(
+                onTap: () => Navigator.pop(context),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.06),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Center(
+                    child: Text(
+                      'Close',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.8),
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   void _showRaiseDialog(GameRoom room, GamePlayer player) {
     // Minimum raise is current bet + last raise amount (or big blind if first raise)
     final calculatedMinRaise = room.currentBet + (room.lastRaiseAmount > 0 ? room.lastRaiseAmount : room.bigBlind);
@@ -2381,63 +2611,205 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
 
     showDialog(
       context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.8),
       builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          backgroundColor: const Color(0xFF1A1A1A),
-          title: const Text(
-            'Raise Amount',
-            style: TextStyle(color: Colors.white),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Slider(
-                value: raiseAmount.toDouble(),
-                min: minRaise.toDouble(),
-                max: maxRaise.toDouble(),
-                activeColor: const Color(0xFFD4AF37),
-                onChanged: (value) {
-                  setDialogState(() => raiseAmount = value.toInt());
-                },
-              ),
-              Text(
-                'Raise to: $raiseAmount',
-                style: const TextStyle(
-                  color: Color(0xFFD4AF37),
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
+        builder: (context, setDialogState) => Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 320),
+            child: Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: const Color(0xFF0A0A0A),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.1),
                 ),
               ),
-              const SizedBox(height: 8),
-              Text(
-                'Min: $minRaise | Max: $maxRaise (All-in)',
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.5),
-                  fontSize: 12,
-                ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Amount display
+                  Text(
+                    _formatChips(raiseAmount),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 48,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -1,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'RAISE TO',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.4),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      letterSpacing: 3,
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  // Slider
+                  SliderTheme(
+                    data: SliderTheme.of(context).copyWith(
+                      activeTrackColor: Colors.white,
+                      inactiveTrackColor: Colors.white.withValues(alpha: 0.1),
+                      thumbColor: Colors.white,
+                      overlayColor: Colors.white.withValues(alpha: 0.1),
+                      trackHeight: 4,
+                      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 10),
+                    ),
+                    child: Slider(
+                      value: raiseAmount.toDouble().clamp(minRaise.toDouble(), maxRaise.toDouble()),
+                      min: minRaise.toDouble(),
+                      max: maxRaise.toDouble(),
+                      onChanged: (value) {
+                        setDialogState(() => raiseAmount = value.toInt());
+                      },
+                    ),
+                  ),
+                  // Min/Max labels
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          _formatChips(minRaise),
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.3),
+                            fontSize: 12,
+                          ),
+                        ),
+                        Text(
+                          _formatChips(maxRaise),
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.3),
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  // Quick bet buttons
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildQuickBetButton('½ Pot', () {
+                          setDialogState(() {
+                            raiseAmount = ((room.pot / 2) + room.currentBet).toInt().clamp(minRaise, maxRaise);
+                          });
+                        }),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildQuickBetButton('Pot', () {
+                          setDialogState(() {
+                            raiseAmount = (room.pot + room.currentBet).clamp(minRaise, maxRaise);
+                          });
+                        }),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildQuickBetButton('All In', () {
+                          setDialogState(() {
+                            raiseAmount = maxRaise;
+                          });
+                        }),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  // Action buttons
+                  Row(
+                    children: [
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => Navigator.pop(context),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.06),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Center(
+                              child: Text(
+                                'Cancel',
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.6),
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () {
+                            Navigator.pop(context);
+                            _gameService.playerAction(
+                              widget.roomId,
+                              'raise',
+                              raiseAmount: raiseAmount,
+                            );
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Center(
+                              child: Text(
+                                'Raise',
+                                style: TextStyle(
+                                  color: Color(0xFF0A0A0A),
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuickBetButton(String label, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.1),
+          ),
+        ),
+        child: Center(
+          child: Text(
+            label,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.8),
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
             ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                _gameService.playerAction(
-                  widget.roomId,
-                  'raise',
-                  raiseAmount: raiseAmount,
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFD4AF37),
-              ),
-              child: const Text('Raise', style: TextStyle(color: Colors.white)),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -2484,31 +2856,23 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
             ),
           ],
           const SizedBox(height: 16),
-          if (isHost)
-            ElevatedButton(
-              onPressed: () => _gameService.newHand(widget.roomId),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFD4AF37),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 32,
-                  vertical: 12,
-                ),
-              ),
-              child: const Text(
-                'PLAY AGAIN',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
+          ElevatedButton(
+            onPressed: () => _gameService.newHand(widget.roomId),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFD4AF37),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 32,
+                vertical: 12,
               ),
             ),
-          if (!isHost)
-            Text(
-              'Waiting for host to start next hand...',
+            child: const Text(
+              'NEXT HAND',
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.5),
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
               ),
             ),
+          ),
         ],
       ),
     );
@@ -2639,5 +3003,96 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
         ),
       ),
     );
+  }
+}
+
+/// Custom painter for rounded rectangle progress border
+class _RoundedRectProgressPainter extends CustomPainter {
+  final double progress;
+  final Color color;
+  final double strokeWidth;
+
+  _RoundedRectProgressPainter({
+    required this.progress,
+    required this.color,
+    required this.strokeWidth,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round;
+
+    final rect = Rect.fromLTWH(
+      strokeWidth / 2,
+      strokeWidth / 2,
+      size.width - strokeWidth,
+      size.height - strokeWidth,
+    );
+    final rrect = RRect.fromRectAndRadius(rect, const Radius.circular(16));
+
+    // Calculate path length for the rounded rect
+    final perimeter = 2 * (size.width + size.height - strokeWidth * 2);
+    final progressLength = perimeter * progress;
+
+    // Create path for rounded rect starting from top-center
+    final path = Path();
+    // Start from top-center
+    path.moveTo(size.width / 2, strokeWidth / 2);
+    // Draw to top-right corner
+    path.lineTo(size.width - strokeWidth / 2 - 16, strokeWidth / 2);
+    path.arcToPoint(
+      Offset(size.width - strokeWidth / 2, strokeWidth / 2 + 16),
+      radius: const Radius.circular(16),
+    );
+    // Right side
+    path.lineTo(size.width - strokeWidth / 2, size.height - strokeWidth / 2 - 16);
+    path.arcToPoint(
+      Offset(size.width - strokeWidth / 2 - 16, size.height - strokeWidth / 2),
+      radius: const Radius.circular(16),
+    );
+    // Bottom side
+    path.lineTo(strokeWidth / 2 + 16, size.height - strokeWidth / 2);
+    path.arcToPoint(
+      Offset(strokeWidth / 2, size.height - strokeWidth / 2 - 16),
+      radius: const Radius.circular(16),
+    );
+    // Left side
+    path.lineTo(strokeWidth / 2, strokeWidth / 2 + 16);
+    path.arcToPoint(
+      Offset(strokeWidth / 2 + 16, strokeWidth / 2),
+      radius: const Radius.circular(16),
+    );
+    // Back to start
+    path.lineTo(size.width / 2, strokeWidth / 2);
+
+    // Create dash effect based on progress
+    final pathMetrics = path.computeMetrics();
+    final progressPath = Path();
+
+    for (final metric in pathMetrics) {
+      final extractPath = metric.extractPath(0, progressLength);
+      progressPath.addPath(extractPath, Offset.zero);
+    }
+
+    canvas.drawPath(progressPath, paint);
+
+    // Add glow effect
+    final glowPaint = Paint()
+      ..color = color.withValues(alpha: 0.3)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth + 4
+      ..strokeCap = StrokeCap.round
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
+
+    canvas.drawPath(progressPath, glowPaint);
+  }
+
+  @override
+  bool shouldRepaint(_RoundedRectProgressPainter oldDelegate) {
+    return oldDelegate.progress != progress || oldDelegate.color != color;
   }
 }

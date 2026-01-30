@@ -139,12 +139,12 @@ class _QuickPlayScreenState extends State<QuickPlayScreen> {
         startingChips: buyIn,
         gameType: 'quickplay',
         isPrivate: true,
-        maxPlayers: 3, // You + 2 bots
+        maxPlayers: 5, // You + 4 bots
       );
 
-      // Add 2 bots to the room
-      await _gameService.addBotsToRoom(room.id, 2);
-      print('✅ Added 2 bots to room ${room.id}');
+      // Add 4 bots to the room
+      await _gameService.addBotsToRoom(room.id, 4);
+      print('✅ Added 4 bots to room ${room.id}');
 
       if (mounted) {
         Navigator.pushReplacement(
