@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import '../widgets/mobile_wrapper.dart';
+import '../services/user_preferences.dart';
 
 // Bot class to manage individual bot state
 class Bot {
@@ -1383,6 +1384,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   Widget _buildPlayersRow() {
     final isShowdown = _gamePhase == 'showdown';
     final totalBots = _bots.length;
+    // Always include player in row when we have multiple bots
     final includePlayerInRow = totalBots > 5;
     const maxVisible = 5;
 
@@ -1419,34 +1421,9 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
               seatIndex: i + 1,
             )));
 
-    // Calculate which participants to show - center on current actor's turn
-    List<_Participant> visibleParticipants;
     final totalParticipants = allParticipants.length;
-
-    if (totalParticipants <= maxVisible) {
-      visibleParticipants = allParticipants;
-    } else {
-      // Find current actor index in allParticipants list
-      int currentActorListIndex;
-      if (includePlayerInRow) {
-        // Player is at index 0 in the list, bots are at index 1+
-        currentActorListIndex = _currentActorIndex; // 0 = player, 1+ = bots
-      } else {
-        // Only bots in list
-        currentActorListIndex = _currentActorIndex > 0 ? _currentActorIndex - 1 : 0;
-      }
-
-      // Calculate start index to center current actor
-      int startIndex = currentActorListIndex - (maxVisible ~/ 2);
-
-      // Clamp to valid range
-      if (startIndex < 0) startIndex = 0;
-      if (startIndex + maxVisible > totalParticipants) {
-        startIndex = totalParticipants - maxVisible;
-      }
-
-      visibleParticipants = allParticipants.sublist(startIndex, startIndex + maxVisible);
-    }
+    // Enable centering and sliding with 4+ participants
+    final shouldCenterOnActive = totalParticipants >= 4;
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
@@ -1454,21 +1431,81 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       padding: const EdgeInsets.symmetric(horizontal: 8),
       child: LayoutBuilder(
         builder: (context, constraints) {
+          // Use Stack-based sliding animation for centering on active player
+          if (shouldCenterOnActive) {
+            // Find current actor index in allParticipants list
+            int activeIndex;
+            if (includePlayerInRow) {
+              activeIndex = _currentActorIndex;
+            } else {
+              activeIndex = _currentActorIndex > 0 ? _currentActorIndex - 1 : 0;
+            }
+
+            // Clamp activeIndex to valid range
+            if (activeIndex < 0) activeIndex = 0;
+            if (activeIndex >= totalParticipants) activeIndex = totalParticipants - 1;
+
+            const centerSlot = maxVisible ~/ 2; // = 2 (middle of 5 slots)
+            final availableWidth = constraints.maxWidth;
+            const avatarWidth = 72.0;
+            const avatarMargin = 4.0;
+            const slotWidth = avatarWidth + avatarMargin;
+            final rowWidth = maxVisible * slotWidth;
+            final rowStartX = (availableWidth - rowWidth) / 2;
+
+            // Build visible slots with circular wrapping
+            // E.g., if activeIndex=0 and total=7, show: 5, 6, 0, 1, 2
+            final visibleIndices = <int>[];
+            for (int slot = 0; slot < maxVisible; slot++) {
+              final offset = slot - centerSlot; // -2, -1, 0, 1, 2
+              final idx = (activeIndex + offset + totalParticipants) % totalParticipants;
+              visibleIndices.add(idx);
+            }
+
+            return Stack(
+              clipBehavior: Clip.none,
+              children: [
+                for (int slot = 0; slot < visibleIndices.length; slot++)
+                  Builder(
+                    key: ValueKey(allParticipants[visibleIndices[slot]].seatIndex),
+                    builder: (context) {
+                      final participantIndex = visibleIndices[slot];
+                      final participant = allParticipants[participantIndex];
+
+                      // Calculate x position for this slot
+                      final xPos = rowStartX + (slot * slotWidth);
+
+                      return AnimatedPositioned(
+                        key: ValueKey('pos_${participant.seatIndex}'),
+                        duration: const Duration(milliseconds: 400),
+                        curve: Curves.easeOutCubic,
+                        left: xPos,
+                        top: 0,
+                        bottom: 0,
+                        child: _buildParticipantAvatar(participant),
+                      );
+                    },
+                  ),
+              ],
+            );
+          }
+
+          // Default behavior for smaller games - simple row
           final availableWidth = constraints.maxWidth;
-          final avatarWidth = 68.0;
-          final totalWidth = visibleParticipants.length * (avatarWidth + 4);
+          const avatarWidth = 68.0;
+          final totalWidth = allParticipants.length * (avatarWidth + 4);
           final startX = (availableWidth - totalWidth) / 2;
 
           return Stack(
             children: [
-              for (int i = 0; i < visibleParticipants.length; i++)
+              for (int i = 0; i < allParticipants.length; i++)
                 AnimatedPositioned(
                   duration: const Duration(milliseconds: 400),
                   curve: Curves.easeOutCubic,
                   left: startX + (i * (avatarWidth + 4)),
                   top: 0,
                   bottom: 0,
-                  child: _buildParticipantAvatar(visibleParticipants[i]),
+                  child: _buildParticipantAvatar(allParticipants[i]),
                 ),
             ],
           );
@@ -1483,9 +1520,9 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     final isLoser = isShowdown && _showdownAnimationComplete && !isWinner && !p.hasFolded;
     final participantHand = _showdownHands[p.seatIndex];
 
-    // Avatar emoji based on name
+    // Avatar emoji based on name - use user's selected avatar for "You"
     String getAvatar(String name) {
-      if (name == 'You') return '👤';
+      if (name == 'You') return UserPreferences.avatar;
       final avatars = ['🤖', '🦊', '🐸', '🦁', '🐼', '🐮', '🐧'];
       final index = int.tryParse(name.replaceAll(RegExp(r'[^0-9]'), '')) ?? 1;
       return avatars[(index - 1) % avatars.length];
@@ -1512,6 +1549,22 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
               alignment: Alignment.center,
               clipBehavior: Clip.none,
               children: [
+                // Active turn glow ring (pulsing gold glow when it's their turn)
+                if (p.isCurrentTurn && _gamePhase != 'showdown')
+                  Container(
+                    width: 50,
+                    height: 50,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFD4AF37).withValues(alpha: 0.5),
+                          blurRadius: 16,
+                          spreadRadius: 4,
+                        ),
+                      ],
+                    ),
+                  ),
                 // Winner glow ring
                 if (isShowdown && _showdownAnimationComplete && isWinner)
                   Container(
@@ -2231,8 +2284,8 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                   width: 2,
                 ),
               ),
-              child: const Center(
-                child: Text('👤', style: TextStyle(fontSize: 24)),
+              child: Center(
+                child: Text(UserPreferences.avatar, style: const TextStyle(fontSize: 24)),
               ),
             ),
             // Dealer badge
@@ -2323,7 +2376,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                 ),
                 child: Center(
                   child: Text(
-                    '👤',
+                    UserPreferences.avatar,
                     style: TextStyle(
                       fontSize: 24,
                       color: isMyTurn ? Colors.black : null,

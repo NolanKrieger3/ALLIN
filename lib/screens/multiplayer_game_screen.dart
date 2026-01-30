@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
+import 'dart:math';
 import '../models/game_room.dart';
 import '../services/game_service.dart';
 import '../services/hand_evaluator.dart';
+import '../services/user_preferences.dart';
 import '../widgets/mobile_wrapper.dart';
 
 class MultiplayerGameScreen extends StatefulWidget {
@@ -46,9 +48,18 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
   String? _lastShowdownPhase;
   EvaluatedHand? _winningHand;
 
+  // Bot handling
+  bool _isBotActing = false;
+  String? _lastBotTurnId;
+
+  // Cache the stream to prevent flickering on rebuild
+  late final Stream<GameRoom?> _roomStream;
+
   @override
   void initState() {
     super.initState();
+    // Cache the stream once - prevents recreation on every build which causes flickering
+    _roomStream = _gameService.watchRoom(widget.roomId);
     _foldAnimationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 400),
@@ -81,6 +92,14 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
   void _updateTurnTimer(GameRoom room) {
     final currentTurnId = room.currentTurnPlayerId;
     final isMyTurn = currentTurnId == _gameService.currentUserId;
+    final isHost = room.hostId == _gameService.currentUserId;
+    final isBotTurn = currentTurnId != null && _gameService.isBot(currentTurnId);
+
+    // Handle bot turns - host controls bot actions
+    if (isBotTurn && isHost && currentTurnId != _lastBotTurnId && !_isBotActing) {
+      _lastBotTurnId = currentTurnId;
+      _triggerBotAction(room);
+    }
 
     // Reset auto-fold flag when it's a new turn
     if (currentTurnId != _lastTurnPlayerId) {
@@ -116,6 +135,98 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
         });
       }
     }
+  }
+
+  /// Trigger a bot action with some simple AI logic
+  Future<void> _triggerBotAction(GameRoom room) async {
+    if (_isBotActing) return;
+    _isBotActing = true;
+
+    // Small delay to make it feel more natural
+    final delay = Random().nextInt(1500) + 500; // 0.5 - 2 seconds
+    await Future.delayed(Duration(milliseconds: delay));
+
+    if (!mounted) {
+      _isBotActing = false;
+      return;
+    }
+
+    try {
+      final currentTurnId = room.currentTurnPlayerId;
+      if (currentTurnId == null || !_gameService.isBot(currentTurnId)) {
+        _isBotActing = false;
+        return;
+      }
+
+      // Find the bot player
+      final bot = room.players.firstWhere(
+        (p) => p.uid == currentTurnId,
+        orElse: () => room.players.first,
+      );
+
+      // Simple bot AI
+      final random = Random();
+      final highestBet = room.currentBet;
+      final botCurrentBet = bot.currentBet;
+      final callAmount = highestBet - botCurrentBet;
+      final canCheck = callAmount == 0;
+      final potSize = room.pot;
+
+      // Calculate action probabilities based on situation
+      String action;
+      int? raiseAmount;
+
+      if (canCheck) {
+        // Can check - 60% check, 30% raise, 10% fold (bluff fold for realism)
+        final roll = random.nextDouble();
+        if (roll < 0.60) {
+          action = 'check';
+        } else if (roll < 0.90) {
+          action = 'raise';
+          // Raise between 1x and 2x the big blind
+          raiseAmount = room.bigBlind * (random.nextInt(2) + 1);
+        } else {
+          action = 'fold';
+        }
+      } else {
+        // Must call or fold
+        final potOdds = callAmount / (potSize + callAmount);
+
+        if (callAmount > bot.chips) {
+          // All-in situation - 70% call (all-in), 30% fold
+          action = random.nextDouble() < 0.70 ? 'call' : 'fold';
+        } else if (potOdds > 0.5) {
+          // Bad pot odds - 30% call, 10% raise, 60% fold
+          final roll = random.nextDouble();
+          if (roll < 0.30) {
+            action = 'call';
+          } else if (roll < 0.40) {
+            action = 'raise';
+            raiseAmount = room.bigBlind * (random.nextInt(2) + 1);
+          } else {
+            action = 'fold';
+          }
+        } else {
+          // Good pot odds - 60% call, 25% raise, 15% fold
+          final roll = random.nextDouble();
+          if (roll < 0.60) {
+            action = 'call';
+          } else if (roll < 0.85) {
+            action = 'raise';
+            raiseAmount = room.bigBlind * (random.nextInt(3) + 1);
+          } else {
+            action = 'fold';
+          }
+        }
+      }
+
+      // Execute the bot action
+      await _gameService.botAction(widget.roomId, currentTurnId, action, raiseAmount: raiseAmount);
+    } catch (e) {
+      print('❌ Bot action error: $e');
+    }
+
+    _isBotActing = false;
   }
 
   /// Animate cards flying away then trigger fold action
@@ -252,7 +363,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
   Widget build(BuildContext context) {
     return MobileWrapper(
       child: StreamBuilder<GameRoom?>(
-        stream: _gameService.watchRoom(widget.roomId),
+        stream: _roomStream,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Scaffold(
@@ -988,8 +1099,27 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
   }
 
   Widget _buildPlayersRow(GameRoom room, List<GamePlayer> opponents, GamePlayer currentPlayer) {
-    // Show only OPPONENTS (not current user) - matches GameScreen layout
     final isShowdown = room.phase == 'showdown';
+    final isSitAndGo = room.gameType.contains('sitandgo');
+    final totalPlayers = opponents.length + 1; // Include current player count
+
+    // Include player in row when we have 6+ total players (like practice mode)
+    final includePlayerInRow = isSitAndGo && totalPlayers > 5;
+
+    // Build all participants when including player in row
+    final allParticipants = <GamePlayer>[];
+    if (includePlayerInRow) {
+      // Find player's position in the original player order
+      final myIndex = room.players.indexWhere((p) => p.uid == _gameService.currentUserId);
+      // Rebuild the list in seat order with current player included
+      for (final player in room.players) {
+        allParticipants.add(player);
+      }
+    }
+
+    final displayList = includePlayerInRow ? allParticipants : opponents;
+    final shouldCenterActivePlayer = displayList.length >= 4 && isSitAndGo;
+    const maxVisible = 5;
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
@@ -997,13 +1127,102 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final totalWidth = opponents.length * 88.0; // 80 width + 8 margin
+          // For Sit and Go with many participants, center on active player with sliding animation
+          if (shouldCenterActivePlayer) {
+            // Find the index of the current turn player in display list
+            int activeIndex = displayList.indexWhere((p) => p.uid == room.currentTurnPlayerId);
+
+            // If current turn player not found, find the next player who will act
+            if (activeIndex == -1) {
+              final allPlayers = room.players;
+              final currentTurnIdx = allPlayers.indexWhere((p) => p.uid == room.currentTurnPlayerId);
+
+              if (currentTurnIdx != -1) {
+                // Find this player in display list
+                activeIndex = displayList.indexWhere((p) => p.uid == allPlayers[currentTurnIdx].uid);
+              }
+
+              if (activeIndex == -1) {
+                // Find the next non-folded player in turn order
+                for (int i = 0; i < allPlayers.length; i++) {
+                  final player = allPlayers[i];
+                  if (!player.hasFolded) {
+                    activeIndex = displayList.indexWhere((p) => p.uid == player.uid);
+                    if (activeIndex != -1) break;
+                  }
+                }
+              }
+
+              // Fallback to middle if we still can't find one
+              if (activeIndex == -1) {
+                activeIndex = displayList.length ~/ 2;
+              }
+            }
+
+            final totalParticipants = displayList.length;
+
+            // Calculate the offset to center the active player
+            // Active player should be at position 2 (middle of 5 visible slots: 0,1,2,3,4)
+            const centerSlot = maxVisible ~/ 2; // = 2
+
+            // Calculate where each participant should be positioned
+            // The active player goes to centerSlot, others are relative to that
+            final availableWidth = constraints.maxWidth;
+            const avatarWidth = 80.0;
+            const avatarMargin = 8.0;
+            const slotWidth = avatarWidth + avatarMargin;
+            final rowWidth = maxVisible * slotWidth;
+            final rowStartX = (availableWidth - rowWidth) / 2;
+
+            // Build visible slots with circular wrapping
+            // E.g., if activeIndex=0 and total=7, show: 5, 6, 0, 1, 2
+            final visibleIndices = <int>[];
+            for (int slot = 0; slot < maxVisible; slot++) {
+              final offset = slot - centerSlot; // -2, -1, 0, 1, 2
+              final idx = (activeIndex + offset + totalParticipants) % totalParticipants;
+              visibleIndices.add(idx);
+            }
+
+            return Stack(
+              clipBehavior: Clip.none,
+              children: [
+                for (int slot = 0; slot < visibleIndices.length; slot++)
+                  Builder(
+                    key: ValueKey(displayList[visibleIndices[slot]].uid),
+                    builder: (context) {
+                      final participantIndex = visibleIndices[slot];
+                      final participant = displayList[participantIndex];
+                      final isCurrentPlayer = participant.uid == _gameService.currentUserId;
+
+                      // Calculate x position for this slot
+                      final xPos = rowStartX + (slot * slotWidth);
+
+                      return AnimatedPositioned(
+                        key: ValueKey('pos_${participant.uid}'),
+                        duration: const Duration(milliseconds: 400),
+                        curve: Curves.easeOutCubic,
+                        left: xPos,
+                        top: 0,
+                        bottom: 0,
+                        child: _buildParticipantAvatar(participant, room, isCurrentPlayer: isCurrentPlayer),
+                      );
+                    },
+                  ),
+              ],
+            );
+          }
+
+          // Default behavior for smaller games - simple row
+          final totalWidth = displayList.length * 88.0; // 80 width + 8 margin
           final needsScroll = totalWidth > constraints.maxWidth;
 
           final row = Row(
             mainAxisAlignment: MainAxisAlignment.center,
             mainAxisSize: MainAxisSize.min,
-            children: opponents.map((player) => _buildOpponentAvatar(player, room)).toList(),
+            children: displayList.map((player) {
+              final isCurrentPlayer = player.uid == _gameService.currentUserId;
+              return _buildParticipantAvatar(player, room, isCurrentPlayer: isCurrentPlayer);
+            }).toList(),
           );
 
           if (needsScroll) {
@@ -1019,13 +1238,15 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
     );
   }
 
-  /// Build opponent avatar (matches GameScreen's _buildParticipantAvatar)
-  Widget _buildOpponentAvatar(GamePlayer player, GameRoom room) {
+  /// Build participant avatar (handles both opponents and current player)
+  /// Matches GameScreen's _buildParticipantAvatar visual style
+  Widget _buildParticipantAvatar(GamePlayer player, GameRoom room, {bool isCurrentPlayer = false}) {
     final isTheirTurn = room.currentTurnPlayerId == player.uid;
     final hasFolded = player.hasFolded;
     final isShowdown = room.phase == 'showdown';
     final isWinner = room.winnerId == player.uid;
     final isLoser = isShowdown && _showdownAnimationComplete && !isWinner && !hasFolded;
+    final isBot = _gameService.isBot(player.uid);
 
     // Calculate this player's hand for card highlighting
     EvaluatedHand? playerHand;
@@ -1033,8 +1254,23 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
       playerHand = HandEvaluator.evaluateBestHand(player.cards, room.communityCards);
     }
 
-    // Avatar emojis based on display name
+    // Bot-specific avatars (matching practice mode)
+    String getBotAvatar(String name) {
+      final botAvatars = ['🤖', '🦊', '🐸', '🦁', '🐼', '🐮', '🐧', '🐯', '🐻', '🦄', '🐵', '🐺'];
+      // Extract number from bot name or use hash
+      final numMatch = RegExp(r'\d+').firstMatch(name);
+      if (numMatch != null) {
+        final num = int.tryParse(numMatch.group(0)!) ?? 0;
+        return botAvatars[num % botAvatars.length];
+      }
+      // Use name hash for consistent avatar
+      return botAvatars[name.hashCode.abs() % botAvatars.length];
+    }
+
+    // Avatar emojis - use user's selected avatar for current player, bot avatars for bots, letter-based for others
     String getAvatar(String name) {
+      if (isCurrentPlayer) return UserPreferences.avatar;
+      if (isBot) return getBotAvatar(name);
       if (name.isEmpty) return '👤';
       final firstChar = name[0].toLowerCase();
       final avatars = {
@@ -1068,6 +1304,9 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
       return avatars[firstChar] ?? '👤';
     }
 
+    // Display name - "You" for current player
+    final displayName = isCurrentPlayer ? 'You' : player.displayName;
+
     // Border color: gold if winner at showdown, gold if their turn
     Color? borderColor;
     if (isShowdown && _showdownAnimationComplete && isWinner) {
@@ -1093,6 +1332,22 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
               alignment: Alignment.center,
               clipBehavior: Clip.none,
               children: [
+                // Active turn glow ring (pulsing gold glow when it's their turn)
+                if (isTheirTurn && room.status == 'playing' && room.phase != 'showdown')
+                  Container(
+                    width: 54,
+                    height: 54,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFD4AF37).withValues(alpha: 0.5),
+                          blurRadius: 16,
+                          spreadRadius: 4,
+                        ),
+                      ],
+                    ),
+                  ),
                 // Winner glow ring
                 if (isShowdown && _showdownAnimationComplete && isWinner)
                   Container(
@@ -1185,9 +1440,9 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
               ],
             ),
             const SizedBox(height: 4),
-            // Name
+            // Name - use displayName which is "You" for current player
             Text(
-              player.displayName.length > 8 ? player.displayName.substring(0, 8) : player.displayName,
+              displayName.length > 8 ? displayName.substring(0, 8) : displayName,
               style: TextStyle(
                 color: hasFolded ? Colors.grey : Colors.white,
                 fontSize: 11,
@@ -1747,39 +2002,8 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
 
   /// Build player avatar for bottom right - matches GameScreen's _buildPlayerAvatar
   Widget _buildPlayerInfoMinimal(GamePlayer player, {GameRoom? room}) {
-    String getAvatar(String name) {
-      if (name.isEmpty) return '👤';
-      final firstChar = name[0].toLowerCase();
-      final avatars = {
-        'a': '👨',
-        'b': '🧔',
-        'c': '👩',
-        'd': '🧑',
-        'e': '👴',
-        'f': '👵',
-        'g': '🦊',
-        'h': '🦄',
-        'i': '🐸',
-        'j': '🐵',
-        'k': '🐻',
-        'l': '🐼',
-        'm': '🦁',
-        'n': '🐯',
-        'o': '🐨',
-        'p': '🐷',
-        'q': '🐰',
-        'r': '🐶',
-        's': '🐱',
-        't': '🐲',
-        'u': '🦋',
-        'v': '🦅',
-        'w': '🐺',
-        'x': '🦈',
-        'y': '🦜',
-        'z': '🦎',
-      };
-      return avatars[firstChar] ?? '👤';
-    }
+    // Use the user's selected avatar for current player
+    final playerAvatar = UserPreferences.avatar;
 
     final isMyTurn = room != null && room.currentTurnPlayerId == player.uid;
     final isDealer = room != null &&
@@ -1805,7 +2029,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
                 ),
               ),
               child: Center(
-                child: Text(getAvatar(player.displayName), style: const TextStyle(fontSize: 40)),
+                child: Text(playerAvatar, style: const TextStyle(fontSize: 40)),
               ),
             ),
             // Dealer badge
@@ -1872,9 +2096,19 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
 
   void _showRaiseDialog(GameRoom room, GamePlayer player) {
     // Minimum raise is current bet + last raise amount (or big blind if first raise)
-    final minRaise = room.currentBet + (room.lastRaiseAmount > 0 ? room.lastRaiseAmount : room.bigBlind);
-    var raiseAmount = minRaise;
+    final calculatedMinRaise = room.currentBet + (room.lastRaiseAmount > 0 ? room.lastRaiseAmount : room.bigBlind);
     final maxRaise = player.chips + player.currentBet;
+
+    // Ensure minRaise doesn't exceed maxRaise (player might not have enough chips)
+    final minRaise = calculatedMinRaise > maxRaise ? maxRaise : calculatedMinRaise;
+    var raiseAmount = minRaise;
+
+    // Don't show slider if player can only go all-in
+    if (minRaise >= maxRaise) {
+      // Just go all-in directly
+      _gameService.playerAction(widget.roomId, 'raise', raiseAmount: maxRaise);
+      return;
+    }
 
     showDialog(
       context: context,
@@ -1889,7 +2123,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
             mainAxisSize: MainAxisSize.min,
             children: [
               Slider(
-                value: raiseAmount.toDouble().clamp(minRaise.toDouble(), maxRaise.toDouble()),
+                value: raiseAmount.toDouble(),
                 min: minRaise.toDouble(),
                 max: maxRaise.toDouble(),
                 activeColor: const Color(0xFFD4AF37),

@@ -31,11 +31,13 @@ class ProfileTabState extends State<ProfileTab> {
   StreamSubscription? _friendsSub;
   StreamSubscription? _authSub;
   String _displayUsername = '';
+  String _selectedAvatar = '👤';
 
   @override
   void initState() {
     super.initState();
     _displayUsername = UserPreferences.username;
+    _selectedAvatar = UserPreferences.avatar;
     _loadFriends();
     _friendsSub = _friendsService.friendsStream.listen((friends) {
       if (mounted) setState(() => _friends = friends);
@@ -535,14 +537,36 @@ class ProfileTabState extends State<ProfileTab> {
                 ),
                 child: Column(
                   children: [
-                    Container(
-                      width: 56,
-                      height: 56,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(16),
+                    GestureDetector(
+                      onTap: () => _showAvatarPicker(context),
+                      child: Stack(
+                        children: [
+                          Container(
+                            width: 56,
+                            height: 56,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Center(child: Text(_selectedAvatar, style: const TextStyle(fontSize: 26))),
+                          ),
+                          // Edit indicator
+                          Positioned(
+                            right: -2,
+                            bottom: -2,
+                            child: Container(
+                              width: 20,
+                              height: 20,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF2196F3),
+                                shape: BoxShape.circle,
+                                border: Border.all(color: const Color(0xFF141414), width: 2),
+                              ),
+                              child: const Icon(Icons.edit, color: Colors.white, size: 10),
+                            ),
+                          ),
+                        ],
                       ),
-                      child: const Center(child: Text('👤', style: TextStyle(fontSize: 26))),
                     ),
                     const SizedBox(height: 12),
                     Text(
@@ -843,11 +867,11 @@ class ProfileTabState extends State<ProfileTab> {
                     Row(
                       children: [
                         const Expanded(
-                          child: StatCard(value: '0', label: 'Duels Won'),
+                          child: StatCard(value: '0', label: 'Tourneys Won'),
                         ),
                         const SizedBox(width: 8),
                         const Expanded(
-                          child: StatCard(value: '0', label: 'Tournaments'),
+                          child: StatCard(value: '0', label: 'Cash Games'),
                         ),
                         const SizedBox(width: 8),
                         const Expanded(
@@ -1628,6 +1652,140 @@ class ProfileTabState extends State<ProfileTab> {
                 ],
               ),
             ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showAvatarPicker(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => Dialog(
+        backgroundColor: const Color(0xFF1A1A1A),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        child: Container(
+          width: 340,
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Choose Avatar',
+                    style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w700),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(dialogContext),
+                    icon: Icon(Icons.close, color: Colors.white.withValues(alpha: 0.5)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Select your profile avatar',
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 14),
+              ),
+              const SizedBox(height: 20),
+              // Avatar grid
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 4,
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                ),
+                itemCount: GameAvatars.all.length,
+                itemBuilder: (context, index) {
+                  final avatar = GameAvatars.all[index];
+                  final isUnlocked = GameAvatars.isUnlocked(index);
+                  final isSelected = UserPreferences.avatarIndex == index;
+
+                  return GestureDetector(
+                    onTap: isUnlocked
+                        ? () async {
+                            await UserPreferences.setAvatar(index);
+                            if (mounted) {
+                              setState(() => _selectedAvatar = avatar);
+                            }
+                            Navigator.pop(dialogContext);
+                          }
+                        : () {
+                            // Show unlock requirement
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('🔒 ${GameAvatars.getUnlockRequirement(index)}'),
+                                backgroundColor: const Color(0xFF333333),
+                              ),
+                            );
+                          },
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? const Color(0xFF2196F3).withValues(alpha: 0.3)
+                            : Colors.white.withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isSelected
+                              ? const Color(0xFF2196F3)
+                              : isUnlocked
+                                  ? Colors.white.withValues(alpha: 0.1)
+                                  : Colors.white.withValues(alpha: 0.03),
+                          width: isSelected ? 2 : 1,
+                        ),
+                      ),
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          Text(
+                            avatar,
+                            style: TextStyle(
+                              fontSize: 28,
+                              color: isUnlocked ? null : Colors.grey,
+                            ),
+                          ),
+                          // Lock overlay for locked avatars
+                          if (!isUnlocked)
+                            Container(
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.6),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Center(
+                                child: Icon(Icons.lock, color: Colors.white54, size: 20),
+                              ),
+                            ),
+                          // Checkmark for selected
+                          if (isSelected)
+                            Positioned(
+                              top: 2,
+                              right: 2,
+                              child: Container(
+                                width: 16,
+                                height: 16,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFF2196F3),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.check, color: Colors.white, size: 10),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 16),
+              Text(
+                '🔓 3 avatars unlocked • 🔒 ${GameAvatars.all.length - 3} locked',
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 12),
+              ),
+            ],
           ),
         ),
       ),
@@ -2623,9 +2781,9 @@ class AchievementCard extends StatelessWidget {
     AchievementData('✨', 'Ultra Jackpot', 'Win 1,000,000 from the wheel', false, 0.0),
 
     // Multiplayer (56-70)
-    AchievementData('⚔️', 'Duel Winner', 'Win your first heads-up duel', false, 0.0),
-    AchievementData('⚔️', '10 Duels Won', 'Win 10 heads-up duels', false, 0.0),
-    AchievementData('⚔️', '50 Duels Won', 'Win 50 heads-up duels', false, 0.0),
+    AchievementData('🤝', 'Team Player', 'Join your first team', false, 0.0),
+    AchievementData('🏅', 'Team Contributor', 'Earn 10,000 chips for your team', false, 0.0),
+    AchievementData('⭐', 'Team Star', 'Be MVP in a team match', false, 0.0),
     AchievementData('👥', 'Table Regular', 'Play 50 multiplayer games', false, 0.0),
     AchievementData('🎭', 'Social Player', 'Play with 20 different players', false, 0.0),
     AchievementData('🗣️', 'Chatty', 'Send 100 chat messages', false, 0.0),

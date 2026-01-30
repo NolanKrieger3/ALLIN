@@ -120,6 +120,57 @@ class _QuickPlayScreenState extends State<QuickPlayScreen> {
     }
   }
 
+  Future<void> _startGameWithBots() async {
+    if (!_authService.isLoggedIn) {
+      await _authService.signInAnonymously();
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      final blindLevel = _blindLevels[_selectedBlindIndex];
+      final bigBlind = blindLevel['big'] as int;
+      final buyIn = blindLevel['buyIn'] as int;
+
+      // Create a new private room for testing
+      print('🤖 Creating test room with bots');
+      final room = await _gameService.createRoom(
+        bigBlind: bigBlind,
+        startingChips: buyIn,
+        gameType: 'quickplay',
+        isPrivate: true,
+        maxPlayers: 3, // You + 2 bots
+      );
+
+      // Add 2 bots to the room
+      await _gameService.addBotsToRoom(room.id, 2);
+      print('✅ Added 2 bots to room ${room.id}');
+
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => MultiplayerGameScreen(roomId: room.id, autoStart: true),
+          ),
+        );
+      }
+    } catch (e) {
+      print('❌ Failed to create test game: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to start test game: $e'),
+            backgroundColor: const Color(0xFFFF4444),
+          ),
+        );
+      }
+    }
+
+    if (mounted) {
+      setState(() => _isLoading = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final blindLevel = _blindLevels[_selectedBlindIndex];
@@ -273,6 +324,40 @@ class _QuickPlayScreenState extends State<QuickPlayScreen> {
                                 letterSpacing: 2,
                               ),
                             ),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 12),
+
+                // Test with bots button
+                GestureDetector(
+                  onTap: _isLoading ? null : _startGameWithBots,
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                    ),
+                    child: Center(
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.smart_toy, color: Colors.white.withValues(alpha: 0.6), size: 18),
+                          const SizedBox(width: 8),
+                          Text(
+                            'TEST WITH 2 BOTS',
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.7),
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 1,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),

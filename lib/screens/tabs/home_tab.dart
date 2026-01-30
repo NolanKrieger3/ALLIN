@@ -2260,7 +2260,7 @@ class HomeTabState extends State<HomeTab> {
                     children: [
                       Text('♠', style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 24)),
                       const SizedBox(width: 8),
-                      Text('♥', style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 24)),
+                      const Text('♥', style: TextStyle(color: Colors.red, fontSize: 24)),
                       const SizedBox(width: 8),
                       Text('♣', style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 24)),
                       const SizedBox(width: 8),
