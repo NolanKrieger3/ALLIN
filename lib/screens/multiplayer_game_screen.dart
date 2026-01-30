@@ -37,10 +37,15 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
   late Animation<double> _foldOpacityAnimation;
   bool _isFolding = false;
   double _dragOffset = 0.0; // Track drag distance for swipe-to-fold
+  List<PlayingCard> _foldedCards = []; // Store cards when folded to show ghost outline
+
+  // Stats panel
+  bool _showStatsPanel = false;
+  double _statsPanelOffset = 0.0;
 
   // Turn timer
   Timer? _turnTimer;
-  double _remainingSeconds = 6.0;
+  double _remainingSeconds = 10.0;
   String? _lastTurnPlayerId;
   bool _hasAutoFolded = false;
 
@@ -244,9 +249,14 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
   }
 
   /// Animate cards flying away then trigger fold action
-  Future<void> _animateFold() async {
+  Future<void> _animateFold(List<PlayingCard> cards) async {
     if (_isFolding) return;
-    setState(() => _isFolding = true);
+
+    // Save the cards before folding so we can show ghost outline
+    setState(() {
+      _isFolding = true;
+      _foldedCards = List.from(cards);
+    });
 
     await _foldAnimationController.forward();
     await _gameService.playerAction(widget.roomId, 'fold');
@@ -276,6 +286,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
       _showdownAnimationComplete = false;
       _lastShowdownPhase = null;
       _winningHand = null;
+      _foldedCards = []; // Clear folded cards for new hand
     } catch (e) {
       print('❌ Failed to start new hand: $e');
     }
@@ -1594,13 +1605,13 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
     return Column(
       children: [
         // Community Cards Row
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            for (var i = 0; i < 5; i++)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: () {
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              for (var i = 0; i < 5; i++)
+                () {
                   final card = i < room.communityCards.length ? room.communityCards[i] : null;
                   final isHighlighted = isShowdown && card != null && _isCardInWinningHand(card, room);
                   final isDimmed = isShowdown && card != null && !_isCardInWinningHand(card, room);
@@ -1611,8 +1622,8 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
                     isDimmed: isDimmed,
                   );
                 }(),
-              ),
-          ],
+            ],
+          ),
         ),
         const SizedBox(height: 12),
         // Pot amount below cards
@@ -1629,7 +1640,11 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
   }
 
   Widget _buildMinimalCard(PlayingCard? card,
-      {bool isEmpty = false, bool isHoleCard = false, bool isHighlighted = false, bool isDimmed = false}) {
+      {bool isEmpty = false,
+      bool isHoleCard = false,
+      bool isHighlighted = false,
+      bool isDimmed = false,
+      bool isGhost = false}) {
     // Use larger size for hole cards (player's cards at bottom)
     final width = isHoleCard ? 70.0 : 56.0;
     final height = isHoleCard ? 98.0 : 78.0;
@@ -1654,6 +1669,39 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
     }
 
     final isRed = card.suit == '♥' || card.suit == '♦';
+
+    // Ghost card style for folded cards
+    if (isGhost) {
+      return Container(
+        width: width,
+        height: height,
+        decoration: BoxDecoration(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.2), width: 2),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              card.rank,
+              style: TextStyle(
+                color: (isRed ? Colors.red.shade300 : Colors.white).withValues(alpha: 0.4),
+                fontSize: isHoleCard ? 24 : 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            Text(
+              card.suit,
+              style: TextStyle(
+                color: (isRed ? Colors.red.shade300 : Colors.white).withValues(alpha: 0.4),
+                fontSize: isHoleCard ? 20 : 16,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
@@ -1791,16 +1839,28 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              // Player's cards (face down when waiting)
-              Row(
-                children: [
-                  _buildCardBack(width: 70, height: 98),
-                  Transform.translate(
-                    offset: const Offset(-20, 0),
-                    child: _buildCardBack(width: 70, height: 98),
-                  ),
-                ],
-              ),
+              // Player's cards - show ghost outline if folded, otherwise card backs
+              if (player.hasFolded && _foldedCards.isNotEmpty)
+                Row(
+                  children: [
+                    _buildMinimalCard(_foldedCards[0], isHoleCard: true, isGhost: true),
+                    if (_foldedCards.length > 1)
+                      Transform.translate(
+                        offset: const Offset(-20, 0),
+                        child: _buildMinimalCard(_foldedCards[1], isHoleCard: true, isGhost: true),
+                      ),
+                  ],
+                )
+              else
+                Row(
+                  children: [
+                    _buildCardBack(width: 70, height: 98),
+                    Transform.translate(
+                      offset: const Offset(-20, 0),
+                      child: _buildCardBack(width: 70, height: 98),
+                    ),
+                  ],
+                ),
               const Spacer(),
               // Player info
               _buildPlayerAvatarLarge(player, room: room),
@@ -1877,9 +1937,9 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
                   });
                 },
                 onVerticalDragEnd: (details) {
-                  // If swiped up enough (past threshold), trigger fold
-                  if (_dragOffset < -80) {
-                    _animateFold();
+                  // If swiped up enough (past threshold) or fast enough, trigger fold
+                  if (_dragOffset < -80 || (details.primaryVelocity != null && details.primaryVelocity! < -300)) {
+                    _animateFold(player.cards);
                   }
                   // Reset drag offset
                   setState(() => _dragOffset = 0);
@@ -2114,78 +2174,165 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
         room.dealerIndex < room.players.length &&
         player.uid == room.players[room.dealerIndex].uid;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Container(
-              width: 100,
-              height: 126, // Match the large card height
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.white.withValues(alpha: 0.08),
-                    Colors.white.withValues(alpha: 0.02),
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: isMyTurn ? Colors.white.withValues(alpha: 0.9) : Colors.white.withValues(alpha: 0.1),
-                  width: isMyTurn ? 2 : 1,
-                ),
-                boxShadow: isMyTurn
-                    ? [
-                        BoxShadow(
-                          color: Colors.white.withValues(alpha: 0.3),
-                          blurRadius: 16,
-                          spreadRadius: 0,
-                        ),
-                      ]
-                    : null,
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(playerAvatar, style: const TextStyle(fontSize: 40)),
-                  const SizedBox(height: 8),
-                  Text(
-                    _formatChips(player.chips),
-                    style: const TextStyle(
-                      color: Colors.white70,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
+    return GestureDetector(
+      onVerticalDragUpdate: (details) {
+        setState(() {
+          _statsPanelOffset += details.delta.dy;
+          // Clamp to only allow downward drag to reveal stats
+          _statsPanelOffset = _statsPanelOffset.clamp(-150.0, 0.0);
+        });
+      },
+      onVerticalDragEnd: (details) {
+        setState(() {
+          // If dragged down enough, snap open
+          if (_statsPanelOffset < -50) {
+            _statsPanelOffset = -150;
+            _showStatsPanel = true;
+          } else {
+            _statsPanelOffset = 0;
+            _showStatsPanel = false;
+          }
+        });
+      },
+      onTap: () {
+        setState(() {
+          _showStatsPanel = !_showStatsPanel;
+          _statsPanelOffset = _showStatsPanel ? -150 : 0;
+        });
+      },
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              // Stats panel background (appears below avatar)
+              AnimatedPositioned(
+                duration: const Duration(milliseconds: 200),
+                bottom: _statsPanelOffset.abs(),
+                right: 0,
+                child: AnimatedOpacity(
+                  duration: const Duration(milliseconds: 200),
+                  opacity: _showStatsPanel ? 1.0 : 0.0,
+                  child: Container(
+                    width: 100,
+                    height: 150,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.8),
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(16),
+                        topRight: Radius.circular(16),
+                      ),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        _buildStatRow('Hands', '${player.handsPlayed ?? 0}'),
+                        _buildStatRow('Won', '${player.handsWon ?? 0}'),
+                        _buildStatRow('Bet', _formatChips(player.currentBet)),
+                        _buildStatRow('Total', _formatChips(player.totalBet ?? 0)),
+                      ],
                     ),
                   ),
-                ],
+                ),
               ),
-            ),
-            // Dealer badge
-            if (isDealer)
-              Positioned(
-                bottom: -2,
-                right: -2,
+              // Main avatar container
+              Transform.translate(
+                offset: Offset(0, _statsPanelOffset),
                 child: Container(
-                  width: 18,
-                  height: 18,
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
+                  width: 100,
+                  height: 126, // Match the large card height
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.white.withValues(alpha: 0.08),
+                        Colors.white.withValues(alpha: 0.02),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: isMyTurn ? Colors.white.withValues(alpha: 0.9) : Colors.white.withValues(alpha: 0.1),
+                      width: isMyTurn ? 2 : 1,
+                    ),
+                    boxShadow: isMyTurn
+                        ? [
+                            BoxShadow(
+                              color: Colors.white.withValues(alpha: 0.3),
+                              blurRadius: 16,
+                              spreadRadius: 0,
+                            ),
+                          ]
+                        : null,
                   ),
-                  child: const Center(
-                    child: Text('D',
-                        style: TextStyle(
-                          color: Colors.black,
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                        )),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(playerAvatar, style: const TextStyle(fontSize: 40)),
+                      const SizedBox(height: 8),
+                      Text(
+                        _formatChips(player.chips),
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
-          ],
+              // Dealer badge
+              if (isDealer)
+                Positioned(
+                  bottom: -2,
+                  right: -2,
+                  child: Container(
+                    width: 18,
+                    height: 18,
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Center(
+                      child: Text('D',
+                          style: TextStyle(
+                            color: Colors.black,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          )),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatRow(String label, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: 0.5),
+            fontSize: 10,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        Text(
+          value,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ],
     );

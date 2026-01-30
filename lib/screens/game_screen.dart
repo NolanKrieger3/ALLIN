@@ -91,6 +91,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   late Animation<double> _foldOpacityAnimation;
   bool _isFolding = false;
   double _dragOffset = 0.0;
+  List<PlayingCard> _foldedCards = []; // Store cards when folded to show ghost outline
 
   @override
   void initState() {
@@ -403,6 +404,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       _playerBet = 0;
       _playerHasActed = false;
       _playerHasFolded = false;
+      _foldedCards = []; // Clear folded cards for new hand
 
       // Reset and deal to bots
       for (var bot in _bots) {
@@ -570,6 +572,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
 
       switch (action) {
         case 'fold':
+          _foldedCards = List.from(_playerCards); // Save cards before folding
           _playerHasFolded = true;
           _checkForWinner();
           break;
@@ -1062,11 +1065,11 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
 
   void _checkGameOver() {
     // Remove bots with no chips
-    final activeBots = _bots.where((b) => b.chips > 0).toList();
+    _bots = _bots.where((b) => b.chips > 0).toList();
 
     if (_playerChips <= 0) {
       _showGameOver(false);
-    } else if (activeBots.isEmpty) {
+    } else if (_bots.isEmpty) {
       _showGameOver(true);
     } else {
       _startNewHand();
@@ -1818,13 +1821,13 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
             ),
           ),
         ),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            for (var i = 0; i < 5; i++)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 3),
-                child: () {
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              for (var i = 0; i < 5; i++)
+                () {
                   if (i >= _communityCards.length) {
                     return _buildEmptyCardSlot();
                   }
@@ -1833,8 +1836,8 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                   final isDimmed = isShowdown && winnerHand != null && !winnerHand.isCardInWinningHand(card);
                   return _buildMinimalCard(card, isHighlighted: isHighlighted, isDimmed: isDimmed);
                 }(),
-              ),
-          ],
+            ],
+          ),
         ),
         const SizedBox(height: 12),
         // Pot amount below cards
@@ -2009,6 +2012,18 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                       ),
                     ],
                   )
+                else if (_playerHasFolded && _foldedCards.isNotEmpty)
+                  // Show ghost outline of folded cards
+                  Row(
+                    children: [
+                      _buildLargeCard(_foldedCards[0], isGhost: true),
+                      if (_foldedCards.length > 1)
+                        Transform.translate(
+                          offset: const Offset(-15, 0),
+                          child: _buildLargeCard(_foldedCards[1], isGhost: true),
+                        ),
+                    ],
+                  )
                 else
                   _buildPlayerCardsLarge(),
                 const Spacer(),
@@ -2144,10 +2159,43 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildLargeCard(PlayingCard card, {bool isHighlighted = false, bool isDimmed = false}) {
+  Widget _buildLargeCard(PlayingCard card, {bool isHighlighted = false, bool isDimmed = false, bool isGhost = false}) {
     const width = 90.0;
     const height = 126.0;
     final isRed = card.suit == '♥' || card.suit == '♦';
+
+    // Ghost card style for folded cards
+    if (isGhost) {
+      return Container(
+        width: width,
+        height: height,
+        decoration: BoxDecoration(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.2), width: 2),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              card.rank,
+              style: TextStyle(
+                color: (isRed ? Colors.red.shade300 : Colors.white).withValues(alpha: 0.4),
+                fontSize: 32,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            Text(
+              card.suit,
+              style: TextStyle(
+                color: (isRed ? Colors.red.shade300 : Colors.white).withValues(alpha: 0.4),
+                fontSize: 34,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
