@@ -91,6 +91,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   late Animation<double> _foldOpacityAnimation;
   bool _isFolding = false;
   double _dragOffset = 0.0;
+  List<PlayingCard> _foldedCards = []; // Store cards when folded to show ghost outline
 
   @override
   void initState() {
@@ -403,6 +404,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       _playerBet = 0;
       _playerHasActed = false;
       _playerHasFolded = false;
+      _foldedCards = []; // Clear folded cards for new hand
 
       // Reset and deal to bots
       for (var bot in _bots) {
@@ -570,6 +572,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
 
       switch (action) {
         case 'fold':
+          _foldedCards = List.from(_playerCards); // Save cards before folding
           _playerHasFolded = true;
           _checkForWinner();
           break;
@@ -2014,6 +2017,18 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                       ),
                     ],
                   )
+                else if (_playerHasFolded && _foldedCards.isNotEmpty)
+                  // Show ghost outline of folded cards
+                  Row(
+                    children: [
+                      _buildLargeCard(_foldedCards[0], isGhost: true),
+                      if (_foldedCards.length > 1)
+                        Transform.translate(
+                          offset: const Offset(-15, 0),
+                          child: _buildLargeCard(_foldedCards[1], isGhost: true),
+                        ),
+                    ],
+                  )
                 else
                   _buildPlayerCardsLarge(),
                 const Spacer(),
@@ -2149,10 +2164,43 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildLargeCard(PlayingCard card, {bool isHighlighted = false, bool isDimmed = false}) {
+  Widget _buildLargeCard(PlayingCard card, {bool isHighlighted = false, bool isDimmed = false, bool isGhost = false}) {
     const width = 90.0;
     const height = 126.0;
     final isRed = card.suit == '♥' || card.suit == '♦';
+
+    // Ghost card style for folded cards
+    if (isGhost) {
+      return Container(
+        width: width,
+        height: height,
+        decoration: BoxDecoration(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.2), width: 2),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              card.rank,
+              style: TextStyle(
+                color: (isRed ? Colors.red.shade300 : Colors.white).withValues(alpha: 0.4),
+                fontSize: 32,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            Text(
+              card.suit,
+              style: TextStyle(
+                color: (isRed ? Colors.red.shade300 : Colors.white).withValues(alpha: 0.4),
+                fontSize: 34,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),

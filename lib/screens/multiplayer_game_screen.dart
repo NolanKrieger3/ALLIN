@@ -36,6 +36,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
   late Animation<Offset> _foldSlideAnimation;
   late Animation<double> _foldOpacityAnimation;
   bool _isFolding = false;
+  List<PlayingCard> _foldedCards = []; // Store cards when folded to show ghost outline
 
   // Turn timer
   Timer? _turnTimer;
@@ -230,9 +231,14 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
   }
 
   /// Animate cards flying away then trigger fold action
-  Future<void> _animateFold() async {
+  Future<void> _animateFold(List<PlayingCard> cards) async {
     if (_isFolding) return;
-    setState(() => _isFolding = true);
+
+    // Save the cards before folding so we can show ghost outline
+    setState(() {
+      _isFolding = true;
+      _foldedCards = List.from(cards);
+    });
 
     await _foldAnimationController.forward();
     await _gameService.playerAction(widget.roomId, 'fold');
@@ -262,6 +268,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
       _showdownAnimationComplete = false;
       _lastShowdownPhase = null;
       _winningHand = null;
+      _foldedCards = []; // Clear folded cards for new hand
     } catch (e) {
       print('❌ Failed to start new hand: $e');
     }
@@ -1613,7 +1620,11 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
   }
 
   Widget _buildMinimalCard(PlayingCard? card,
-      {bool isEmpty = false, bool isHoleCard = false, bool isHighlighted = false, bool isDimmed = false}) {
+      {bool isEmpty = false,
+      bool isHoleCard = false,
+      bool isHighlighted = false,
+      bool isDimmed = false,
+      bool isGhost = false}) {
     // Use larger size for hole cards (player's cards at bottom)
     final width = isHoleCard ? 70.0 : 56.0;
     final height = isHoleCard ? 98.0 : 78.0;
@@ -1638,6 +1649,39 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
     }
 
     final isRed = card.suit == '♥' || card.suit == '♦';
+
+    // Ghost card style for folded cards
+    if (isGhost) {
+      return Container(
+        width: width,
+        height: height,
+        decoration: BoxDecoration(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.2), width: 2),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              card.rank,
+              style: TextStyle(
+                color: (isRed ? Colors.red.shade300 : Colors.white).withValues(alpha: 0.4),
+                fontSize: isHoleCard ? 24 : 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            Text(
+              card.suit,
+              style: TextStyle(
+                color: (isRed ? Colors.red.shade300 : Colors.white).withValues(alpha: 0.4),
+                fontSize: isHoleCard ? 20 : 16,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
@@ -1775,16 +1819,28 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              // Player's cards (face down when waiting)
-              Row(
-                children: [
-                  _buildCardBack(width: 70, height: 98),
-                  Transform.translate(
-                    offset: const Offset(-20, 0),
-                    child: _buildCardBack(width: 70, height: 98),
-                  ),
-                ],
-              ),
+              // Player's cards - show ghost outline if folded, otherwise card backs
+              if (player.hasFolded && _foldedCards.isNotEmpty)
+                Row(
+                  children: [
+                    _buildMinimalCard(_foldedCards[0], isHoleCard: true, isGhost: true),
+                    if (_foldedCards.length > 1)
+                      Transform.translate(
+                        offset: const Offset(-20, 0),
+                        child: _buildMinimalCard(_foldedCards[1], isHoleCard: true, isGhost: true),
+                      ),
+                  ],
+                )
+              else
+                Row(
+                  children: [
+                    _buildCardBack(width: 70, height: 98),
+                    Transform.translate(
+                      offset: const Offset(-20, 0),
+                      child: _buildCardBack(width: 70, height: 98),
+                    ),
+                  ],
+                ),
               const Spacer(),
               // Player info
               _buildPlayerInfoMinimal(player, room: room),
@@ -1856,7 +1912,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
                 onVerticalDragEnd: (details) {
                   // Swipe up to fold
                   if (details.primaryVelocity != null && details.primaryVelocity! < -300) {
-                    _animateFold();
+                    _animateFold(player.cards);
                   }
                 },
                 child: SlideTransition(
