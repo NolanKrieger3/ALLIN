@@ -1555,7 +1555,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
             Text(
               p.currentBet > 0 ? '${_formatChips(p.chips)} (${_formatChips(p.currentBet)})' : _formatChips(p.chips),
               style: TextStyle(
-                color: p.hasFolded ? Colors.grey : Colors.yellow.shade600,
+                color: p.hasFolded ? Colors.grey : Colors.white70,
                 fontSize: 10,
                 fontWeight: FontWeight.w600,
               ),
@@ -2142,7 +2142,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
         Text(
           _formatChips(_playerChips),
           style: TextStyle(
-            color: Colors.yellow.shade600,
+            color: Colors.white70,
             fontSize: 14,
             fontWeight: FontWeight.w600,
           ),

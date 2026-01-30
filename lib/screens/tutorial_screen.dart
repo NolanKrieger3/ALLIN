@@ -809,7 +809,7 @@ class _TutorialScreenState extends State<TutorialScreen> with TickerProviderStat
           Text(
             _formatChips(chips),
             style: TextStyle(
-              color: hasFolded ? Colors.grey : Colors.yellow.shade600,
+              color: hasFolded ? Colors.grey : Colors.white70,
               fontSize: 10,
               fontWeight: FontWeight.w600,
             ),
@@ -1075,7 +1075,7 @@ class _TutorialScreenState extends State<TutorialScreen> with TickerProviderStat
         Text(
           _formatChips(_playerChips),
           style: TextStyle(
-            color: Colors.yellow.shade600,
+            color: Colors.white70,
             fontSize: 14,
             fontWeight: FontWeight.w600,
           ),

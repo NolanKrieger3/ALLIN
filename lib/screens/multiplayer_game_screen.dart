@@ -1201,7 +1201,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
                   ? '${_formatChips(player.chips)} (${_formatChips(player.currentBet)})'
                   : _formatChips(player.chips),
               style: TextStyle(
-                color: hasFolded ? Colors.grey : Colors.yellow.shade600,
+                color: hasFolded ? Colors.grey : Colors.white70,
                 fontSize: 10,
                 fontWeight: FontWeight.w600,
               ),
@@ -1836,7 +1836,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
         Text(
           _formatChips(player.chips),
           style: TextStyle(
-            color: Colors.yellow.shade600,
+            color: Colors.white70,
             fontSize: 16,
             fontWeight: FontWeight.w600,
           ),
