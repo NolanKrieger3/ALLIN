@@ -2179,7 +2179,7 @@ class HomeTabState extends State<HomeTab> {
           // Header - Balance and Notification
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 32, 24, 0),
+              padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -2252,7 +2252,7 @@ class HomeTabState extends State<HomeTab> {
           // ALL IN Logo
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 40, 24, 0),
+              padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
               child: Column(
                 children: [
                   Row(
@@ -2285,11 +2285,11 @@ class HomeTabState extends State<HomeTab> {
           // Swipeable Play Card
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 40, 24, 0),
+              padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
               child: Column(
                 children: [
                   SizedBox(
-                    height: 160,
+                    height: 140,
                     child: LayoutBuilder(
                       builder: (context, constraints) {
                         final cardWidth = constraints.maxWidth;
@@ -2308,7 +2308,7 @@ class HomeTabState extends State<HomeTab> {
                       },
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
                   // Animated dots indicator
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -2335,7 +2335,7 @@ class HomeTabState extends State<HomeTab> {
           SliverToBoxAdapter(
             key: _teamSectionKey,
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+              padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
