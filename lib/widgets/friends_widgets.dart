@@ -125,13 +125,9 @@ class _NotificationPanelState extends State<NotificationPanel> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected 
-              ? const Color(0xFFD4AF37).withValues(alpha: 0.2) 
-              : Colors.white.withValues(alpha: 0.05),
+          color: isSelected ? const Color(0xFFD4AF37).withValues(alpha: 0.2) : Colors.white.withValues(alpha: 0.05),
           borderRadius: BorderRadius.circular(20),
-          border: isSelected 
-              ? Border.all(color: const Color(0xFFD4AF37).withValues(alpha: 0.5)) 
-              : null,
+          border: isSelected ? Border.all(color: const Color(0xFFD4AF37).withValues(alpha: 0.5)) : null,
         ),
         child: Row(
           children: [
@@ -185,7 +181,7 @@ class _NotificationPanelState extends State<NotificationPanel> {
   Widget _buildNotificationItem(AppNotification notification) {
     IconData icon;
     Color iconColor;
-    
+
     switch (notification.type) {
       case NotificationType.friendRequest:
         icon = Icons.person_add;
@@ -228,13 +224,9 @@ class _NotificationPanelState extends State<NotificationPanel> {
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: notification.isRead 
-              ? Colors.white.withValues(alpha: 0.03) 
-              : Colors.white.withValues(alpha: 0.08),
+          color: notification.isRead ? Colors.white.withValues(alpha: 0.03) : Colors.white.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(14),
-          border: notification.isRead 
-              ? null 
-              : Border.all(color: iconColor.withValues(alpha: 0.3)),
+          border: notification.isRead ? null : Border.all(color: iconColor.withValues(alpha: 0.3)),
         ),
         child: Row(
           children: [
@@ -632,9 +624,9 @@ class _AddFriendDialogState extends State<AddFriendDialog> {
     }
 
     setState(() => _isSearching = true);
-    
+
     final results = await _friendsService.searchUsers(query);
-    
+
     if (mounted) {
       setState(() {
         _searchResults = results;
@@ -716,9 +708,7 @@ class _AddFriendDialogState extends State<AddFriendDialog> {
                           child: Padding(
                             padding: const EdgeInsets.all(40),
                             child: Text(
-                              _searchController.text.isEmpty
-                                  ? 'Enter a username to search'
-                                  : 'No players found',
+                              _searchController.text.isEmpty ? 'Enter a username to search' : 'No players found',
                               style: TextStyle(
                                 color: Colors.white.withValues(alpha: 0.5),
                               ),
@@ -732,7 +722,7 @@ class _AddFriendDialogState extends State<AddFriendDialog> {
                           itemBuilder: (context, index) {
                             final user = _searchResults[index];
                             final isPending = _pendingRequests.contains(user.id);
-                            
+
                             return Container(
                               margin: const EdgeInsets.only(bottom: 10),
                               padding: const EdgeInsets.all(12),
@@ -778,9 +768,7 @@ class _AddFriendDialogState extends State<AddFriendDialog> {
                                               width: 8,
                                               height: 8,
                                               decoration: BoxDecoration(
-                                                color: user.isOnline 
-                                                    ? const Color(0xFF4CAF50) 
-                                                    : Colors.grey,
+                                                color: user.isOnline ? const Color(0xFF4CAF50) : Colors.grey,
                                                 shape: BoxShape.circle,
                                               ),
                                             ),
@@ -811,9 +799,8 @@ class _AddFriendDialogState extends State<AddFriendDialog> {
                                                         ? 'Friend request sent to ${user.username}!'
                                                         : 'Could not send request',
                                                   ),
-                                                  backgroundColor: success
-                                                      ? const Color(0xFF4CAF50)
-                                                      : const Color(0xFFFF4444),
+                                                  backgroundColor:
+                                                      success ? const Color(0xFF4CAF50) : const Color(0xFFFF4444),
                                                 ),
                                               );
                                             }
@@ -821,9 +808,8 @@ class _AddFriendDialogState extends State<AddFriendDialog> {
                                     child: Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                                       decoration: BoxDecoration(
-                                        color: isPending
-                                            ? Colors.white.withValues(alpha: 0.1)
-                                            : const Color(0xFF2196F3),
+                                        color:
+                                            isPending ? Colors.white.withValues(alpha: 0.1) : const Color(0xFF2196F3),
                                         borderRadius: BorderRadius.circular(8),
                                       ),
                                       child: Text(
@@ -940,8 +926,7 @@ class _FriendsListDialogState extends State<FriendsListDialog> {
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.people_outline, 
-                                    color: Colors.white.withValues(alpha: 0.3), size: 48),
+                                Icon(Icons.people_outline, color: Colors.white.withValues(alpha: 0.3), size: 48),
                                 const SizedBox(height: 12),
                                 Text(
                                   'No friends yet',
@@ -985,7 +970,7 @@ class _FriendsListDialogState extends State<FriendsListDialog> {
 
   Widget _buildFriendItem(Friend friend) {
     final isInvited = _invitedFriends.contains(friend.id);
-    
+
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(12),
@@ -1045,13 +1030,9 @@ class _FriendsListDialogState extends State<FriendsListDialog> {
                   ),
                 ),
                 Text(
-                  friend.isOnline 
-                      ? (friend.currentGame != null ? 'In Game' : 'Online')
-                      : 'Offline',
+                  friend.isOnline ? (friend.currentGame != null ? 'In Game' : 'Online') : 'Offline',
                   style: TextStyle(
-                    color: friend.isOnline 
-                        ? const Color(0xFF4CAF50) 
-                        : Colors.white.withValues(alpha: 0.5),
+                    color: friend.isOnline ? const Color(0xFF4CAF50) : Colors.white.withValues(alpha: 0.5),
                     fontSize: 12,
                   ),
                 ),
@@ -1067,7 +1048,7 @@ class _FriendsListDialogState extends State<FriendsListDialog> {
                       await _friendsService.sendGameInvite(
                         toUserId: friend.id,
                         roomCode: widget.roomCode!,
-                        gameType: widget.gameType ?? 'Heads Up',
+                        gameType: widget.gameType ?? 'Cash Game',
                         stakeName: widget.stakeName ?? 'Bronze',
                       );
                       if (mounted) {

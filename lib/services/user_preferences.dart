@@ -24,6 +24,63 @@ class LuckyHandType {
   ];
 }
 
+/// Available avatars in the game
+class GameAvatars {
+  /// All available avatars with their unlock status
+  /// First 3 are unlocked by default, rest require unlocking
+  static const List<String> all = [
+    '👤', // Default - always unlocked
+    '🎭', // Unlocked
+    '🎩', // Unlocked
+    '👑', // Locked - Premium
+    '🦊', // Locked - Level 10
+    '🐺', // Locked - Level 20
+    '🦁', // Locked - Level 30
+    '🐲', // Locked - Level 40
+    '🦅', // Locked - Win 100 games
+    '🤖', // Locked - Play 500 hands
+    '👻', // Locked - Halloween event
+    '🎅', // Locked - Holiday event
+  ];
+
+  /// Number of avatars unlocked by default
+  static const int defaultUnlocked = 3;
+
+  /// Check if an avatar is unlocked
+  static bool isUnlocked(int index) {
+    // First 3 are always unlocked
+    if (index < defaultUnlocked) return true;
+    // TODO: Add unlock logic for other avatars based on achievements
+    return false;
+  }
+
+  /// Get unlock requirement text for locked avatars
+  static String getUnlockRequirement(int index) {
+    switch (index) {
+      case 3:
+        return 'Get Pro Pass';
+      case 4:
+        return 'Reach Level 10';
+      case 5:
+        return 'Reach Level 20';
+      case 6:
+        return 'Reach Level 30';
+      case 7:
+        return 'Reach Level 40';
+      case 8:
+        return 'Win 100 games';
+      case 9:
+        return 'Play 500 hands';
+      case 10:
+        return 'Halloween Event';
+      case 11:
+        return 'Holiday Event';
+      default:
+        return 'Locked';
+    }
+  }
+}
+
 /// Service for managing user preferences stored locally
 class UserPreferences {
   static const String _usernameKey = 'username';
@@ -32,6 +89,7 @@ class UserPreferences {
   static const String _cachedPasswordKey = 'cached_password';
   static const String _chipsKey = 'chips';
   static const String _gemsKey = 'gems';
+  static const String _avatarKey = 'selected_avatar';
   static const String _luckyHandDateKey = 'lucky_hand_date';
   static const String _luckyHandIndexKey = 'lucky_hand_index';
   static const String _luckyHandWinsKey = 'lucky_hand_wins_today';
@@ -54,6 +112,27 @@ class UserPreferences {
   /// Set Pro Pass status (for dev testing)
   static Future<void> setProPass(bool value) async {
     await _prefs?.setBool(_hasProPassKey, value);
+  }
+
+  /// Get the selected avatar emoji
+  static String get avatar {
+    final index = _prefs?.getInt(_avatarKey) ?? 0;
+    if (index >= 0 && index < GameAvatars.all.length) {
+      return GameAvatars.all[index];
+    }
+    return GameAvatars.all[0];
+  }
+
+  /// Get the selected avatar index
+  static int get avatarIndex {
+    return _prefs?.getInt(_avatarKey) ?? 0;
+  }
+
+  /// Set the selected avatar by index
+  static Future<void> setAvatar(int index) async {
+    if (index >= 0 && index < GameAvatars.all.length && GameAvatars.isUnlocked(index)) {
+      await _prefs?.setInt(_avatarKey, index);
+    }
   }
 
   /// Check if user has set their username

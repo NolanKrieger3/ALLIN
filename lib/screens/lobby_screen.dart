@@ -89,52 +89,6 @@ class _LobbyScreenState extends State<LobbyScreen> {
     ),
   ];
 
-  // Stake levels for Heads-Up Duel
-  static const List<StakeLevel> _headsUpStakes = [
-    StakeLevel(name: 'Bronze', smallBlind: 10, bigBlind: 20, minBuyIn: 500, maxBuyIn: 500, color: Color(0xFFCD7F32)),
-    StakeLevel(name: 'Silver', smallBlind: 50, bigBlind: 100, minBuyIn: 2500, maxBuyIn: 2500, color: Color(0xFFC0C0C0)),
-    StakeLevel(
-      name: 'Gold',
-      smallBlind: 250,
-      bigBlind: 500,
-      minBuyIn: 12500,
-      maxBuyIn: 12500,
-      color: Color(0xFFD4AF37),
-    ),
-    StakeLevel(
-      name: 'Platinum',
-      smallBlind: 1000,
-      bigBlind: 2000,
-      minBuyIn: 50000,
-      maxBuyIn: 50000,
-      color: Color(0xFFE5E4E2),
-    ),
-    StakeLevel(
-      name: 'Diamond',
-      smallBlind: 5000,
-      bigBlind: 10000,
-      minBuyIn: 250000,
-      maxBuyIn: 250000,
-      color: Color(0xFF00BCD4),
-    ),
-    StakeLevel(
-      name: 'Champion',
-      smallBlind: 25000,
-      bigBlind: 50000,
-      minBuyIn: 1250000,
-      maxBuyIn: 1250000,
-      color: Color(0xFFFF6B35),
-    ),
-    StakeLevel(
-      name: 'Legend',
-      smallBlind: 100000,
-      bigBlind: 200000,
-      minBuyIn: 5000000,
-      maxBuyIn: 5000000,
-      color: Color(0xFF9C27B0),
-    ),
-  ];
-
   // Sit & Go buy-in levels
   static const List<SitAndGoBuyIn> _sitAndGoBuyIns = [
     SitAndGoBuyIn(name: 'Freeroll', buyIn: 0, prizePool: 1000, color: Color(0xFF4CAF50)),
@@ -273,54 +227,6 @@ class _LobbyScreenState extends State<LobbyScreen> {
     });
   }
 
-  Future<void> _joinHeadsUp(StakeLevel stake) async {
-    if (!_authService.isLoggedIn) {
-      setState(() => _error = 'Not connected. Please try again.');
-      return;
-    }
-
-    setState(() {
-      _isLoading = true;
-      _loadingAction = 'Finding ${stake.name} duel...';
-      _error = null;
-    });
-
-    try {
-      // Try to find an available room at this stake level (filtered by blind and gameType)
-      final rooms = await _gameService.fetchJoinableRoomsByBlind(stake.bigBlind, gameType: 'headsup');
-
-      if (rooms.isNotEmpty) {
-        // Join the first available room at this stake
-        final roomToJoin = rooms.first;
-        await _gameService.joinRoom(roomToJoin.id, startingChips: stake.minBuyIn);
-        if (mounted) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => MultiplayerGameScreen(roomId: roomToJoin.id)),
-          );
-        }
-      } else {
-        // No rooms available at this stake, create one
-        final room = await _gameService.createRoom(
-          bigBlind: stake.bigBlind,
-          startingChips: stake.minBuyIn,
-          isPrivate: false,
-          gameType: 'headsup',
-        );
-        if (mounted) {
-          Navigator.push(context, MaterialPageRoute(builder: (context) => MultiplayerGameScreen(roomId: room.id)));
-        }
-      }
-    } catch (e) {
-      setState(() => _error = 'Failed to find duel: $e');
-    }
-
-    setState(() {
-      _isLoading = false;
-      _loadingAction = null;
-    });
-  }
-
   Future<void> _joinSitAndGo(SitAndGoBuyIn buyIn) async {
     if (!_authService.isLoggedIn) {
       setState(() => _error = 'Not connected. Please try again.');
@@ -421,65 +327,6 @@ class _LobbyScreenState extends State<LobbyScreen> {
                       onTap: () {
                         Navigator.pop(context);
                         _joinCashGame(stake);
-                      },
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showHeadsUpDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => Dialog(
-        backgroundColor: const Color(0xFF1A1A1A),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        child: Container(
-          width: 340,
-          constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.7),
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  const Text('⚔️', style: TextStyle(fontSize: 28)),
-                  const SizedBox(width: 12),
-                  const Expanded(
-                    child: Text(
-                      'Heads-Up Duel',
-                      style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w700),
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: Icon(Icons.close, color: Colors.white.withValues(alpha: 0.5)),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Text('1v1 winner takes all', style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 14)),
-              const SizedBox(height: 16),
-              Flexible(
-                child: ListView.separated(
-                  shrinkWrap: true,
-                  itemCount: _headsUpStakes.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 10),
-                  itemBuilder: (context, index) {
-                    final stake = _headsUpStakes[index];
-                    return _HeadsUpCard(
-                      stake: stake,
-                      onTap: () {
-                        Navigator.pop(context);
-                        _joinHeadsUp(stake);
                       },
                     );
                   },
@@ -1209,72 +1056,6 @@ class _StakeLevelCard extends StatelessWidget {
                   style: TextStyle(color: stake.color, fontSize: 13, fontWeight: FontWeight.w700),
                 ),
               ],
-            ),
-            const SizedBox(width: 10),
-            Icon(Icons.chevron_right, color: Colors.white.withValues(alpha: 0.3), size: 20),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ============================================================================
-// HEADS-UP CARD
-// ============================================================================
-
-class _HeadsUpCard extends StatelessWidget {
-  final StakeLevel stake;
-  final VoidCallback onTap;
-
-  const _HeadsUpCard({required this.stake, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(colors: [stake.color.withValues(alpha: 0.15), stake.color.withValues(alpha: 0.05)]),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: stake.color.withValues(alpha: 0.3)),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 52,
-              height: 52,
-              decoration: BoxDecoration(
-                color: stake.color.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: const Center(child: Text('⚔️', style: TextStyle(fontSize: 24))),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    stake.name,
-                    style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Blinds: ${stake.blindsDisplay}',
-                    style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13),
-                  ),
-                ],
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              decoration: BoxDecoration(color: stake.color, borderRadius: BorderRadius.circular(10)),
-              child: Text(
-                StakeLevel._formatNumber(stake.minBuyIn),
-                style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700),
-              ),
             ),
             const SizedBox(width: 10),
             Icon(Icons.chevron_right, color: Colors.white.withValues(alpha: 0.3), size: 20),

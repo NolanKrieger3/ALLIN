@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import '../widgets/mobile_wrapper.dart';
+import '../services/user_preferences.dart';
 
 // Bot class to manage individual bot state
 class Bot {
@@ -179,18 +180,18 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
               const SizedBox(height: 12),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [1, 2, 3, 4, 5].map((num) {
+                children: [1, 2, 3, 4, 5, 6, 7].map((num) {
                   final isSelected = selectedBots == num;
                   return _AnimatedPressButton(
                     onTap: () {
                       setDialogState(() => selectedBots = num);
                     },
                     child: Container(
-                      width: 44,
-                      height: 44,
+                      width: 36,
+                      height: 36,
                       decoration: BoxDecoration(
                         color: isSelected ? const Color(0xFFD4AF37) : Colors.white.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(10),
                         border: Border.all(
                           color: isSelected ? const Color(0xFFD4AF37) : Colors.white.withValues(alpha: 0.2),
                           width: 2,
@@ -1213,8 +1214,8 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                   child: Slider(
                     value: _numberOfBots.toDouble(),
                     min: 1,
-                    max: 5,
-                    divisions: 4,
+                    max: 7,
+                    divisions: 6,
                     onChanged: (value) {
                       setState(() => _numberOfBots = value.round());
                     },
@@ -1235,7 +1236,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                         ),
                       ),
                       Text(
-                        '5',
+                        '7',
                         style: TextStyle(
                           color: Colors.white.withValues(alpha: 0.3),
                           fontSize: 12,
@@ -1382,47 +1383,132 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
 
   Widget _buildPlayersRow() {
     final isShowdown = _gamePhase == 'showdown';
+    final totalBots = _bots.length;
+    // Always include player in row when we have multiple bots
+    final includePlayerInRow = totalBots > 5;
+    const maxVisible = 5;
 
-    // Build list with only bots (opponents) - player is shown at bottom
-    final allParticipants = <_Participant>[
-      ...List.generate(
-          _bots.length,
-          (i) => _Participant(
-                name: _bots[i].name,
-                chips: _bots[i].chips,
-                currentBet: _bots[i].currentBet,
-                hasFolded: _bots[i].hasFolded,
-                isCurrentTurn: _currentActorIndex == i + 1 && _gamePhase != 'showdown',
-                isPlayer: false,
-                isDealer: _dealerPosition == i + 1,
-                cards: _bots[i].cards,
-                seatIndex: i + 1,
-              )),
-    ];
+    // Build all participants - include player when more than 5 bots
+    final allParticipants = <_Participant>[];
+
+    // Player is at seat index 0
+    if (includePlayerInRow) {
+      allParticipants.add(_Participant(
+        name: 'You',
+        chips: _playerChips,
+        currentBet: _playerBet,
+        hasFolded: _playerHasFolded,
+        isCurrentTurn: _currentActorIndex == 0 && _gamePhase != 'showdown',
+        isPlayer: true,
+        isDealer: _dealerPosition == 0,
+        cards: _playerCards,
+        seatIndex: 0,
+      ));
+    }
+
+    // Add all bots (seat indices 1+)
+    allParticipants.addAll(List.generate(
+        _bots.length,
+        (i) => _Participant(
+              name: _bots[i].name,
+              chips: _bots[i].chips,
+              currentBet: _bots[i].currentBet,
+              hasFolded: _bots[i].hasFolded,
+              isCurrentTurn: _currentActorIndex == i + 1 && _gamePhase != 'showdown',
+              isPlayer: false,
+              isDealer: _dealerPosition == i + 1,
+              cards: _bots[i].cards,
+              seatIndex: i + 1,
+            )));
+
+    final totalParticipants = allParticipants.length;
+    // Enable centering and sliding with 4+ participants
+    final shouldCenterOnActive = totalParticipants >= 4;
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
-      height: isShowdown ? 170 : 110, // More height during showdown to show cards
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      height: isShowdown ? 170 : 110,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final totalWidth = allParticipants.length * 88.0; // 80 width + 8 margin
-          final needsScroll = totalWidth > constraints.maxWidth;
+          // Use Stack-based sliding animation for centering on active player
+          if (shouldCenterOnActive) {
+            // Find current actor index in allParticipants list
+            int activeIndex;
+            if (includePlayerInRow) {
+              activeIndex = _currentActorIndex;
+            } else {
+              activeIndex = _currentActorIndex > 0 ? _currentActorIndex - 1 : 0;
+            }
 
-          final row = Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            mainAxisSize: MainAxisSize.min,
-            children: allParticipants.map((p) => _buildParticipantAvatar(p)).toList(),
-          );
+            // Clamp activeIndex to valid range
+            if (activeIndex < 0) activeIndex = 0;
+            if (activeIndex >= totalParticipants) activeIndex = totalParticipants - 1;
 
-          if (needsScroll) {
-            return SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: row,
+            const centerSlot = maxVisible ~/ 2; // = 2 (middle of 5 slots)
+            final availableWidth = constraints.maxWidth;
+            const avatarWidth = 72.0;
+            const avatarMargin = 4.0;
+            const slotWidth = avatarWidth + avatarMargin;
+            final rowWidth = maxVisible * slotWidth;
+            final rowStartX = (availableWidth - rowWidth) / 2;
+
+            // Build visible slots with circular wrapping
+            // E.g., if activeIndex=0 and total=7, show: 5, 6, 0, 1, 2
+            final visibleIndices = <int>[];
+            for (int slot = 0; slot < maxVisible; slot++) {
+              final offset = slot - centerSlot; // -2, -1, 0, 1, 2
+              final idx = (activeIndex + offset + totalParticipants) % totalParticipants;
+              visibleIndices.add(idx);
+            }
+
+            return Stack(
+              clipBehavior: Clip.none,
+              children: [
+                for (int slot = 0; slot < visibleIndices.length; slot++)
+                  Builder(
+                    key: ValueKey(allParticipants[visibleIndices[slot]].seatIndex),
+                    builder: (context) {
+                      final participantIndex = visibleIndices[slot];
+                      final participant = allParticipants[participantIndex];
+
+                      // Calculate x position for this slot
+                      final xPos = rowStartX + (slot * slotWidth);
+
+                      return AnimatedPositioned(
+                        key: ValueKey('pos_${participant.seatIndex}'),
+                        duration: const Duration(milliseconds: 400),
+                        curve: Curves.easeOutCubic,
+                        left: xPos,
+                        top: 0,
+                        bottom: 0,
+                        child: _buildParticipantAvatar(participant),
+                      );
+                    },
+                  ),
+              ],
             );
-          } else {
-            return Center(child: row);
           }
+
+          // Default behavior for smaller games - simple row
+          final availableWidth = constraints.maxWidth;
+          const avatarWidth = 68.0;
+          final totalWidth = allParticipants.length * (avatarWidth + 4);
+          final startX = (availableWidth - totalWidth) / 2;
+
+          return Stack(
+            children: [
+              for (int i = 0; i < allParticipants.length; i++)
+                AnimatedPositioned(
+                  duration: const Duration(milliseconds: 400),
+                  curve: Curves.easeOutCubic,
+                  left: startX + (i * (avatarWidth + 4)),
+                  top: 0,
+                  bottom: 0,
+                  child: _buildParticipantAvatar(allParticipants[i]),
+                ),
+            ],
+          );
         },
       ),
     );
@@ -1434,10 +1520,10 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     final isLoser = isShowdown && _showdownAnimationComplete && !isWinner && !p.hasFolded;
     final participantHand = _showdownHands[p.seatIndex];
 
-    // Avatar emoji based on name
+    // Avatar emoji based on name - use user's selected avatar for "You"
     String getAvatar(String name) {
-      if (name == 'You') return '👤';
-      final avatars = ['🤖', '🦊', '🐸', '🦁', '🐼'];
+      if (name == 'You') return UserPreferences.avatar;
+      final avatars = ['🤖', '🦊', '🐸', '🦁', '🐼', '🐮', '🐧'];
       final index = int.tryParse(name.replaceAll(RegExp(r'[^0-9]'), '')) ?? 1;
       return avatars[(index - 1) % avatars.length];
     }
@@ -1454,8 +1540,8 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       duration: const Duration(milliseconds: 300),
       opacity: isLoser ? 0.5 : 1.0,
       child: Container(
-        width: 80,
-        margin: const EdgeInsets.symmetric(horizontal: 4),
+        width: 68,
+        margin: const EdgeInsets.symmetric(horizontal: 2),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -1463,6 +1549,22 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
               alignment: Alignment.center,
               clipBehavior: Clip.none,
               children: [
+                // Active turn glow ring (pulsing gold glow when it's their turn)
+                if (p.isCurrentTurn && _gamePhase != 'showdown')
+                  Container(
+                    width: 50,
+                    height: 50,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFD4AF37).withValues(alpha: 0.5),
+                          blurRadius: 16,
+                          spreadRadius: 4,
+                        ),
+                      ],
+                    ),
+                  ),
                 // Winner glow ring
                 if (isShowdown && _showdownAnimationComplete && isWinner)
                   Container(
@@ -1551,17 +1653,25 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
               ),
               overflow: TextOverflow.ellipsis,
             ),
-            // Chips on one line
+            // Chips amount
             Text(
-              p.currentBet > 0 ? '${_formatChips(p.chips)} (${_formatChips(p.currentBet)})' : _formatChips(p.chips),
+              _formatChips(p.chips),
               style: TextStyle(
                 color: p.hasFolded ? Colors.grey : Colors.white70,
                 fontSize: 10,
                 fontWeight: FontWeight.w600,
               ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
             ),
+            // Current bet on separate line
+            if (p.currentBet > 0)
+              Text(
+                '(${_formatChips(p.currentBet)})',
+                style: TextStyle(
+                  color: p.hasFolded ? Colors.grey.withValues(alpha: 0.6) : Colors.orange.shade400,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
             // Show hole cards during showdown
             if (isShowdown && !p.hasFolded && p.cards.isNotEmpty)
               Padding(
@@ -1718,7 +1828,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
           children: [
             for (var i = 0; i < 5; i++)
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 3),
                 child: () {
                   if (i >= _communityCards.length) {
                     return _buildEmptyCardSlot();
@@ -1729,17 +1839,17 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                   return _buildMinimalCard(card, isHighlighted: isHighlighted, isDimmed: isDimmed);
                 }(),
               ),
-            const SizedBox(width: 16),
-            // Pot amount
-            Text(
-              _pot.toString(),
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 24,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
           ],
+        ),
+        const SizedBox(height: 12),
+        // Pot amount below cards
+        Text(
+          _pot.toString(),
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 24,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ],
     );
@@ -1747,8 +1857,8 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
 
   Widget _buildMinimalCard(PlayingCard card,
       {bool isLarge = false, bool isHighlighted = false, bool isDimmed = false}) {
-    final width = isLarge ? 70.0 : 56.0;
-    final height = isLarge ? 98.0 : 78.0;
+    final width = isLarge ? 70.0 : 58.0;
+    final height = isLarge ? 98.0 : 82.0;
     final isRed = card.suit == '♥' || card.suit == '♦';
 
     return AnimatedContainer(
@@ -1789,7 +1899,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
               card.rank,
               style: TextStyle(
                 color: isDimmed ? Colors.grey : (isRed ? Colors.red.shade700 : Colors.black),
-                fontSize: isLarge ? 24 : 20,
+                fontSize: isLarge ? 24 : 24,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -1797,7 +1907,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
               card.suit,
               style: TextStyle(
                 color: isDimmed ? Colors.grey : (isRed ? Colors.red.shade700 : Colors.black),
-                fontSize: isLarge ? 26 : 22,
+                fontSize: isLarge ? 26 : 26,
               ),
             ),
           ],
@@ -1880,9 +1990,8 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                 if (isShowdown && _playerCards.isNotEmpty)
                   Row(
                     children: [
-                      _buildMinimalCard(
+                      _buildLargeCard(
                         _playerCards[0],
-                        isLarge: true,
                         isHighlighted: _showdownAnimationComplete &&
                             isPlayerWinner &&
                             !_playerHasFolded &&
@@ -1891,10 +2000,9 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                         isDimmed: isPlayerLoser || _playerHasFolded,
                       ),
                       Transform.translate(
-                        offset: const Offset(-20, 0),
-                        child: _buildMinimalCard(
+                        offset: const Offset(-15, 0),
+                        child: _buildLargeCard(
                           _playerCards.length > 1 ? _playerCards[1] : _playerCards[0],
-                          isLarge: true,
                           isHighlighted: _showdownAnimationComplete &&
                               isPlayerWinner &&
                               !_playerHasFolded &&
@@ -1907,9 +2015,9 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                     ],
                   )
                 else
-                  _buildPlayerCards(),
+                  _buildPlayerCardsLarge(),
                 const Spacer(),
-                _buildPlayerAvatar(),
+                _buildPlayerAvatarLarge(),
               ],
             ),
           ),
@@ -1969,7 +2077,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
             ],
           ),
           const SizedBox(height: 16),
-          // Cards area with swipe to fold
+          // Cards area with swipe to fold (no text)
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
@@ -1995,31 +2103,19 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                         position: _foldSlideAnimation,
                         child: FadeTransition(
                           opacity: _foldOpacityAnimation,
-                          child: _buildPlayerCards(),
+                          child: _buildPlayerCardsLarge(),
                         ),
                       )
                     : Transform.translate(
                         offset: Offset(0, _dragOffset * 0.5),
                         child: Opacity(
                           opacity: (1.0 + _dragOffset / 200).clamp(0.3, 1.0),
-                          child: Column(
-                            children: [
-                              Text(
-                                '↑ Swipe to fold',
-                                style: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.4),
-                                  fontSize: 11,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              _buildPlayerCards(),
-                            ],
-                          ),
+                          child: _buildPlayerCardsLarge(),
                         ),
                       ),
               ),
               const Spacer(),
-              _buildPlayerAvatar(),
+              _buildPlayerAvatarLarge(),
             ],
           ),
         ],
@@ -2040,49 +2136,127 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     );
   }
 
+  Widget _buildPlayerCardsLarge({bool isDimmed = false}) {
+    return Row(
+      children: [
+        if (_playerCards.isNotEmpty) _buildLargeCard(_playerCards[0], isDimmed: isDimmed),
+        if (_playerCards.length > 1)
+          Transform.translate(
+            offset: const Offset(-15, 0),
+            child: _buildLargeCard(_playerCards[1], isDimmed: isDimmed),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildLargeCard(PlayingCard card, {bool isHighlighted = false, bool isDimmed = false}) {
+    const width = 90.0;
+    const height = 126.0;
+    final isRed = card.suit == '♥' || card.suit == '♦';
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: isDimmed ? Colors.grey.shade300 : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          if (isHighlighted) ...[
+            BoxShadow(
+              color: const Color(0xFFFFD700).withValues(alpha: 0.8),
+              blurRadius: 12,
+              spreadRadius: 2,
+            ),
+          ] else
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isDimmed ? 0.1 : 0.4),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+        ],
+        border: isHighlighted ? Border.all(color: const Color(0xFFFFD700), width: 2) : null,
+      ),
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 300),
+        opacity: isDimmed ? 0.5 : 1.0,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              card.rank,
+              style: TextStyle(
+                color: isDimmed ? Colors.grey : (isRed ? Colors.red.shade700 : Colors.black),
+                fontSize: 32,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            Text(
+              card.suit,
+              style: TextStyle(
+                color: isDimmed ? Colors.grey : (isRed ? Colors.red.shade700 : Colors.black),
+                fontSize: 34,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildPlayerAreaWithCards() {
+    final callAmount = _currentBet - _playerBet;
+    final canCheck = callAmount <= 0;
+
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
+      padding: const EdgeInsets.symmetric(horizontal: 40),
       child: Column(
         children: [
-          // Waiting indicator
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            decoration: BoxDecoration(
-              color: Colors.transparent,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: Colors.white.withValues(alpha: 0.6),
+          // Disabled action buttons (grayed out while bot thinks)
+          Row(
+            children: [
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  decoration: BoxDecoration(
+                    color: Colors.transparent,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+                  ),
+                  child: Center(
+                    child: Text(
+                      canCheck ? 'Check' : 'Call ${_formatChips(callAmount)}',
+                      style: TextStyle(color: Colors.white.withValues(alpha: 0.3), fontSize: 16),
+                    ),
                   ),
                 ),
-                const SizedBox(width: 12),
-                Text(
-                  'Bot thinking...',
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.6),
-                    fontSize: 16,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Center(
+                    child: Text(
+                      'Raise',
+                      style: TextStyle(
+                          color: Colors.black.withValues(alpha: 0.4), fontSize: 16, fontWeight: FontWeight.w600),
+                    ),
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
           const SizedBox(height: 16),
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              _buildPlayerCards(),
+              _buildPlayerCardsLarge(),
               const Spacer(),
-              _buildPlayerAvatar(),
+              _buildPlayerAvatarLarge(),
             ],
           ),
         ],
@@ -2110,8 +2284,8 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                   width: 2,
                 ),
               ),
-              child: const Center(
-                child: Text('👤', style: TextStyle(fontSize: 24)),
+              child: Center(
+                child: Text(UserPreferences.avatar, style: const TextStyle(fontSize: 24)),
               ),
             ),
             // Dealer badge
@@ -2151,6 +2325,131 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     );
   }
 
+  Widget _buildPlayerAvatarLarge() {
+    final isDealer = _dealerPosition == 0;
+    final isMyTurn = _isPlayerTurn && _gamePhase != 'showdown';
+
+    return Container(
+      width: 100,
+      height: 126, // Match the large card height
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Colors.white.withValues(alpha: 0.08),
+            Colors.white.withValues(alpha: 0.02),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isMyTurn ? const Color(0xFFD4AF37) : Colors.white.withValues(alpha: 0.1),
+          width: isMyTurn ? 2 : 1,
+        ),
+        boxShadow: isMyTurn
+            ? [
+                BoxShadow(
+                  color: const Color(0xFFD4AF37).withValues(alpha: 0.3),
+                  blurRadius: 16,
+                  spreadRadius: 0,
+                ),
+              ]
+            : null,
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // Avatar circle
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: isMyTurn ? const Color(0xFFD4AF37) : Colors.white.withValues(alpha: 0.1),
+                  border: Border.all(
+                    color: isMyTurn ? const Color(0xFFD4AF37) : Colors.white.withValues(alpha: 0.2),
+                    width: 2,
+                  ),
+                ),
+                child: Center(
+                  child: Text(
+                    UserPreferences.avatar,
+                    style: TextStyle(
+                      fontSize: 24,
+                      color: isMyTurn ? Colors.black : null,
+                    ),
+                  ),
+                ),
+              ),
+              // Dealer badge
+              if (isDealer)
+                Positioned(
+                  bottom: -4,
+                  right: -4,
+                  child: Container(
+                    width: 20,
+                    height: 20,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: const Color(0xFF0A0A0A),
+                        width: 2,
+                      ),
+                    ),
+                    child: const Center(
+                      child: Text(
+                        'D',
+                        style: TextStyle(
+                          color: Colors.black,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          // Player label
+          Text(
+            'YOU',
+            style: TextStyle(
+              color: isMyTurn ? const Color(0xFFD4AF37) : Colors.white.withValues(alpha: 0.5),
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 1,
+            ),
+          ),
+          const SizedBox(height: 2),
+          // Chips amount
+          Text(
+            _formatChips(_playerChips),
+            style: TextStyle(
+              color: Colors.yellow.shade500,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          // Current bet if any
+          if (_playerBet > 0)
+            Text(
+              '(${_formatChips(_playerBet)})',
+              style: TextStyle(
+                color: Colors.orange.shade400,
+                fontSize: 10,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildCardBack({double width = 56, double height = 78}) {
     return Container(
       width: width,
@@ -2180,59 +2479,197 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
 
     showDialog(
       context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.8),
       builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          backgroundColor: const Color(0xFF1A1A1A),
-          title: const Text(
-            'Raise Amount',
-            style: TextStyle(color: Colors.white),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Slider(
-                value: raiseAmount.toDouble().clamp(minRaise.toDouble(), maxRaise.toDouble()),
-                min: minRaise.toDouble(),
-                max: maxRaise.toDouble(),
-                activeColor: const Color(0xFFD4AF37),
-                onChanged: (value) {
-                  setDialogState(() => raiseAmount = value.toInt());
-                },
-              ),
-              Text(
-                'Raise to: ${_formatChips(raiseAmount)}',
-                style: const TextStyle(
-                  color: Color(0xFFD4AF37),
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
+        builder: (context, setDialogState) => Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 320),
+            child: Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: const Color(0xFF0A0A0A),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.1),
                 ),
               ),
-              const SizedBox(height: 8),
-              Text(
-                'Min: ${_formatChips(minRaise)} | Max: ${_formatChips(maxRaise)}',
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.5),
-                  fontSize: 12,
-                ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Amount display
+                  Text(
+                    _formatChips(raiseAmount),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 48,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -1,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'RAISE TO',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.4),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      letterSpacing: 3,
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  // Slider
+                  SliderTheme(
+                    data: SliderTheme.of(context).copyWith(
+                      activeTrackColor: Colors.white,
+                      inactiveTrackColor: Colors.white.withValues(alpha: 0.1),
+                      thumbColor: Colors.white,
+                      overlayColor: Colors.white.withValues(alpha: 0.1),
+                      trackHeight: 4,
+                      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 10),
+                    ),
+                    child: Slider(
+                      value: raiseAmount.toDouble().clamp(minRaise.toDouble(), maxRaise.toDouble()),
+                      min: minRaise.toDouble(),
+                      max: maxRaise.toDouble(),
+                      onChanged: (value) {
+                        setDialogState(() => raiseAmount = value.toInt());
+                      },
+                    ),
+                  ),
+                  // Min/Max labels
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          _formatChips(minRaise),
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.3),
+                            fontSize: 12,
+                          ),
+                        ),
+                        Text(
+                          _formatChips(maxRaise),
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.3),
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  // Quick bet buttons
+                  Row(
+                    children: [
+                      _buildQuickBetButton('½ Pot', () {
+                        setDialogState(() {
+                          raiseAmount = ((_pot / 2) + _currentBet).toInt().clamp(minRaise, maxRaise);
+                        });
+                      }),
+                      const SizedBox(width: 8),
+                      _buildQuickBetButton('Pot', () {
+                        setDialogState(() {
+                          raiseAmount = (_pot + _currentBet).clamp(minRaise, maxRaise);
+                        });
+                      }),
+                      const SizedBox(width: 8),
+                      _buildQuickBetButton('All In', () {
+                        setDialogState(() {
+                          raiseAmount = maxRaise;
+                        });
+                      }),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  // Action buttons
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _AnimatedPressButton(
+                          onTap: () => Navigator.pop(context),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.06),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Center(
+                              child: Text(
+                                'Cancel',
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.6),
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _AnimatedPressButton(
+                          onTap: () {
+                            Navigator.pop(context);
+                            _playerAction('raise', amount: raiseAmount);
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Center(
+                              child: Text(
+                                'Raise',
+                                style: TextStyle(
+                                  color: Color(0xFF0A0A0A),
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuickBetButton(String label, VoidCallback onTap) {
+    return Expanded(
+      child: _AnimatedPressButton(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.1),
             ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                _playerAction('raise', amount: raiseAmount);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFD4AF37),
+          ),
+          child: Center(
+            child: Text(
+              label,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.8),
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
               ),
-              child: const Text('Raise', style: TextStyle(color: Colors.white)),
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -2321,13 +2758,13 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
 
   Widget _buildEmptyCardSlot() {
     return Container(
-      width: 42,
-      height: 60,
+      width: 58,
+      height: 82,
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.03),
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: Colors.white.withValues(alpha: 0.06),
+          color: Colors.white.withValues(alpha: 0.08),
         ),
       ),
     );

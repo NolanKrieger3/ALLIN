@@ -754,6 +754,219 @@ class GameService {
     );
   }
 
+  /// Bot action - executes an action on behalf of a bot player
+  /// Only the host can trigger bot actions
+  /// This essentially mirrors playerAction but for bot players
+  Future<void> botAction(String roomId, String botId, String action, {int? raiseAmount}) async {
+    final userId = currentUserId;
+    if (userId == null) return;
+
+    final token = await _getAuthToken();
+    final room = await _fetchRoom(roomId);
+    if (room == null) return;
+
+    // Only the host can control bots
+    if (room.hostId != userId) {
+      throw Exception('Only the host can control bots');
+    }
+
+    // Verify it's the bot's turn
+    if (room.currentTurnPlayerId != botId) {
+      throw Exception('Not this bot\'s turn');
+    }
+
+    // Verify this is actually a bot
+    if (!isBot(botId)) {
+      throw Exception('Not a bot player');
+    }
+
+    final playerIndex = room.players.indexWhere((p) => p.uid == botId);
+    if (playerIndex == -1) return;
+
+    final player = room.players[playerIndex];
+    var updatedPlayers = List<GamePlayer>.from(room.players);
+    var pot = room.pot;
+    var currentBet = room.currentBet;
+    var lastRaiseAmount = room.lastRaiseAmount;
+
+    // Mark that this player has acted this round
+    updatedPlayers[playerIndex] = player.copyWith(hasActed: true);
+
+    String lastActionLabel = action.toUpperCase();
+
+    switch (action) {
+      case 'fold':
+        updatedPlayers[playerIndex] = updatedPlayers[playerIndex].copyWith(hasFolded: true, lastAction: 'FOLD');
+        break;
+
+      case 'check':
+        if (currentBet > player.currentBet) {
+          // Can't check, must call instead
+          var callAmount = currentBet - player.currentBet;
+          if (callAmount > player.chips) {
+            callAmount = player.chips;
+            lastActionLabel = 'ALL-IN';
+          } else {
+            lastActionLabel = 'CALL';
+          }
+          updatedPlayers[playerIndex] = updatedPlayers[playerIndex].copyWith(
+            chips: player.chips - callAmount,
+            currentBet: player.currentBet + callAmount,
+            totalContributed: player.totalContributed + callAmount,
+            lastAction: lastActionLabel,
+          );
+          pot += callAmount;
+        } else {
+          updatedPlayers[playerIndex] = updatedPlayers[playerIndex].copyWith(lastAction: 'CHECK');
+        }
+        break;
+
+      case 'call':
+        var callAmount = currentBet - player.currentBet;
+        if (callAmount > player.chips) {
+          callAmount = player.chips;
+          lastActionLabel = 'ALL-IN';
+        } else {
+          lastActionLabel = 'CALL';
+        }
+        updatedPlayers[playerIndex] = updatedPlayers[playerIndex].copyWith(
+          chips: player.chips - callAmount,
+          currentBet: player.currentBet + callAmount,
+          totalContributed: player.totalContributed + callAmount,
+          lastAction: lastActionLabel,
+        );
+        pot += callAmount;
+        break;
+
+      case 'raise':
+        final totalBet = raiseAmount ?? (currentBet + lastRaiseAmount);
+        final raiseBy = totalBet - currentBet;
+        final addAmount = totalBet - player.currentBet;
+
+        if (addAmount > player.chips) {
+          // Go all-in instead
+          final allInAmount = player.chips;
+          final newTotalBet = player.currentBet + allInAmount;
+          pot += allInAmount;
+          updatedPlayers[playerIndex] = updatedPlayers[playerIndex].copyWith(
+            currentBet: newTotalBet,
+            chips: 0,
+            totalContributed: player.totalContributed + allInAmount,
+            lastAction: 'ALL-IN',
+          );
+          if (newTotalBet > currentBet) {
+            currentBet = newTotalBet;
+          }
+        } else {
+          if (addAmount == player.chips) {
+            lastActionLabel = 'ALL-IN';
+          } else {
+            lastActionLabel = 'RAISE';
+          }
+          updatedPlayers[playerIndex] = updatedPlayers[playerIndex].copyWith(
+            chips: player.chips - addAmount,
+            currentBet: totalBet,
+            totalContributed: player.totalContributed + addAmount,
+            lastAction: lastActionLabel,
+          );
+          pot += addAmount;
+          lastRaiseAmount = raiseBy > 0 ? raiseBy : lastRaiseAmount;
+          currentBet = totalBet;
+
+          // Reset hasActed for all other players since there's a raise
+          updatedPlayers = updatedPlayers.map((p) {
+            if (p.uid != botId && !p.hasFolded) {
+              return p.copyWith(hasActed: false);
+            }
+            return p;
+          }).toList();
+        }
+        break;
+    }
+
+    // Check if hand is over (only one player left)
+    final activePlayers = updatedPlayers.where((p) => !p.hasFolded).toList();
+    if (activePlayers.length == 1) {
+      // Award pot to winner
+      final winnerIndex = updatedPlayers.indexWhere((p) => !p.hasFolded);
+      updatedPlayers[winnerIndex] = updatedPlayers[winnerIndex].copyWith(
+        chips: updatedPlayers[winnerIndex].chips + pot,
+      );
+
+      await http.patch(
+        Uri.parse('$_databaseUrl/game_rooms/$roomId.json?auth=$token'),
+        body: jsonEncode({
+          'players': updatedPlayers.map((p) => p.toJson()).toList(),
+          'pot': 0,
+          'status': 'finished',
+          'phase': 'showdown',
+          'winnerId': updatedPlayers[winnerIndex].uid,
+        }),
+      );
+      return;
+    }
+
+    // Find next player who can act (not folded and has chips)
+    var nextPlayerIndex = (playerIndex + 1) % updatedPlayers.length;
+    int loopCount = 0;
+    while ((updatedPlayers[nextPlayerIndex].hasFolded || updatedPlayers[nextPlayerIndex].chips == 0) &&
+        loopCount < updatedPlayers.length) {
+      nextPlayerIndex = (nextPlayerIndex + 1) % updatedPlayers.length;
+      loopCount++;
+    }
+
+    // Check BB option (preflop only)
+    final currentPhase = GamePhase.fromString(room.phase);
+    var bbOptionUsed = true;
+
+    if (currentPhase == GamePhase.preflop) {
+      bbOptionUsed = !room.bbHasOption;
+      if (room.bbHasOption) {
+        final numPlayers = updatedPlayers.length;
+        final isHeadsUp = numPlayers == 2;
+        final bbIndex = isHeadsUp ? (room.dealerIndex + 1) % numPlayers : (room.dealerIndex + 2) % numPlayers;
+
+        if (updatedPlayers[playerIndex].uid == updatedPlayers[bbIndex].uid) {
+          bbOptionUsed = true;
+        } else if (action == 'raise') {
+          bbOptionUsed = true;
+        }
+      }
+    }
+
+    // Check if all remaining players are all-in
+    final playersWhoCanAct = updatedPlayers.where((p) => !p.hasFolded && p.chips > 0).toList();
+    final allPlayersAllIn = playersWhoCanAct.isEmpty || playersWhoCanAct.length <= 1;
+
+    if (allPlayersAllIn) {
+      await _dealToShowdown(roomId, room, updatedPlayers, pot);
+      return;
+    }
+
+    // Check if betting round is complete
+    final allPlayersActed = playersWhoCanAct.every((p) => p.hasActed);
+    final allBetsEqual = playersWhoCanAct.every((p) => p.currentBet == currentBet);
+    final isPreflop = currentPhase == GamePhase.preflop;
+    final bettingComplete = allPlayersActed && allBetsEqual && (isPreflop ? bbOptionUsed : true);
+
+    if (bettingComplete) {
+      await _advancePhase(roomId, room, updatedPlayers, pot);
+    } else {
+      await http.patch(
+        Uri.parse('$_databaseUrl/game_rooms/$roomId.json?auth=$token'),
+        body: jsonEncode({
+          'players': updatedPlayers.map((p) => p.toJson()).toList(),
+          'pot': pot,
+          'currentBet': currentBet,
+          'lastRaiseAmount': lastRaiseAmount,
+          'currentTurnPlayerId': updatedPlayers[nextPlayerIndex].uid,
+          'turnStartTime': DateTime.now().millisecondsSinceEpoch,
+          'bbHasOption': !bbOptionUsed,
+        }),
+      );
+    }
+  }
+
   /// Player action (fold, check, call, raise, allin)
   Future<void> playerAction(String roomId, String action, {int? raiseAmount}) async {
     final userId = currentUserId;
@@ -1369,6 +1582,183 @@ class GameService {
     }
 
     return finalPlayers;
+  }
+
+  /// Fill a room with bot players for testing
+  /// Adds bots until the room is full
+  Future<void> fillRoomWithBots(String roomId) async {
+    final userId = currentUserId;
+    if (userId == null) throw Exception('Must be logged in');
+
+    final token = await _getAuthToken();
+
+    // Get current room data
+    final response = await http.get(Uri.parse('$_databaseUrl/game_rooms/$roomId.json?auth=$token'));
+    if (response.statusCode != 200 || response.body == 'null') {
+      throw Exception('Room not found');
+    }
+
+    final roomData = jsonDecode(response.body) as Map<String, dynamic>;
+    final room = GameRoom.fromJson(roomData, roomId);
+
+    // Only host can add bots
+    if (room.hostId != userId) {
+      throw Exception('Only the host can add bots');
+    }
+
+    // Bot names for variety
+    const botNames = [
+      'RoboBluff',
+      'ChipBot',
+      'AceAI',
+      'PokerDroid',
+      'CardShark',
+      'BetBot',
+      'FoldMaster',
+      'AllInAI',
+      'RiverBot',
+      'FlopKing',
+      'TurnPro',
+      'BlindRaider'
+    ];
+
+    final random = Random();
+    final existingCount = room.players.length;
+    final botsNeeded = room.maxPlayers - existingCount;
+
+    if (botsNeeded <= 0) return; // Room already full
+
+    // Get starting chips from first player (should be the host)
+    final startingChips = room.players.isNotEmpty ? room.players.first.chips : 1500;
+
+    // Create bot players
+    final newPlayers = <GamePlayer>[...room.players];
+    final usedNames = room.players.map((p) => p.displayName).toSet();
+
+    for (int i = 0; i < botsNeeded; i++) {
+      // Pick a unique bot name
+      String botName;
+      int attempts = 0;
+      do {
+        botName = botNames[random.nextInt(botNames.length)];
+        if (usedNames.contains(botName)) {
+          botName = '$botName${random.nextInt(99) + 1}';
+        }
+        attempts++;
+      } while (usedNames.contains(botName) && attempts < 20);
+
+      usedNames.add(botName);
+
+      // Generate a unique bot ID
+      final botId = 'bot_${DateTime.now().millisecondsSinceEpoch}_$i';
+
+      newPlayers.add(GamePlayer(
+        uid: botId,
+        displayName: botName,
+        chips: startingChips,
+        isReady: true,
+        lastActiveAt: DateTime.now(),
+      ));
+    }
+
+    // Update room with bots
+    await http.patch(
+      Uri.parse('$_databaseUrl/game_rooms/$roomId.json?auth=$token'),
+      body: jsonEncode({'players': newPlayers.map((p) => p.toJson()).toList()}),
+    );
+
+    print('🤖 Added $botsNeeded bots to room $roomId');
+  }
+
+  /// Add a specific number of bots to a room
+  Future<void> addBotsToRoom(String roomId, int count) async {
+    final userId = currentUserId;
+    if (userId == null) throw Exception('Must be logged in');
+
+    final token = await _getAuthToken();
+
+    // Get current room data
+    final response = await http.get(Uri.parse('$_databaseUrl/game_rooms/$roomId.json?auth=$token'));
+    if (response.statusCode != 200 || response.body == 'null') {
+      throw Exception('Room not found');
+    }
+
+    final roomData = jsonDecode(response.body) as Map<String, dynamic>;
+    final room = GameRoom.fromJson(roomData, roomId);
+
+    // Only host can add bots
+    if (room.hostId != userId) {
+      throw Exception('Only the host can add bots');
+    }
+
+    // Bot names for variety
+    const botNames = [
+      'RoboBluff',
+      'ChipBot',
+      'AceAI',
+      'PokerDroid',
+      'CardShark',
+      'BetBot',
+      'FoldMaster',
+      'AllInAI',
+      'RiverBot',
+      'FlopKing',
+      'TurnPro',
+      'BlindRaider'
+    ];
+
+    final random = Random();
+    final existingCount = room.players.length;
+    final maxBotsToAdd = room.maxPlayers - existingCount;
+    final botsToAdd = count.clamp(0, maxBotsToAdd);
+
+    if (botsToAdd <= 0) return; // Room already full
+
+    // Get starting chips from first player (should be the host)
+    final startingChips = room.players.isNotEmpty ? room.players.first.chips : 1500;
+
+    // Create bot players
+    final newPlayers = <GamePlayer>[...room.players];
+    final usedNames = room.players.map((p) => p.displayName).toSet();
+
+    for (int i = 0; i < botsToAdd; i++) {
+      // Pick a unique bot name
+      String botName;
+      int attempts = 0;
+      do {
+        botName = botNames[random.nextInt(botNames.length)];
+        if (usedNames.contains(botName)) {
+          botName = '$botName${random.nextInt(99) + 1}';
+        }
+        attempts++;
+      } while (usedNames.contains(botName) && attempts < 20);
+
+      usedNames.add(botName);
+
+      // Generate a unique bot ID
+      final botId = 'bot_${DateTime.now().millisecondsSinceEpoch}_$i';
+
+      newPlayers.add(GamePlayer(
+        uid: botId,
+        displayName: botName,
+        chips: startingChips,
+        isReady: true,
+        lastActiveAt: DateTime.now(),
+      ));
+    }
+
+    // Update room with bots
+    await http.patch(
+      Uri.parse('$_databaseUrl/game_rooms/$roomId.json?auth=$token'),
+      body: jsonEncode({'players': newPlayers.map((p) => p.toJson()).toList()}),
+    );
+
+    print('🤖 Added $botsToAdd bots to room $roomId');
+  }
+
+  /// Check if a player is a bot
+  bool isBot(String playerId) {
+    return playerId.startsWith('bot_');
   }
 
   String _generateRoomId() {
