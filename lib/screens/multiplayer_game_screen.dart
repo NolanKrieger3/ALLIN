@@ -49,6 +49,11 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
   double _remainingSeconds = 10.0;
   String? _lastTurnPlayerId;
   bool _hasAutoFolded = false;
+  bool _timerStarted = false;
+
+  // Action debouncing
+  bool _isProcessingAction = false;
+  DateTime? _lastActionTime;
 
   // Showdown animation
   bool _showdownAnimationComplete = false;
@@ -108,39 +113,50 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
       _triggerBotAction(room);
     }
 
-    // Reset auto-fold flag when it's a new turn
+    // Reset auto-fold flag and timer when it's a new turn
     if (currentTurnId != _lastTurnPlayerId) {
       _hasAutoFolded = false;
       _lastTurnPlayerId = currentTurnId;
+      _timerStarted = false;
 
-      // Calculate remaining time from turnStartTime
-      if (room.turnStartTime != null && room.status == 'playing' && room.phase != 'showdown') {
-        final elapsed = DateTime.now().millisecondsSinceEpoch - room.turnStartTime!;
-        final elapsedSeconds = elapsed / 1000;
-        _remainingSeconds = (room.turnTimeLimit - elapsedSeconds).clamp(0.0, room.turnTimeLimit.toDouble());
+      // Cancel existing timer immediately
+      _turnTimer?.cancel();
+      _turnTimer = null;
+    }
 
-        // Cancel existing timer
-        _turnTimer?.cancel();
+    // Start timer only once per turn
+    if (!_timerStarted && room.turnStartTime != null && room.status == 'playing' && room.phase != 'showdown') {
+      _timerStarted = true;
 
-        // Start new timer (100ms for smooth animation)
-        _turnTimer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
-          if (!mounted) {
-            timer.cancel();
-            return;
-          }
+      final elapsed = DateTime.now().millisecondsSinceEpoch - room.turnStartTime!;
+      final elapsedSeconds = elapsed / 1000;
+      _remainingSeconds = (room.turnTimeLimit - elapsedSeconds).clamp(0.0, room.turnTimeLimit.toDouble());
 
-          setState(() {
-            _remainingSeconds -= 0.1;
-          });
+      // Start new timer (100ms for smooth animation)
+      _turnTimer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
+        if (!mounted) {
+          timer.cancel();
+          return;
+        }
 
-          // Auto-fold when time runs out (only if it's my turn)
-          if (_remainingSeconds <= 0 && isMyTurn && !_hasAutoFolded) {
-            timer.cancel();
-            _hasAutoFolded = true;
-            _gameService.playerAction(widget.roomId, 'fold');
-          }
+        setState(() {
+          _remainingSeconds -= 0.1;
         });
-      }
+
+        // Auto-fold when time runs out (only if it's my turn)
+        if (_remainingSeconds <= 0 && isMyTurn && !_hasAutoFolded) {
+          timer.cancel();
+          _hasAutoFolded = true;
+          _gameService.playerAction(widget.roomId, 'fold');
+        }
+      });
+    }
+
+    // Stop timer if phase changes to showdown
+    if (room.phase == 'showdown' && _turnTimer != null) {
+      _turnTimer?.cancel();
+      _turnTimer = null;
+      _timerStarted = false;
     }
   }
 
@@ -1873,28 +1889,30 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              // Player's cards - show ghost outline if folded, otherwise card backs
-              if (player.hasFolded && _foldedCards.isNotEmpty)
-                Row(
-                  children: [
-                    _buildMinimalCard(_foldedCards[0], isHoleCard: true, isGhost: true),
-                    if (_foldedCards.length > 1)
-                      Transform.translate(
-                        offset: const Offset(-20, 0),
-                        child: _buildMinimalCard(_foldedCards[1], isHoleCard: true, isGhost: true),
+              // Player's cards - fixed width to prevent shifting
+              SizedBox(
+                width: 120, // Fixed width for 2 overlapping cards
+                child: player.hasFolded && _foldedCards.isNotEmpty
+                    ? Row(
+                        children: [
+                          _buildMinimalCard(_foldedCards[0], isHoleCard: true, isGhost: true),
+                          if (_foldedCards.length > 1)
+                            Transform.translate(
+                              offset: const Offset(-20, 0),
+                              child: _buildMinimalCard(_foldedCards[1], isHoleCard: true, isGhost: true),
+                            ),
+                        ],
+                      )
+                    : Row(
+                        children: [
+                          _buildCardBack(width: 70, height: 98),
+                          Transform.translate(
+                            offset: const Offset(-20, 0),
+                            child: _buildCardBack(width: 70, height: 98),
+                          ),
+                        ],
                       ),
-                  ],
-                )
-              else
-                Row(
-                  children: [
-                    _buildCardBack(width: 70, height: 98),
-                    Transform.translate(
-                      offset: const Offset(-20, 0),
-                      child: _buildCardBack(width: 70, height: 98),
-                    ),
-                  ],
-                ),
+              ),
               const Spacer(),
               // Player info
               _buildPlayerAvatarLarge(player, room: room),
@@ -1918,18 +1936,43 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
             children: [
               Expanded(
                 child: GestureDetector(
-                  onTap: () => _gameService.playerAction(widget.roomId, canCheck ? 'check' : 'call'),
+                  onTap: () async {
+                    // Debounce: prevent rapid button presses
+                    if (_isProcessingAction) return;
+                    final now = DateTime.now();
+                    if (_lastActionTime != null && now.difference(_lastActionTime!).inMilliseconds < 300) {
+                      return;
+                    }
+
+                    setState(() {
+                      _isProcessingAction = true;
+                      _lastActionTime = now;
+                    });
+
+                    // Add slight delay for smoother feel
+                    await Future.delayed(const Duration(milliseconds: 150));
+                    await _gameService.playerAction(widget.roomId, canCheck ? 'check' : 'call');
+
+                    // Reset after action completes
+                    await Future.delayed(const Duration(milliseconds: 200));
+                    if (mounted) {
+                      setState(() => _isProcessingAction = false);
+                    }
+                  },
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     decoration: BoxDecoration(
-                      color: Colors.transparent,
+                      color: _isProcessingAction ? Colors.grey.withValues(alpha: 0.3) : Colors.transparent,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
                     ),
                     child: Center(
                       child: Text(
                         canCheck ? 'Check' : 'Call ${_formatChips(callAmount)}',
-                        style: const TextStyle(color: Colors.white, fontSize: 16),
+                        style: TextStyle(
+                          color: _isProcessingAction ? Colors.white.withValues(alpha: 0.5) : Colors.white,
+                          fontSize: 16,
+                        ),
                       ),
                     ),
                   ),
@@ -1938,17 +1981,25 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
               const SizedBox(width: 12),
               Expanded(
                 child: GestureDetector(
-                  onTap: () => _showRaiseDialog(room, player),
+                  onTap: () {
+                    // Prevent opening dialog during action processing
+                    if (_isProcessingAction) return;
+                    _showRaiseDialog(room, player);
+                  },
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: _isProcessingAction ? Colors.grey.withValues(alpha: 0.5) : Colors.white,
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Center(
+                    child: Center(
                       child: Text(
                         'Raise',
-                        style: TextStyle(color: Colors.black, fontSize: 16, fontWeight: FontWeight.w600),
+                        style: TextStyle(
+                          color: _isProcessingAction ? Colors.black.withValues(alpha: 0.5) : Colors.black,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                   ),
@@ -1961,38 +2012,55 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              // Swipeable cards with fold animation
-              GestureDetector(
-                onVerticalDragUpdate: (details) {
-                  setState(() {
-                    _dragOffset += details.delta.dy;
-                    // Clamp to only allow upward drag
-                    if (_dragOffset > 0) _dragOffset = 0;
-                  });
-                },
-                onVerticalDragEnd: (details) {
-                  // If swiped up enough (past threshold) or fast enough, trigger fold
-                  if (_dragOffset < -80 || (details.primaryVelocity != null && details.primaryVelocity! < -300)) {
-                    _animateFold(player.cards);
-                  }
-                  // Reset drag offset
-                  setState(() => _dragOffset = 0);
-                },
-                child: _isFolding
-                    ? SlideTransition(
-                        position: _foldSlideAnimation,
-                        child: FadeTransition(
-                          opacity: _foldOpacityAnimation,
-                          child: _buildPlayerCardsLarge(player),
+              // Swipeable cards with fold animation - fixed width
+              SizedBox(
+                width: 165, // Fixed width for 2 overlapping large cards
+                child: GestureDetector(
+                  onVerticalDragUpdate: (details) {
+                    // Don't allow drag if processing action
+                    if (_isProcessingAction) return;
+                    setState(() {
+                      _dragOffset += details.delta.dy;
+                      // Clamp to only allow upward drag
+                      if (_dragOffset > 0) _dragOffset = 0;
+                    });
+                  },
+                  onVerticalDragEnd: (details) async {
+                    // Prevent multiple fold actions
+                    if (_isProcessingAction) {
+                      setState(() => _dragOffset = 0);
+                      return;
+                    }
+
+                    // If swiped up enough (past threshold) or fast enough, trigger fold
+                    if (_dragOffset < -80 || (details.primaryVelocity != null && details.primaryVelocity! < -300)) {
+                      setState(() => _isProcessingAction = true);
+                      await Future.delayed(const Duration(milliseconds: 100));
+                      _animateFold(player.cards);
+                      await Future.delayed(const Duration(milliseconds: 300));
+                      if (mounted) {
+                        setState(() => _isProcessingAction = false);
+                      }
+                    }
+                    // Reset drag offset
+                    setState(() => _dragOffset = 0);
+                  },
+                  child: _isFolding
+                      ? SlideTransition(
+                          position: _foldSlideAnimation,
+                          child: FadeTransition(
+                            opacity: _foldOpacityAnimation,
+                            child: _buildPlayerCardsLarge(player),
+                          ),
+                        )
+                      : Transform.translate(
+                          offset: Offset(0, _dragOffset * 0.5),
+                          child: Opacity(
+                            opacity: (1.0 + _dragOffset / 200).clamp(0.3, 1.0),
+                            child: _buildPlayerCardsLarge(player),
+                          ),
                         ),
-                      )
-                    : Transform.translate(
-                        offset: Offset(0, _dragOffset * 0.5),
-                        child: Opacity(
-                          opacity: (1.0 + _dragOffset / 200).clamp(0.3, 1.0),
-                          child: _buildPlayerCardsLarge(player),
-                        ),
-                      ),
+                ),
               ),
               const Spacer(),
               _buildPlayerAvatarLarge(player, room: room),
@@ -2104,8 +2172,11 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                // Player's large cards with overlapping layout
-                _buildPlayerCardsLarge(player),
+                // Player's large cards with overlapping layout - fixed width
+                SizedBox(
+                  width: 165, // Fixed width for 2 overlapping large cards (90 + 75)
+                  child: _buildPlayerCardsLarge(player),
+                ),
                 const Spacer(),
                 Column(
                   mainAxisSize: MainAxisSize.min,
@@ -2138,8 +2209,8 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
 
   /// Build large player cards for bottom area
   Widget _buildPlayerCardsLarge(GamePlayer player) {
-    // If player has no cards yet, show card backs
-    if (player.cards.isEmpty) {
+    // If player has no cards yet or phase is waiting, show card backs
+    if (player.cards.isEmpty || player.cards.length < 2) {
       return Row(
         children: [
           _buildCardBack(width: 90, height: 126),
@@ -2153,12 +2224,11 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
 
     return Row(
       children: [
-        if (player.cards.isNotEmpty) _buildLargeCard(player.cards[0]),
-        if (player.cards.length > 1)
-          Transform.translate(
-            offset: const Offset(-15, 0),
-            child: _buildLargeCard(player.cards[1]),
-          ),
+        _buildLargeCard(player.cards[0]),
+        Transform.translate(
+          offset: const Offset(-15, 0),
+          child: _buildLargeCard(player.cards[1]),
+        ),
       ],
     );
   }
@@ -2751,13 +2821,21 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
                       const SizedBox(width: 12),
                       Expanded(
                         child: GestureDetector(
-                          onTap: () {
+                          onTap: () async {
                             Navigator.pop(context);
-                            _gameService.playerAction(
+                            // Add delay for smoother transition
+                            await Future.delayed(const Duration(milliseconds: 100));
+                            setState(() => _isProcessingAction = true);
+                            await Future.delayed(const Duration(milliseconds: 150));
+                            await _gameService.playerAction(
                               widget.roomId,
                               'raise',
                               raiseAmount: raiseAmount,
                             );
+                            await Future.delayed(const Duration(milliseconds: 200));
+                            if (mounted) {
+                              setState(() => _isProcessingAction = false);
+                            }
                           },
                           child: Container(
                             padding: const EdgeInsets.symmetric(vertical: 16),
