@@ -39,7 +39,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
 
   // Turn timer
   Timer? _turnTimer;
-  int _remainingSeconds = 30;
+  double _remainingSeconds = 6.0;
   String? _lastTurnPlayerId;
   bool _hasAutoFolded = false;
 
@@ -109,21 +109,21 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
       // Calculate remaining time from turnStartTime
       if (room.turnStartTime != null && room.status == 'playing' && room.phase != 'showdown') {
         final elapsed = DateTime.now().millisecondsSinceEpoch - room.turnStartTime!;
-        final elapsedSeconds = (elapsed / 1000).floor();
-        _remainingSeconds = (room.turnTimeLimit - elapsedSeconds).clamp(0, room.turnTimeLimit);
+        final elapsedSeconds = elapsed / 1000;
+        _remainingSeconds = (room.turnTimeLimit - elapsedSeconds).clamp(0.0, room.turnTimeLimit.toDouble());
 
         // Cancel existing timer
         _turnTimer?.cancel();
 
-        // Start new timer
-        _turnTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        // Start new timer (100ms for smooth animation)
+        _turnTimer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
           if (!mounted) {
             timer.cancel();
             return;
           }
 
           setState(() {
-            _remainingSeconds--;
+            _remainingSeconds -= 0.1;
           });
 
           // Auto-fold when time runs out (only if it's my turn)
@@ -142,8 +142,8 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
     if (_isBotActing) return;
     _isBotActing = true;
 
-    // Small delay to make it feel more natural
-    final delay = Random().nextInt(1500) + 500; // 0.5 - 2 seconds
+    // Variable delay to make bots feel more human (1-4 seconds)
+    final delay = Random().nextInt(3000) + 1000; // 1 - 4 seconds
     await Future.delayed(Duration(milliseconds: delay));
 
     if (!mounted) {
@@ -177,43 +177,56 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
       int? raiseAmount;
 
       if (canCheck) {
-        // Can check - 60% check, 30% raise, 10% fold (bluff fold for realism)
+        // Can check - 50% check, 35% raise, 15% fold (sometimes fold even when can check)
         final roll = random.nextDouble();
-        if (roll < 0.60) {
+        if (roll < 0.50) {
           action = 'check';
-        } else if (roll < 0.90) {
+        } else if (roll < 0.85) {
           action = 'raise';
-          // Raise between 1x and 2x the big blind
-          raiseAmount = room.bigBlind * (random.nextInt(2) + 1);
+          // More variety in raise amounts (0.5x to 3x pot)
+          final raiseMultiplier = random.nextDouble() * 2.5 + 0.5;
+          raiseAmount = (potSize * raiseMultiplier).toInt().clamp(room.bigBlind, bot.chips);
         } else {
           action = 'fold';
         }
       } else {
         // Must call or fold
         final potOdds = callAmount / (potSize + callAmount);
+        final chipRatio = callAmount / bot.chips; // How much of stack is needed
 
         if (callAmount > bot.chips) {
-          // All-in situation - 70% call (all-in), 30% fold
-          action = random.nextDouble() < 0.70 ? 'call' : 'fold';
-        } else if (potOdds > 0.5) {
-          // Bad pot odds - 30% call, 10% raise, 60% fold
+          // All-in situation - 60% call (all-in), 40% fold (more conservative)
+          action = random.nextDouble() < 0.60 ? 'call' : 'fold';
+        } else if (chipRatio > 0.3) {
+          // Large bet relative to stack - 25% call, 10% raise, 65% fold
           final roll = random.nextDouble();
-          if (roll < 0.30) {
+          if (roll < 0.25) {
             action = 'call';
-          } else if (roll < 0.40) {
+          } else if (roll < 0.35) {
             action = 'raise';
-            raiseAmount = room.bigBlind * (random.nextInt(2) + 1);
+            raiseAmount = (callAmount * (random.nextDouble() * 1.5 + 1.5)).toInt().clamp(room.bigBlind, bot.chips);
+          } else {
+            action = 'fold';
+          }
+        } else if (potOdds > 0.4) {
+          // Moderate pot odds - 35% call, 15% raise, 50% fold
+          final roll = random.nextDouble();
+          if (roll < 0.35) {
+            action = 'call';
+          } else if (roll < 0.50) {
+            action = 'raise';
+            raiseAmount = (potSize * (random.nextDouble() * 1.5 + 0.8)).toInt().clamp(room.bigBlind, bot.chips);
           } else {
             action = 'fold';
           }
         } else {
-          // Good pot odds - 60% call, 25% raise, 15% fold
+          // Good pot odds - 55% call, 30% raise, 15% fold
           final roll = random.nextDouble();
-          if (roll < 0.60) {
+          if (roll < 0.55) {
             action = 'call';
           } else if (roll < 0.85) {
             action = 'raise';
-            raiseAmount = room.bigBlind * (random.nextInt(3) + 1);
+            raiseAmount = (potSize * (random.nextDouble() * 2 + 0.8)).toInt().clamp(room.bigBlind, bot.chips);
           } else {
             action = 'fold';
           }
@@ -369,7 +382,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
             return const Scaffold(
               backgroundColor: Colors.black,
               body: Center(
-                child: CircularProgressIndicator(color: Color(0xFFD4AF37)),
+                child: CircularProgressIndicator(color: Colors.white),
               ),
             );
           }
@@ -1307,14 +1320,6 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
     // Display name - "You" for current player
     final displayName = isCurrentPlayer ? 'You' : player.displayName;
 
-    // Border color: gold if winner at showdown, gold if their turn
-    Color? borderColor;
-    if (isShowdown && _showdownAnimationComplete && isWinner) {
-      borderColor = const Color(0xFFFFD700); // Gold for winner
-    } else if (isTheirTurn && !isShowdown) {
-      borderColor = const Color(0xFFD4AF37);
-    }
-
     final isDealer = room.players.isNotEmpty &&
         room.dealerIndex < room.players.length &&
         player.uid == room.players[room.dealerIndex].uid;
@@ -1332,22 +1337,6 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
               alignment: Alignment.center,
               clipBehavior: Clip.none,
               children: [
-                // Active turn glow ring (pulsing gold glow when it's their turn)
-                if (isTheirTurn && room.status == 'playing' && room.phase != 'showdown')
-                  Container(
-                    width: 54,
-                    height: 54,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFFD4AF37).withValues(alpha: 0.5),
-                          blurRadius: 16,
-                          spreadRadius: 4,
-                        ),
-                      ],
-                    ),
-                  ),
                 // Winner glow ring
                 if (isShowdown && _showdownAnimationComplete && isWinner)
                   Container(
@@ -1357,25 +1346,43 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFFFFD700).withValues(alpha: 0.6),
+                          color: const Color(0xFF6366F1).withValues(alpha: 0.6),
                           blurRadius: 12,
                           spreadRadius: 3,
                         ),
                       ],
                     ),
                   ),
-                // Timer ring (only show when it's their turn and game is active)
+                // Timer ring as border (only show when it's their turn and game is active)
                 if (isTheirTurn && room.status == 'playing' && room.phase != 'showdown')
                   SizedBox(
                     width: 48,
                     height: 48,
-                    child: CircularProgressIndicator(
-                      value: _remainingSeconds / room.turnTimeLimit,
-                      strokeWidth: 2,
-                      backgroundColor: Colors.grey.shade800,
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        _remainingSeconds <= 5 ? Colors.red : const Color(0xFFD4AF37),
+                    child: TweenAnimationBuilder<double>(
+                      duration: const Duration(milliseconds: 100),
+                      curve: Curves.linear,
+                      tween: Tween<double>(
+                        begin: _remainingSeconds / room.turnTimeLimit,
+                        end: _remainingSeconds / room.turnTimeLimit,
                       ),
+                      builder: (context, value, child) => CircularProgressIndicator(
+                        value: value,
+                        strokeWidth: 3,
+                        backgroundColor: Colors.transparent,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          _remainingSeconds <= 2 ? Colors.red : Colors.white.withValues(alpha: 0.9),
+                        ),
+                      ),
+                    ),
+                  ),
+                // Winner border (solid when not showing timer)
+                if (isShowdown && _showdownAnimationComplete && isWinner && room.phase == 'showdown')
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: const Color(0xFF6366F1), width: 3),
                     ),
                   ),
                 Container(
@@ -1384,7 +1391,15 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: hasFolded ? Colors.grey.shade800 : Colors.white.withValues(alpha: 0.1),
-                    border: borderColor != null ? Border.all(color: borderColor, width: 3) : null,
+                    boxShadow: hasFolded
+                        ? [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.6),
+                              blurRadius: 8,
+                              spreadRadius: 2,
+                            ),
+                          ]
+                        : null,
                   ),
                   child: Center(
                     child: Text(

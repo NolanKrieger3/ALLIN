@@ -716,12 +716,14 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       bot.lastAction = null; // Clear previous action while thinking
     });
 
-    // Simulate bot thinking - harder bots think faster
-    final thinkTime = _difficulty == 'Easy'
-        ? 1200
+    // Simulate bot thinking - variable timing for realism
+    final random = Random();
+    final baseTime = _difficulty == 'Easy'
+        ? 1500
         : _difficulty == 'Medium'
-            ? 800
-            : 500;
+            ? 1200
+            : 900;
+    final thinkTime = baseTime + random.nextInt(1000); // Add 0-1s variation
 
     Future.delayed(Duration(milliseconds: thinkTime), () {
       if (!mounted) return;
@@ -730,26 +732,26 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       final callAmount = _currentBet - bot.currentBet;
       final canCheck = callAmount <= 0;
 
-      // AI decision based on difficulty
+      // AI decision based on difficulty (with more realistic fold/raise behavior)
       int foldThreshold;
       int callThreshold;
       int raiseMultiplierMax;
 
       switch (_difficulty) {
         case 'Easy':
-          foldThreshold = 20;
-          callThreshold = 85;
-          raiseMultiplierMax = 2;
+          foldThreshold = 35; // Folds more often
+          callThreshold = 80;
+          raiseMultiplierMax = 3;
           break;
         case 'Hard':
-          foldThreshold = 5;
-          callThreshold = 45;
-          raiseMultiplierMax = 5;
+          foldThreshold = 15; // Still folds sometimes
+          callThreshold = 50; // Raises more
+          raiseMultiplierMax = 6;
           break;
         default: // Medium
-          foldThreshold = 10;
-          callThreshold = 60;
-          raiseMultiplierMax = 3;
+          foldThreshold = 25;
+          callThreshold = 65;
+          raiseMultiplierMax = 4;
       }
 
       final decision = random.nextInt(100);
@@ -1528,12 +1530,12 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       return avatars[(index - 1) % avatars.length];
     }
 
-    // Border color: gold if winner at showdown, gold if their turn
+    // Border color: primary color if winner at showdown, white if their turn
     Color? borderColor;
     if (isShowdown && _showdownAnimationComplete && isWinner) {
-      borderColor = const Color(0xFFFFD700); // Gold for winner
+      borderColor = const Color(0xFF6366F1); // Primary color for winner
     } else if (p.isCurrentTurn) {
-      borderColor = const Color(0xFFD4AF37);
+      borderColor = Colors.white.withValues(alpha: 0.9);
     }
 
     return AnimatedOpacity(
@@ -1549,22 +1551,6 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
               alignment: Alignment.center,
               clipBehavior: Clip.none,
               children: [
-                // Active turn glow ring (pulsing gold glow when it's their turn)
-                if (p.isCurrentTurn && _gamePhase != 'showdown')
-                  Container(
-                    width: 50,
-                    height: 50,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFFD4AF37).withValues(alpha: 0.5),
-                          blurRadius: 16,
-                          spreadRadius: 4,
-                        ),
-                      ],
-                    ),
-                  ),
                 // Winner glow ring
                 if (isShowdown && _showdownAnimationComplete && isWinner)
                   Container(
@@ -1574,7 +1560,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFFFFD700).withValues(alpha: 0.6),
+                          color: const Color(0xFF6366F1).withValues(alpha: 0.6),
                           blurRadius: 12,
                           spreadRadius: 3,
                         ),
@@ -1588,6 +1574,15 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                     shape: BoxShape.circle,
                     color: p.hasFolded ? Colors.grey.shade800 : Colors.white.withValues(alpha: 0.1),
                     border: borderColor != null ? Border.all(color: borderColor, width: 3) : null,
+                    boxShadow: p.hasFolded
+                        ? [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.6),
+                              blurRadius: 8,
+                              spreadRadius: 2,
+                            ),
+                          ]
+                        : null,
                   ),
                   child: Center(
                     child: Text(

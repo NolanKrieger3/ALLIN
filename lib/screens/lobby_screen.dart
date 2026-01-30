@@ -961,7 +961,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const CircularProgressIndicator(color: Color(0xFFD4AF37), strokeWidth: 3),
+                        const CircularProgressIndicator(color: Colors.white, strokeWidth: 3),
                         const SizedBox(height: 20),
                         Text(
                           _loadingAction ?? 'Loading...',

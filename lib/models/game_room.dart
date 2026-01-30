@@ -139,7 +139,7 @@ class GameRoom {
   final bool bbHasOption; // Big blind's option to raise preflop if no raises
   final String? winningHandName; // Description of the winning hand at showdown
   final int? turnStartTime; // Timestamp when current turn started (for turn timer)
-  final int turnTimeLimit; // Seconds allowed per turn (default 30)
+  final int turnTimeLimit; // Seconds allowed per turn (default 6)
 
   GameRoom({
     required this.id,
@@ -164,7 +164,7 @@ class GameRoom {
     this.bbHasOption = true,
     this.winningHandName,
     this.turnStartTime,
-    this.turnTimeLimit = 30,
+    this.turnTimeLimit = 6,
   });
 
   Map<String, dynamic> toJson() => {
@@ -222,7 +222,7 @@ class GameRoom {
       bbHasOption: json['bbHasOption'] as bool? ?? true,
       winningHandName: json['winningHandName'] as String?,
       turnStartTime: json['turnStartTime'] as int?,
-      turnTimeLimit: json['turnTimeLimit'] as int? ?? 30,
+      turnTimeLimit: json['turnTimeLimit'] as int? ?? 6,
     );
   }
 

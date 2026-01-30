@@ -950,6 +950,8 @@ class GameService {
     final bettingComplete = allPlayersActed && allBetsEqual && (isPreflop ? bbOptionUsed : true);
 
     if (bettingComplete) {
+      // Add a delay before dealing next cards to give players time to see the action complete
+      await Future.delayed(const Duration(milliseconds: 1500));
       await _advancePhase(roomId, room, updatedPlayers, pot);
     } else {
       await http.patch(
@@ -1187,6 +1189,8 @@ class GameService {
 
     if (bettingComplete) {
       print('✅ Advancing to next phase from ${room.phase}');
+      // Add a delay before dealing next cards to give players time to see the action complete
+      await Future.delayed(const Duration(milliseconds: 1500));
       // Move to next phase
       await _advancePhase(roomId, room, updatedPlayers, pot);
     } else {
