@@ -56,8 +56,9 @@ class _QuickPlayScreenState extends State<QuickPlayScreen> {
       String? roomId;
 
       // Retry logic: Try to find and join a room multiple times before creating
-      for (int attempt = 0; attempt < 3; attempt++) {
-        print('🔍 Matchmaking attempt ${attempt + 1}/3 for blind $bigBlind');
+      // Use more attempts with longer delays to handle race conditions
+      for (int attempt = 0; attempt < 5; attempt++) {
+        print('🔍 Matchmaking attempt ${attempt + 1}/5 for blind $bigBlind');
 
         // Search for joinable Quick Play rooms (separate from Cash Games)
         final rooms = await _gameService.fetchJoinableRoomsByBlind(bigBlind, gameType: 'quickplay');
@@ -81,9 +82,10 @@ class _QuickPlayScreenState extends State<QuickPlayScreen> {
 
         if (roomId != null) break;
 
-        // Small delay before next attempt to allow other rooms to appear
-        if (attempt < 2) {
-          await Future.delayed(const Duration(milliseconds: 500));
+        // Longer delay before next attempt to allow other rooms to appear
+        // This helps prevent race conditions where multiple players create rooms simultaneously
+        if (attempt < 4) {
+          await Future.delayed(Duration(milliseconds: 800 + (attempt * 200)));
         }
       }
 

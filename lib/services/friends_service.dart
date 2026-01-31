@@ -27,6 +27,10 @@ class FriendsService {
   StreamSubscription? _requestsSubscription;
   StreamSubscription? _invitesSubscription;
   StreamSubscription? _notificationsSubscription;
+  Timer? _heartbeatTimer;
+
+  /// Users are considered offline if their lastOnline is older than this
+  static const Duration _onlineTimeout = Duration(minutes: 2);
 
   String? get _currentUserId => _auth.currentUser?.uid;
 
@@ -35,12 +39,8 @@ class FriendsService {
     if (_currentUserId == null) return;
 
     // Listen to friends list
-    _friendsSubscription = _firestore
-        .collection('users')
-        .doc(_currentUserId)
-        .collection('friends')
-        .snapshots()
-        .listen((snapshot) async {
+    _friendsSubscription =
+        _firestore.collection('users').doc(_currentUserId).collection('friends').snapshots().listen((snapshot) async {
       final friends = <Friend>[];
       for (final doc in snapshot.docs) {
         final friendData = await _getUserData(doc.id);
@@ -58,9 +58,7 @@ class FriendsService {
         .where('status', isEqualTo: 'pending')
         .snapshots()
         .listen((snapshot) {
-      final requests = snapshot.docs
-          .map((doc) => FriendRequest.fromJson({...doc.data(), 'id': doc.id}))
-          .toList();
+      final requests = snapshot.docs.map((doc) => FriendRequest.fromJson({...doc.data(), 'id': doc.id})).toList();
       _friendRequestsController.add(requests);
     });
 
@@ -87,19 +85,51 @@ class FriendsService {
         .limit(50)
         .snapshots()
         .listen((snapshot) {
-      final notifications = snapshot.docs
-          .map((doc) => AppNotification.fromJson({...doc.data(), 'id': doc.id}))
-          .toList();
+      final notifications =
+          snapshot.docs.map((doc) => AppNotification.fromJson({...doc.data(), 'id': doc.id})).toList();
       _notificationsController.add(notifications);
     });
 
-    // Set user online status
+    // Set user online status and start heartbeat
     _setOnlineStatus(true);
+    _startHeartbeat();
+  }
+
+  /// Start heartbeat timer to periodically update lastOnline
+  void _startHeartbeat() {
+    _heartbeatTimer?.cancel();
+    // Update lastOnline every 30 seconds to keep user marked as online
+    _heartbeatTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      _updateLastOnline();
+    });
+  }
+
+  /// Update lastOnline timestamp without changing isOnline flag
+  Future<void> _updateLastOnline() async {
+    if (_currentUserId == null) return;
+    try {
+      await _firestore.collection('users').doc(_currentUserId).update({
+        'lastOnline': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      // Handle error silently
+    }
+  }
+
+  /// Check if a user is truly online based on their lastOnline timestamp
+  bool _isUserTrulyOnline(bool isOnlineFlag, DateTime? lastOnline) {
+    // If not marked as online, definitely offline
+    if (!isOnlineFlag) return false;
+    // If no lastOnline timestamp, consider offline (stale data)
+    if (lastOnline == null) return false;
+    // Check if lastOnline is within the timeout period
+    return DateTime.now().difference(lastOnline) < _onlineTimeout;
   }
 
   /// Clean up listeners
   void dispose() {
     _setOnlineStatus(false);
+    _heartbeatTimer?.cancel();
     _friendsSubscription?.cancel();
     _requestsSubscription?.cancel();
     _invitesSubscription?.cancel();
@@ -111,16 +141,19 @@ class FriendsService {
     try {
       final doc = await _firestore.collection('users').doc(userId).get();
       if (!doc.exists) return null;
-      
+
       final data = doc.data()!;
+      final isOnlineFlag = data['isOnline'] ?? false;
+      final lastOnline = data['lastOnline'] != null ? (data['lastOnline'] as Timestamp).toDate() : null;
+      // Use smart online check based on lastOnline timestamp
+      final isTrulyOnline = _isUserTrulyOnline(isOnlineFlag, lastOnline);
+
       return Friend(
         id: userId,
         username: data['username'] ?? 'Unknown',
         avatarUrl: data['avatarUrl'],
-        isOnline: data['isOnline'] ?? false,
-        lastOnline: data['lastOnline'] != null 
-            ? (data['lastOnline'] as Timestamp).toDate() 
-            : null,
+        isOnline: isTrulyOnline,
+        lastOnline: lastOnline,
         currentGame: data['currentGame'],
         rank: data['rank'] ?? 0,
         chips: data['chips'] ?? 10000,
@@ -146,11 +179,17 @@ class FriendsService {
       for (final doc in snapshot.docs) {
         if (doc.id != _currentUserId) {
           final data = doc.data();
+          final isOnlineFlag = data['isOnline'] ?? false;
+          final lastOnline = data['lastOnline'] != null ? (data['lastOnline'] as Timestamp).toDate() : null;
+          // Use smart online check based on lastOnline timestamp
+          final isTrulyOnline = _isUserTrulyOnline(isOnlineFlag, lastOnline);
+
           results.add(Friend(
             id: doc.id,
             username: data['username'] ?? 'Unknown',
             avatarUrl: data['avatarUrl'],
-            isOnline: data['isOnline'] ?? false,
+            isOnline: isTrulyOnline,
+            lastOnline: lastOnline,
             rank: data['rank'] ?? 0,
             chips: data['chips'] ?? 10000,
           ));
@@ -168,12 +207,8 @@ class FriendsService {
 
     try {
       // Check if already friends
-      final friendDoc = await _firestore
-          .collection('users')
-          .doc(_currentUserId)
-          .collection('friends')
-          .doc(toUserId)
-          .get();
+      final friendDoc =
+          await _firestore.collection('users').doc(_currentUserId).collection('friends').doc(toUserId).get();
 
       if (friendDoc.exists) {
         return false; // Already friends
@@ -192,10 +227,7 @@ class FriendsService {
       }
 
       // Get current user's username
-      final currentUserDoc = await _firestore
-          .collection('users')
-          .doc(_currentUserId)
-          .get();
+      final currentUserDoc = await _firestore.collection('users').doc(_currentUserId).get();
       final currentUsername = currentUserDoc.data()?['username'] ?? 'Unknown';
 
       // Create friend request
@@ -228,10 +260,7 @@ class FriendsService {
     if (_currentUserId == null) return false;
 
     try {
-      final requestDoc = await _firestore
-          .collection('friendRequests')
-          .doc(requestId)
-          .get();
+      final requestDoc = await _firestore.collection('friendRequests').doc(requestId).get();
 
       if (!requestDoc.exists) return false;
 
@@ -263,10 +292,7 @@ class FriendsService {
           .set({'addedAt': FieldValue.serverTimestamp()});
 
       // Get current user's username
-      final currentUserDoc = await _firestore
-          .collection('users')
-          .doc(_currentUserId)
-          .get();
+      final currentUserDoc = await _firestore.collection('users').doc(_currentUserId).get();
       final currentUsername = currentUserDoc.data()?['username'] ?? 'Unknown';
 
       // Notify the sender that request was accepted
@@ -303,19 +329,9 @@ class FriendsService {
     if (_currentUserId == null) return false;
 
     try {
-      await _firestore
-          .collection('users')
-          .doc(_currentUserId)
-          .collection('friends')
-          .doc(friendId)
-          .delete();
+      await _firestore.collection('users').doc(_currentUserId).collection('friends').doc(friendId).delete();
 
-      await _firestore
-          .collection('users')
-          .doc(friendId)
-          .collection('friends')
-          .doc(_currentUserId)
-          .delete();
+      await _firestore.collection('users').doc(friendId).collection('friends').doc(_currentUserId).delete();
 
       return true;
     } catch (e) {
@@ -334,10 +350,7 @@ class FriendsService {
 
     try {
       // Get current user's username
-      final currentUserDoc = await _firestore
-          .collection('users')
-          .doc(_currentUserId)
-          .get();
+      final currentUserDoc = await _firestore.collection('users').doc(_currentUserId).get();
       final currentUsername = currentUserDoc.data()?['username'] ?? 'Unknown';
 
       // Create invite (expires in 5 minutes)
@@ -378,10 +391,7 @@ class FriendsService {
     if (_currentUserId == null) return null;
 
     try {
-      final inviteDoc = await _firestore
-          .collection('gameInvites')
-          .doc(inviteId)
-          .get();
+      final inviteDoc = await _firestore.collection('gameInvites').doc(inviteId).get();
 
       if (!inviteDoc.exists) return null;
 
@@ -432,7 +442,7 @@ class FriendsService {
   /// Set current user's game status
   Future<void> setCurrentGame(String? roomCode) async {
     if (_currentUserId == null) return;
-    
+
     try {
       await _firestore.collection('users').doc(_currentUserId).update({
         'currentGame': roomCode,
@@ -451,11 +461,7 @@ class FriendsService {
     Map<String, dynamic>? data,
   ) async {
     try {
-      await _firestore
-          .collection('users')
-          .doc(userId)
-          .collection('notifications')
-          .add({
+      await _firestore.collection('users').doc(userId).collection('notifications').add({
         'type': type.name,
         'title': title,
         'message': message,
@@ -511,12 +517,7 @@ class FriendsService {
     if (_currentUserId == null) return;
 
     try {
-      await _firestore
-          .collection('users')
-          .doc(_currentUserId)
-          .collection('notifications')
-          .doc(notificationId)
-          .delete();
+      await _firestore.collection('users').doc(_currentUserId).collection('notifications').doc(notificationId).delete();
     } catch (e) {
       // Handle error silently
     }
@@ -527,11 +528,7 @@ class FriendsService {
     if (_currentUserId == null) return;
 
     try {
-      final snapshot = await _firestore
-          .collection('users')
-          .doc(_currentUserId)
-          .collection('notifications')
-          .get();
+      final snapshot = await _firestore.collection('users').doc(_currentUserId).collection('notifications').get();
 
       final batch = _firestore.batch();
       for (final doc in snapshot.docs) {
@@ -597,11 +594,7 @@ class FriendsService {
     if (_currentUserId == null) return [];
 
     try {
-      final friendsSnapshot = await _firestore
-          .collection('users')
-          .doc(_currentUserId)
-          .collection('friends')
-          .get();
+      final friendsSnapshot = await _firestore.collection('users').doc(_currentUserId).collection('friends').get();
 
       final onlineFriends = <Friend>[];
       for (final doc in friendsSnapshot.docs) {
@@ -621,12 +614,7 @@ class FriendsService {
     if (_currentUserId == null) return false;
 
     try {
-      final doc = await _firestore
-          .collection('users')
-          .doc(_currentUserId)
-          .collection('friends')
-          .doc(userId)
-          .get();
+      final doc = await _firestore.collection('users').doc(_currentUserId).collection('friends').doc(userId).get();
 
       return doc.exists;
     } catch (e) {
@@ -639,11 +627,7 @@ class FriendsService {
     if (_currentUserId == null) return [];
 
     try {
-      final friendsSnapshot = await _firestore
-          .collection('users')
-          .doc(_currentUserId)
-          .collection('friends')
-          .get();
+      final friendsSnapshot = await _firestore.collection('users').doc(_currentUserId).collection('friends').get();
 
       final friends = <Friend>[];
       for (final doc in friendsSnapshot.docs) {

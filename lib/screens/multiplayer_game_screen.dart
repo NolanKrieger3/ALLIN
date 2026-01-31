@@ -1166,7 +1166,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
       height: isShowdown ? 170 : 110, // Match GameScreen heights
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 8),
       child: LayoutBuilder(
         builder: (context, constraints) {
           // For Sit and Go with many participants, center on active player with sliding animation
@@ -1357,8 +1357,8 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
       duration: const Duration(milliseconds: 300),
       opacity: isLoser ? 0.5 : 1.0,
       child: Container(
-        width: 80,
-        margin: const EdgeInsets.symmetric(horizontal: 4),
+        width: 68,
+        margin: const EdgeInsets.symmetric(horizontal: 2),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -1654,28 +1654,46 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
 
     return Column(
       children: [
-        // Community Cards Row
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            for (var i = 0; i < 5; i++)
-              Padding(
-                padding: EdgeInsets.only(left: i > 0 ? 2.0 : 0),
-                child: () {
+        // Winner text that fades in during showdown (matching game_screen.dart)
+        AnimatedOpacity(
+          duration: const Duration(milliseconds: 500),
+          opacity: isShowdown && room.winningHandName != null ? 1.0 : 0.0,
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Text(
+              room.winningHandName ?? '',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.6),
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ),
+        // Community Cards Row - using spaceBetween like game_screen.dart
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              for (var i = 0; i < 5; i++)
+                () {
                   final card = i < room.communityCards.length ? room.communityCards[i] : null;
                   final isHighlighted = isShowdown && card != null && _isCardInWinningHand(card, room);
                   final isDimmed = isShowdown && card != null && !_isCardInWinningHand(card, room);
+                  if (card == null) {
+                    return _buildEmptyCardSlot();
+                  }
                   return _buildMinimalCard(
                     card,
-                    isEmpty: i >= room.communityCards.length,
                     isHighlighted: isHighlighted,
                     isDimmed: isDimmed,
                   );
                 }(),
-              ),
-          ],
+            ],
+          ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 12),
         // Pot amount below cards
         Text(
           room.pot.toString(),
@@ -1689,15 +1707,28 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
     );
   }
 
+  /// Empty card slot matching game_screen.dart style
+  Widget _buildEmptyCardSlot() {
+    return Container(
+      width: 58,
+      height: 82,
+      decoration: BoxDecoration(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.15), width: 2),
+      ),
+    );
+  }
+
   Widget _buildMinimalCard(PlayingCard? card,
       {bool isEmpty = false,
       bool isHoleCard = false,
       bool isHighlighted = false,
       bool isDimmed = false,
       bool isGhost = false}) {
-    // Use larger size for hole cards (player's cards at bottom)
-    final width = isHoleCard ? 70.0 : 72.0;
-    final height = isHoleCard ? 98.0 : 100.0;
+    // Match game_screen.dart sizes: 58x82 for community cards, 70x98 for hole cards
+    final width = isHoleCard ? 70.0 : 58.0;
+    final height = isHoleCard ? 98.0 : 82.0;
 
     if (isEmpty || card == null) {
       return Container(
@@ -1707,13 +1738,6 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
           color: Colors.transparent,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(color: Colors.white.withValues(alpha: 0.15), width: 2),
-        ),
-        child: Center(
-          child: Icon(
-            Icons.casino_outlined,
-            color: Colors.white.withValues(alpha: 0.1),
-            size: 24,
-          ),
         ),
       );
     }
@@ -1737,7 +1761,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
               card.rank,
               style: TextStyle(
                 color: (isRed ? Colors.red.shade300 : Colors.white).withValues(alpha: 0.4),
-                fontSize: isHoleCard ? 24 : 20,
+                fontSize: isHoleCard ? 24 : 24,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -1745,7 +1769,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
               card.suit,
               style: TextStyle(
                 color: (isRed ? Colors.red.shade300 : Colors.white).withValues(alpha: 0.4),
-                fontSize: isHoleCard ? 20 : 16,
+                fontSize: isHoleCard ? 26 : 26,
               ),
             ),
           ],
@@ -1763,12 +1787,12 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
         boxShadow: [
           if (isHighlighted) ...[
             BoxShadow(
-              color: Colors.white.withValues(alpha: 0.5),
+              color: const Color(0xFFFFD700).withValues(alpha: 0.8),
               blurRadius: 12,
               spreadRadius: 2,
             ),
             BoxShadow(
-              color: Colors.white.withValues(alpha: 0.2),
+              color: const Color(0xFFFFD700).withValues(alpha: 0.4),
               blurRadius: 20,
               spreadRadius: 4,
             ),
@@ -1779,7 +1803,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
               offset: const Offset(0, 4),
             ),
         ],
-        border: isHighlighted ? Border.all(color: Colors.white.withValues(alpha: 0.8), width: 2) : null,
+        border: isHighlighted ? Border.all(color: const Color(0xFFFFD700), width: 2) : null,
       ),
       child: AnimatedOpacity(
         duration: const Duration(milliseconds: 300),
@@ -1791,7 +1815,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
               card.rank,
               style: TextStyle(
                 color: isDimmed ? Colors.grey : (isRed ? Colors.red.shade700 : Colors.black),
-                fontSize: isHoleCard ? 24 : 20,
+                fontSize: 24,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -1799,7 +1823,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
               card.suit,
               style: TextStyle(
                 color: isDimmed ? Colors.grey : (isRed ? Colors.red.shade700 : Colors.black),
-                fontSize: isHoleCard ? 26 : 22,
+                fontSize: 26,
               ),
             ),
           ],
