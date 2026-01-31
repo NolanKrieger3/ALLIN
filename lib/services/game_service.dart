@@ -381,7 +381,15 @@ class GameService {
           shouldDelete = true;
           reason = 'game finished';
         }
-        // Never delete waiting rooms with players in them
+        // Delete waiting rooms with only 1 player that have been waiting 30+ seconds
+        // This forces players to consolidate into the same lobby
+        else if (room.status == 'waiting' && room.players.length == 1) {
+          final waitTime = now.difference(room.createdAt).inSeconds;
+          if (waitTime > 30) {
+            shouldDelete = true;
+            reason = 'stale 1-player lobby (${waitTime}s old)';
+          }
+        }
 
         if (shouldDelete) {
           print('🧹 Deleting room $roomId: $reason');
@@ -486,13 +494,15 @@ class GameService {
           hasSpace;
     }).toList();
 
-    // Sort by oldest first for sit and go (fill up existing lobbies first)
-    // Sort by newest first for quickplay (most active player)
-    if (gameType.startsWith('sitandgo')) {
-      joinableRooms.sort((a, b) => a.createdAt.compareTo(b.createdAt)); // Oldest first
-    } else {
-      joinableRooms.sort((a, b) => b.createdAt.compareTo(a.createdAt)); // Newest first
-    }
+    // Sort by oldest first and most players first (fill up existing lobbies)
+    // This ensures minimal lobbies and forces players together
+    joinableRooms.sort((a, b) {
+      // First priority: More players (fuller lobbies first)
+      final playerCompare = b.players.length.compareTo(a.players.length);
+      if (playerCompare != 0) return playerCompare;
+      // Second priority: Older rooms first
+      return a.createdAt.compareTo(b.createdAt);
+    });
 
     print('🔍 Joinable rooms for blind $bigBlind: ${joinableRooms.length}');
     if (joinableRooms.isNotEmpty) {
