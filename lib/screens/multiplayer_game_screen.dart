@@ -146,7 +146,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
         // CRITICAL FIX: Re-check if it's still my turn before auto-folding
         // Don't use captured isMyTurn variable - it's stale after 10 seconds
         final currentlyMyTurn = room.currentTurnPlayerId == _gameService.currentUserId;
-        
+
         // Auto-fold when time runs out (ONLY if it's CURRENTLY my turn, not stale check)
         if (_remainingSeconds <= 0 && currentlyMyTurn && !_hasAutoFolded && room.status == 'playing') {
           timer.cancel();
