@@ -119,7 +119,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
       _lastTurnPlayerId = currentTurnId;
       _timerStarted = false;
 
-      // Cancel existing timer immediately
+      // Cancel existing timer immediately to prevent it from firing for wrong player
       _turnTimer?.cancel();
       _turnTimer = null;
     }
@@ -143,10 +143,15 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
           _remainingSeconds -= 0.1;
         });
 
-        // Auto-fold when time runs out (only if it's my turn)
-        if (_remainingSeconds <= 0 && isMyTurn && !_hasAutoFolded) {
+        // CRITICAL FIX: Re-check if it's still my turn before auto-folding
+        // Don't use captured isMyTurn variable - it's stale after 10 seconds
+        final currentlyMyTurn = room.currentTurnPlayerId == _gameService.currentUserId;
+        
+        // Auto-fold when time runs out (ONLY if it's CURRENTLY my turn, not stale check)
+        if (_remainingSeconds <= 0 && currentlyMyTurn && !_hasAutoFolded && room.status == 'playing') {
           timer.cancel();
           _hasAutoFolded = true;
+          print('⏰ AUTO-FOLD: Time expired for ${_gameService.currentUserId}');
           _gameService.playerAction(widget.roomId, 'fold');
         }
       });
