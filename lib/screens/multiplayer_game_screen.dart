@@ -50,6 +50,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
   String? _lastTurnPlayerId;
   bool _hasAutoFolded = false;
   bool _timerStarted = false;
+  GameRoom? _currentRoom; // Store latest room state for timer checks
 
   // Action debouncing
   bool _isProcessingAction = false;
@@ -102,6 +103,9 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
 
   /// Start or update the turn timer based on room state
   void _updateTurnTimer(GameRoom room) {
+    // CRITICAL: Store latest room state so timer can check fresh data
+    _currentRoom = room;
+
     final currentTurnId = room.currentTurnPlayerId;
     final isMyTurn = currentTurnId == _gameService.currentUserId;
     final isHost = room.hostId == _gameService.currentUserId;
@@ -122,15 +126,17 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
       // Cancel existing timer immediately to prevent it from firing for wrong player
       _turnTimer?.cancel();
       _turnTimer = null;
+
+      // CRITICAL FIX: Reset to FULL turn time for new turns
+      // Don't calculate elapsed - client polling delay causes premature timeouts
+      _remainingSeconds = room.turnTimeLimit.toDouble();
+
+      print('🔄 NEW TURN: Player ${currentTurnId?.substring(0, 8)}, Full time: ${room.turnTimeLimit}s');
     }
 
     // Start timer only once per turn
     if (!_timerStarted && room.turnStartTime != null && room.status == 'playing' && room.phase != 'showdown') {
       _timerStarted = true;
-
-      final elapsed = DateTime.now().millisecondsSinceEpoch - room.turnStartTime!;
-      final elapsedSeconds = elapsed / 1000;
-      _remainingSeconds = (room.turnTimeLimit - elapsedSeconds).clamp(0.0, room.turnTimeLimit.toDouble());
 
       // Start new timer (100ms for smooth animation)
       _turnTimer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
@@ -143,12 +149,15 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
           _remainingSeconds -= 0.1;
         });
 
-        // CRITICAL FIX: Re-check if it's still my turn before auto-folding
-        // Don't use captured isMyTurn variable - it's stale after 10 seconds
-        final currentlyMyTurn = room.currentTurnPlayerId == _gameService.currentUserId;
+        // CRITICAL FIX: Check FRESH room state, not stale captured variable
+        // Use _currentRoom which is updated every 500ms by StreamBuilder
+        final freshRoom = _currentRoom;
+        if (freshRoom == null) return;
+
+        final currentlyMyTurn = freshRoom.currentTurnPlayerId == _gameService.currentUserId;
 
         // Auto-fold when time runs out (ONLY if it's CURRENTLY my turn, not stale check)
-        if (_remainingSeconds <= 0 && currentlyMyTurn && !_hasAutoFolded && room.status == 'playing') {
+        if (_remainingSeconds <= 0 && currentlyMyTurn && !_hasAutoFolded && freshRoom.status == 'playing') {
           timer.cancel();
           _hasAutoFolded = true;
           print('⏰ AUTO-FOLD: Time expired for ${_gameService.currentUserId}');
@@ -1923,6 +1932,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
                 width: 120, // Fixed width for 2 overlapping cards
                 child: player.hasFolded && _foldedCards.isNotEmpty
                     ? Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
                           _buildMinimalCard(_foldedCards[0], isHoleCard: true, isGhost: true),
                           if (_foldedCards.length > 1)
@@ -1933,6 +1943,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
                         ],
                       )
                     : Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
                           _buildCardBack(width: 70, height: 98),
                           Transform.translate(
