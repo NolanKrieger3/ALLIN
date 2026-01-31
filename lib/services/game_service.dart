@@ -464,14 +464,14 @@ class GameService {
       final isJoinable = room.status == 'waiting' || (room.status == 'playing' && room.phase == 'waiting_for_players');
 
       // For sit and go: join any room that isn't full (up to maxPlayers)
-      // For quickplay/cash (heads-up 2 player): only join rooms with exactly 1 player
+      // For quickplay: join any active game unless it has 6 players (full lobby)
       bool hasSpace;
       if (gameType.startsWith('sitandgo')) {
         // Sit & Go: join any room that has space (populate one lobby at a time)
         hasSpace = room.players.isNotEmpty && room.players.length < (maxPlayers ?? room.maxPlayers);
       } else {
-        // Quick Play / Cash: heads-up, only 1 player waiting
-        hasSpace = room.players.length == 1;
+        // Quick Play: join any game that has less than 6 players
+        hasSpace = room.players.isNotEmpty && room.players.length < 6;
       }
 
       print(
