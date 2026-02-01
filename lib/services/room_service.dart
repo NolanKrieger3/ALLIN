@@ -18,26 +18,37 @@ class RoomService {
   /// Priority: 1) Saved username in preferences, 2) Firebase displayName, 3) Email prefix, 4) Random fallback
   String get currentUserName {
     // First check UserPreferences - this is where the app actually stores the username
-    if (UserPreferences.hasSetUsername) {
-      final savedUsername = UserPreferences.username;
-      if (savedUsername.isNotEmpty) {
-        return savedUsername;
-      }
+    final hasSetUsername = UserPreferences.hasSetUsername;
+    final savedUsername = UserPreferences.username;
+
+    print('🔍 USERNAME CHECK: hasSetUsername=$hasSetUsername, savedUsername=$savedUsername');
+
+    if (hasSetUsername && savedUsername.isNotEmpty) {
+      print('✅ Using saved username: $savedUsername');
+      return savedUsername;
     }
 
     // Fall back to Firebase Auth info
     final user = _auth.currentUser;
     if (user != null) {
+      print('🔍 Firebase user: displayName=${user.displayName}, email=${user.email}, uid=${user.uid}');
+
       if (user.displayName != null && user.displayName!.isNotEmpty) {
+        print('✅ Using Firebase displayName: ${user.displayName}');
         return user.displayName!;
       }
       if (user.email != null && user.email!.isNotEmpty) {
-        return user.email!.split('@').first;
+        final emailPrefix = user.email!.split('@').first;
+        print('✅ Using email prefix: $emailPrefix');
+        return emailPrefix;
       }
-      return 'Player${user.uid.substring(0, 4).toUpperCase()}';
+      final fallbackName = 'Player${user.uid.substring(0, 4).toUpperCase()}';
+      print('⚠️ Using UID fallback: $fallbackName');
+      return fallbackName;
     }
 
     // Final fallback - generate random name
+    print('⚠️ No user, using UserPreferences fallback');
     return UserPreferences.username;
   }
 
@@ -481,19 +492,37 @@ class RoomService {
         final room = GameRoom.fromJson(roomData, roomId);
 
         bool shouldDelete = false;
+        String reason = '';
 
+        // Delete empty rooms
         if (room.players.isEmpty) {
           shouldDelete = true;
-        } else if (room.status == 'finished') {
+          reason = 'empty';
+        }
+        // Delete finished rooms
+        else if (room.status == 'finished') {
           shouldDelete = true;
-        } else if (room.status == 'waiting' && room.players.length == 1) {
+          reason = 'finished';
+        }
+        // Delete waiting rooms with only 1 player after 60 seconds
+        else if (room.status == 'waiting' && room.players.length == 1) {
           final waitTime = now.difference(room.createdAt).inSeconds;
-          if (waitTime > 30) {
+          if (waitTime > 60) {
             shouldDelete = true;
+            reason = 'waiting too long (${waitTime}s)';
+          }
+        }
+        // Delete in_progress rooms older than 30 minutes (stale games)
+        else if (room.status == 'in_progress') {
+          final gameTime = now.difference(room.createdAt).inMinutes;
+          if (gameTime > 30) {
+            shouldDelete = true;
+            reason = 'stale in_progress game (${gameTime}min)';
           }
         }
 
         if (shouldDelete) {
+          print('🗑️ Deleting room $roomId: $reason');
           await http.delete(Uri.parse('$databaseUrl/game_rooms/$roomId.json?auth=$token'));
         }
       }

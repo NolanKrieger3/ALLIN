@@ -1,16 +1,13 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'dart:math';
-import '../../widgets/animated_buttons.dart';
 import '../../widgets/shared_widgets.dart';
 import '../../widgets/friends_widgets.dart';
-import '../../models/friend.dart';
 import '../../services/friends_service.dart';
 import '../../services/user_preferences.dart';
 import '../../services/user_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/game_service.dart';
-import '../username_setup_screen.dart';
 import '../multiplayer_game_screen.dart';
 
 class ProfileTab extends StatefulWidget {
@@ -27,7 +24,6 @@ class ProfileTabState extends State<ProfileTab> {
   bool _statisticsExpanded = false;
   bool _referralExpanded = false;
   final FriendsService _friendsService = FriendsService();
-  List<Friend> _friends = [];
   StreamSubscription? _friendsSub;
   StreamSubscription? _authSub;
   String _displayUsername = '';
@@ -40,7 +36,7 @@ class ProfileTabState extends State<ProfileTab> {
     _selectedAvatar = UserPreferences.avatar;
     _loadFriends();
     _friendsSub = _friendsService.friendsStream.listen((friends) {
-      if (mounted) setState(() => _friends = friends);
+      if (mounted) setState(() {}); // Rebuild on friends update
     });
     // Listen for auth state changes to refresh username
     // Wrapped with try-catch for Windows desktop Firebase threading issues
@@ -79,8 +75,8 @@ class ProfileTabState extends State<ProfileTab> {
   }
 
   Future<void> _loadFriends() async {
-    final friends = await _friendsService.getAllFriends();
-    if (mounted) setState(() => _friends = friends);
+    await _friendsService.getAllFriends();
+    if (mounted) setState(() {}); // Rebuild after loading
   }
 
   void _showAddFriendDialog() {

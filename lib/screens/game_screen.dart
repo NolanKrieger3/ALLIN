@@ -973,14 +973,12 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       _showdownHands = hands;
 
       // Find best hand(s)
-      int? bestSeat;
       _EvaluatedHand? bestHand;
       List<int> winners = [];
 
       for (var entry in hands.entries) {
         if (bestHand == null || entry.value.compareTo(bestHand) > 0) {
           bestHand = entry.value;
-          bestSeat = entry.key;
           winners = [entry.key];
         } else if (entry.value.compareTo(bestHand) == 0) {
           winners.add(entry.key);

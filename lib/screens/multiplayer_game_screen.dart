@@ -109,7 +109,6 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
     _currentRoom = room;
 
     final currentTurnId = room.currentTurnPlayerId;
-    final isMyTurn = currentTurnId == _gameService.currentUserId;
     final isHost = room.hostId == _gameService.currentUserId;
     final isBotTurn = currentTurnId != null && _botService.isBot(currentTurnId);
 
@@ -1100,7 +1099,6 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
     );
     final opponents = room.players.where((p) => p.uid != _gameService.currentUserId).toList();
     final isMyTurn = room.currentTurnPlayerId == _gameService.currentUserId;
-    final isHost = room.hostId == _gameService.currentUserId;
     final isWaitingForPlayers = room.phase == 'waiting_for_players';
 
     // Handle showdown animation
@@ -1167,8 +1165,6 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
     // Build all participants when including player in row
     final allParticipants = <GamePlayer>[];
     if (includePlayerInRow) {
-      // Find player's position in the original player order
-      final myIndex = room.players.indexWhere((p) => p.uid == _gameService.currentUserId);
       // Rebuild the list in seat order with current player included
       for (final player in room.players) {
         allParticipants.add(player);
@@ -2395,7 +2391,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
             clipBehavior: Clip.none,
             children: [
               // Timer border progress around the box
-              if (isMyTurn && room != null && room.status == 'playing' && room.phase != 'showdown')
+              if (isMyTurn && room.status == 'playing' && room.phase != 'showdown')
                 TweenAnimationBuilder<double>(
                   duration: const Duration(milliseconds: 100),
                   curve: Curves.linear,
@@ -3166,14 +3162,6 @@ class _RoundedRectProgressPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = strokeWidth
       ..strokeCap = StrokeCap.round;
-
-    final rect = Rect.fromLTWH(
-      strokeWidth / 2,
-      strokeWidth / 2,
-      size.width - strokeWidth,
-      size.height - strokeWidth,
-    );
-    final rrect = RRect.fromRectAndRadius(rect, const Radius.circular(16));
 
     // Calculate path length for the rounded rect
     final perimeter = 2 * (size.width + size.height - strokeWidth * 2);

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../models/game_room.dart';
 import '../services/auth_service.dart';
 import '../services/game_service.dart';
 import '../widgets/mobile_wrapper.dart';

@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:math';
 import 'package:http/http.dart' as http;
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/game_room.dart';
@@ -66,7 +65,6 @@ class GameActionService {
     final userId = currentUserId;
     if (userId == null) return;
 
-    final token = await _getAuthToken();
     final room = await _roomService.fetchRoom(roomId);
     if (room == null) return;
 
@@ -205,7 +203,6 @@ class GameActionService {
     final userId = currentUserId;
     if (userId == null) return;
 
-    final token = await _getAuthToken();
     final room = await _roomService.fetchRoom(roomId);
     if (room == null) return;
 
@@ -347,7 +344,6 @@ class GameActionService {
     String? actorId,
   }) async {
     final token = await _getAuthToken();
-    final userId = actorId ?? currentUserId;
 
     // Check if hand is over (only one player left)
     final activePlayers = updatedPlayers.where((p) => !p.hasFolded).toList();

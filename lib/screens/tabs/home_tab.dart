@@ -12,7 +12,6 @@ import '../../services/user_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/game_service.dart';
 import '../game_screen.dart';
-import '../lobby_screen.dart';
 import '../quick_play_screen.dart';
 import '../sit_and_go_screen.dart';
 import '../tutorial_screen.dart';
@@ -104,7 +103,7 @@ class HomeTabState extends State<HomeTab> {
   /// Sync all user data from Firestore - redirect to setup if no username
   Future<void> _syncUserDataFromFirestore() async {
     try {
-      final data = await _userService.syncAllUserData();
+      await _userService.syncAllUserData();
       final needsSetup = await _userService.needsUsernameSetup();
 
       if (mounted && needsSetup) {

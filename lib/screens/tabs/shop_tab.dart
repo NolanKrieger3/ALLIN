@@ -1,11 +1,6 @@
 import 'package:flutter/material.dart';
-import 'dart:async';
-import 'dart:math';
 import '../../widgets/animated_buttons.dart';
 import '../../services/user_preferences.dart';
-import '../../services/user_service.dart';
-import '../../services/game_service.dart';
-import '../multiplayer_game_screen.dart';
 import 'profile_tab.dart'; // For dialog widgets
 
 class ShopTab extends StatefulWidget {

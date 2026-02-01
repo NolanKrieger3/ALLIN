@@ -4,8 +4,6 @@ import 'package:http/http.dart' as http;
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/game_room.dart';
 import 'room_service.dart';
-import 'pot_service.dart';
-import 'hand_evaluator.dart';
 
 /// Service for handling game flow - starting games, dealing cards, new hands
 class GameFlowService {
@@ -51,7 +49,6 @@ class GameFlowService {
     final numPlayers = room.players.length;
 
     final updatedPlayers = room.players.asMap().entries.map((entry) {
-      final i = entry.key;
       final player = entry.value;
 
       final card1Str = deck.removeLast().split('|');
