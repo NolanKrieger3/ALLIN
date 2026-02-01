@@ -220,6 +220,66 @@ class ProfileTabState extends State<ProfileTab> {
                           }
                         },
                       ),
+                      DevMenuItem(
+                        icon: UserPreferences.hasProPass ? Icons.star : Icons.star_border,
+                        color: const Color(0xFFFFD700),
+                        title: UserPreferences.hasProPass ? 'Pro Pass: ON' : 'Pro Pass: OFF',
+                        onTap: () async {
+                          Navigator.pop(dialogContext);
+                          final newValue = !UserPreferences.hasProPass;
+                          await UserService().setProPass(newValue);
+                          if (mounted) {
+                            setState(() {});
+                            widget.onChipsChanged?.call();
+                            parentScaffoldMessenger.showSnackBar(
+                              SnackBar(
+                                content: Text(newValue ? 'Pro Pass enabled!' : 'Pro Pass disabled!'),
+                                backgroundColor: const Color(0xFFFFD700),
+                              ),
+                            );
+                          }
+                        },
+                      ),
+                      DevMenuItem(
+                        icon: Icons.diamond_outlined,
+                        color: const Color(0xFF00BCD4),
+                        title: 'Add 1000 Gems',
+                        onTap: () async {
+                          Navigator.pop(dialogContext);
+                          final currentGems = UserPreferences.gems;
+                          final newGems = currentGems + 1000;
+                          await UserPreferences.setGems(newGems);
+                          await UserService().setGems(newGems);
+                          if (mounted) {
+                            setState(() {});
+                            parentScaffoldMessenger.showSnackBar(
+                              SnackBar(
+                                content: Text('Added 1000 gems! Total: $newGems 💎'),
+                                backgroundColor: const Color(0xFF00BCD4),
+                              ),
+                            );
+                          }
+                        },
+                      ),
+                      DevMenuItem(
+                        icon: Icons.bug_report,
+                        color: const Color(0xFF9C27B0),
+                        title: 'Debug Pro Pass Status',
+                        onTap: () async {
+                          Navigator.pop(dialogContext);
+                          final localProPass = UserPreferences.hasProPass;
+                          final firestoreProPass = await UserService().getProPass();
+                          if (mounted) {
+                            parentScaffoldMessenger.showSnackBar(
+                              SnackBar(
+                                content: Text('Local: $localProPass | Firestore: $firestoreProPass'),
+                                backgroundColor: Colors.purple,
+                                duration: const Duration(seconds: 5),
+                              ),
+                            );
+                          }
+                        },
+                      ),
                     ],
                   ),
                 ),
@@ -2612,6 +2672,11 @@ class ProfileTabState extends State<ProfileTab> {
   }
 
   void _showPremiumPassDialog(BuildContext context) {
+    final bool alreadyHasPro = UserPreferences.hasProPass;
+    final int currentGems = UserPreferences.gems;
+    const int proCost = 400;
+    final bool canAfford = currentGems >= proCost;
+
     showDialog(
       context: context,
       builder: (context) => Dialog(
@@ -2772,71 +2837,131 @@ class ProfileTabState extends State<ProfileTab> {
                       ),
                       const SizedBox(height: 20),
 
-                      // Purchase Button
-                      Container(
-                        width: double.infinity,
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFFD4AF37), Color(0xFFB8860B)],
-                          ),
-                          borderRadius: BorderRadius.circular(14),
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFFD4AF37).withValues(alpha: 0.4),
-                              blurRadius: 12,
-                              offset: const Offset(0, 4),
+                      // Purchase Button - different based on pro status
+                      if (alreadyHasPro)
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFF22C55E), Color(0xFF16A34A)],
                             ),
-                          ],
-                        ),
-                        child: ElevatedButton(
-                          onPressed: () {
-                            Navigator.pop(context);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Row(
-                                  children: [
-                                    const Text('👑', style: TextStyle(fontSize: 20)),
-                                    const SizedBox(width: 10),
-                                    const Text('Pro Activated!', style: TextStyle(fontWeight: FontWeight.w600)),
-                                  ],
-                                ),
-                                backgroundColor: const Color(0xFFD4AF37),
-                              ),
-                            );
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.transparent,
-                            shadowColor: Colors.transparent,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                            borderRadius: BorderRadius.circular(14),
                           ),
-                          child: Row(
+                          child: const Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              const Text('💎', style: TextStyle(fontSize: 18)),
-                              const SizedBox(width: 8),
-                              const Text(
-                                '400',
-                                style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800),
-                              ),
-                              const SizedBox(width: 6),
+                              Text('✓', style: TextStyle(fontSize: 20, color: Colors.white)),
+                              SizedBox(width: 8),
                               Text(
-                                '500',
-                                style: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.6),
-                                  fontSize: 14,
-                                  decoration: TextDecoration.lineThrough,
-                                ),
+                                'Already Activated!',
+                                style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700),
                               ),
                             ],
                           ),
+                        )
+                      else
+                        Container(
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: canAfford
+                                  ? [const Color(0xFFD4AF37), const Color(0xFFB8860B)]
+                                  : [Colors.grey.shade700, Colors.grey.shade800],
+                            ),
+                            borderRadius: BorderRadius.circular(14),
+                            boxShadow: canAfford
+                                ? [
+                                    BoxShadow(
+                                      color: const Color(0xFFD4AF37).withValues(alpha: 0.4),
+                                      blurRadius: 12,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ]
+                                : null,
+                          ),
+                          child: ElevatedButton(
+                            onPressed: canAfford
+                                ? () async {
+                                    Navigator.pop(context);
+                                    // Deduct gems and activate pro pass
+                                    final newGems = currentGems - proCost;
+                                    await UserPreferences.setGems(newGems);
+                                    await UserService().setProPass(true);
+                                    // Update Firestore gems
+                                    await UserService().setGems(newGems);
+                                    if (mounted) {
+                                      setState(() {});
+                                      widget.onChipsChanged?.call();
+                                    }
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Row(
+                                          children: [
+                                            const Text('👑', style: TextStyle(fontSize: 20)),
+                                            const SizedBox(width: 10),
+                                            const Text('Pro Activated!', style: TextStyle(fontWeight: FontWeight.w600)),
+                                          ],
+                                        ),
+                                        backgroundColor: const Color(0xFFD4AF37),
+                                      ),
+                                    );
+                                  }
+                                : () {
+                                    Navigator.pop(context);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Not enough gems! You need 400 💎'),
+                                        backgroundColor: Colors.orange,
+                                      ),
+                                    );
+                                  },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.transparent,
+                              shadowColor: Colors.transparent,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Text('💎', style: TextStyle(fontSize: 18)),
+                                const SizedBox(width: 8),
+                                Text(
+                                  '400',
+                                  style: TextStyle(
+                                    color: canAfford ? Colors.white : Colors.white.withValues(alpha: 0.5),
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  '500',
+                                  style: TextStyle(
+                                    color: Colors.white.withValues(alpha: canAfford ? 0.6 : 0.3),
+                                    fontSize: 14,
+                                    decoration: TextDecoration.lineThrough,
+                                  ),
+                                ),
+                                if (!canAfford) ...[
+                                  const SizedBox(width: 10),
+                                  Text(
+                                    '(Need ${proCost - currentGems} more)',
+                                    style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 11),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        'Limited time 20% discount!',
-                        style: TextStyle(color: const Color(0xFFEF4444), fontSize: 11, fontWeight: FontWeight.w500),
-                      ),
+                      if (!alreadyHasPro) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          'Limited time 20% discount!',
+                          style: TextStyle(color: const Color(0xFFEF4444), fontSize: 11, fontWeight: FontWeight.w500),
+                        ),
+                      ],
                       const SizedBox(height: 10),
                       TextButton(
                         onPressed: () => Navigator.pop(context),

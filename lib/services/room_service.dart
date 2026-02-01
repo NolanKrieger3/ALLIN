@@ -64,9 +64,114 @@ class RoomService {
     return List.generate(6, (_) => chars[random.nextInt(chars.length)]).join();
   }
 
+  /// Generate a 4-digit PIN for private rooms
+  String generateRoomPin() {
+    final random = Random();
+    return List.generate(4, (_) => random.nextInt(10).toString()).join();
+  }
+
   // ============================================================================
   // ROOM CRUD
   // ============================================================================
+
+  /// Create a private game room with a 4-digit PIN
+  Future<Map<String, String>> createPrivateRoom({
+    int bigBlind = 100,
+    int startingChips = 10000,
+    int maxPlayers = 8,
+  }) async {
+    final userId = currentUserId;
+    if (userId == null) throw Exception('Must be logged in to create a room');
+
+    final token = await getAuthToken();
+    final roomPin = generateRoomPin();
+    final roomId = 'PRIV_$roomPin'; // Use PIN as part of room ID for easy lookup
+
+    final room = GameRoom(
+      id: roomId,
+      hostId: userId,
+      players: [
+        GamePlayer(
+          uid: userId,
+          displayName: currentUserName,
+          chips: startingChips,
+          lastActiveAt: DateTime.now(),
+        )
+      ],
+      bigBlind: bigBlind,
+      smallBlind: bigBlind ~/ 2,
+      createdAt: DateTime.now(),
+      isPrivate: true,
+      gameType: 'private',
+      maxPlayers: maxPlayers,
+    );
+
+    final response = await http.put(
+      Uri.parse('$databaseUrl/game_rooms/$roomId.json?auth=$token'),
+      body: jsonEncode(room.toJson()),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to create room: ${response.body}');
+    }
+
+    return {'roomId': roomId, 'roomPin': roomPin};
+  }
+
+  /// Join a private room by PIN
+  Future<String> joinPrivateRoom(String pin, {int startingChips = 10000}) async {
+    final userId = currentUserId;
+    if (userId == null) throw Exception('Must be logged in to join a room');
+
+    final roomId = 'PRIV_$pin';
+    final token = await getAuthToken();
+
+    // Check if room exists
+    final response = await http.get(Uri.parse('$databaseUrl/game_rooms/$roomId.json?auth=$token'));
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to find room');
+    }
+
+    final roomData = jsonDecode(response.body);
+    if (roomData == null) {
+      throw Exception('Room not found. Check the PIN and try again.');
+    }
+
+    final room = GameRoom.fromJson(roomData, roomId);
+
+    // Check if room is full
+    if (room.players.length >= room.maxPlayers) {
+      throw Exception('Room is full');
+    }
+
+    // Check if game already started
+    if (room.status != 'waiting') {
+      throw Exception('Game has already started');
+    }
+
+    // Check if already in room
+    if (room.players.any((p) => p.uid == userId)) {
+      return roomId; // Already in room, just return
+    }
+
+    // Add player to room
+    final newPlayer = GamePlayer(
+      uid: userId,
+      displayName: currentUserName,
+      chips: startingChips,
+      lastActiveAt: DateTime.now(),
+    );
+
+    final updatedPlayers = [...room.players, newPlayer];
+
+    await http.patch(
+      Uri.parse('$databaseUrl/game_rooms/$roomId.json?auth=$token'),
+      body: jsonEncode({'players': updatedPlayers.map((p) => p.toJson()).toList()}),
+    );
+
+    return roomId;
+  }
 
   /// Create a new game room
   Future<GameRoom> createRoom({

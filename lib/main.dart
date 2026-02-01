@@ -80,16 +80,16 @@ class _AuthCheckScreenState extends State<_AuthCheckScreen> {
 
   Future<void> _checkAuthAndNavigate() async {
     try {
-      final auth = FirebaseAuth.instance;
-      final userService = UserService();
-
-      // Add small delay to let Firebase Auth settle on desktop platforms
+      // Add delay to let Firebase Auth settle on desktop platforms
       // This helps avoid threading issues with the native plugin
       if (defaultTargetPlatform == TargetPlatform.windows ||
           defaultTargetPlatform == TargetPlatform.linux ||
           defaultTargetPlatform == TargetPlatform.macOS) {
-        await Future.delayed(const Duration(milliseconds: 500));
+        await Future.delayed(const Duration(milliseconds: 1500));
       }
+
+      final auth = FirebaseAuth.instance;
+      final userService = UserService();
 
       // Check if already signed in
       if (auth.currentUser != null) {
