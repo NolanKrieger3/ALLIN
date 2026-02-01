@@ -1240,7 +1240,7 @@ class ProfileTabState extends State<ProfileTab> {
               ),
             ),
 
-          // Season Pass - Premium Battle Pass Design
+          // Pro Subscription - Battle Pass Design
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
@@ -1269,10 +1269,10 @@ class ProfileTabState extends State<ProfileTab> {
                       ),
                       child: Column(
                         children: [
-                          // Season Header Row
+                          // Pro Header Row
                           Row(
                             children: [
-                              // Season Icon
+                              // Pro Icon
                               Container(
                                 width: 48,
                                 height: 48,
@@ -1301,9 +1301,9 @@ class ProfileTabState extends State<ProfileTab> {
                                     Row(
                                       children: [
                                         const Text(
-                                          'SEASON 1',
+                                          'PRO',
                                           style: TextStyle(
-                                            color: Colors.white,
+                                            color: Color(0xFFD4AF37),
                                             fontSize: 16,
                                             fontWeight: FontWeight.w700,
                                             letterSpacing: 1,
@@ -1332,7 +1332,7 @@ class ProfileTabState extends State<ProfileTab> {
                                     Row(
                                       children: [
                                         Text(
-                                          'High Roller\'s Fortune',
+                                          'Exclusive benefits & rewards',
                                           style: TextStyle(
                                             color: Colors.white.withValues(alpha: 0.6),
                                             fontSize: 12,
@@ -1479,236 +1479,113 @@ class ProfileTabState extends State<ProfileTab> {
                               ],
                             ),
                           ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
 
-                  // Tier Track - Horizontal Scroll (also clickable)
-                  GestureDetector(
-                    onTap: () => _showBattlePassDialog(context),
-                    child: SizedBox(
-                      height: 140,
-                      child: ListView.builder(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: 50,
-                        itemBuilder: (context, index) {
-                          final tier = index + 1;
-                          final isUnlocked = tier <= 7;
-                          final isCurrent = tier == 7;
-                          final isPremiumReward = tier % 5 == 0;
+                          const SizedBox(height: 12),
 
-                          return Padding(
-                            padding: EdgeInsets.only(right: 8, left: index == 0 ? 0 : 0),
-                            child: _buildBattlePassTier(
-                              tier: tier,
-                              isUnlocked: isUnlocked,
-                              isCurrent: isCurrent,
-                              isPremiumReward: isPremiumReward,
-                              freeReward: _getTierFreeReward(tier),
-                              premiumReward: _getTierPremiumReward(tier),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
+                          // Divider
+                          Container(
+                            height: 1,
+                            color: Colors.white.withValues(alpha: 0.08),
+                          ),
 
-                  // Daily & Weekly Challenges
-                  Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.03),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'Challenges',
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.8),
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          const SizedBox(height: 10),
+
+                          // Upgrade to Pro Row (inside container)
+                          GestureDetector(
+                            onTap: () => _showPremiumPassDialog(context),
+                            child: Container(
+                              padding: const EdgeInsets.all(10),
                               decoration: BoxDecoration(
-                                color: const Color(0xFFFFBB00).withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(6),
+                                gradient: LinearGradient(
+                                  colors: [
+                                    const Color(0xFFD4AF37).withValues(alpha: 0.15),
+                                    const Color(0xFFD4AF37).withValues(alpha: 0.05),
+                                  ],
+                                ),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: const Color(0xFFD4AF37).withValues(alpha: 0.3),
+                                ),
                               ),
                               child: Row(
                                 children: [
-                                  const Text('⚡', style: TextStyle(fontSize: 10)),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    '3/5 Complete',
-                                    style: const TextStyle(
-                                      color: Color(0xFFFFBB00),
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w600,
+                                  Container(
+                                    width: 36,
+                                    height: 36,
+                                    decoration: BoxDecoration(
+                                      gradient: const LinearGradient(
+                                        colors: [Color(0xFFD4AF37), Color(0xFFB8860B)],
+                                      ),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: const Center(child: Text('👑', style: TextStyle(fontSize: 18))),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            const Text(
+                                              'Upgrade to Pro',
+                                              style: TextStyle(
+                                                color: Color(0xFFD4AF37),
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 6),
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFFEF4444),
+                                                borderRadius: BorderRadius.circular(3),
+                                              ),
+                                              child: const Text(
+                                                '-20%',
+                                                style: TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 8,
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        Text(
+                                          'Unlock all rewards + 2x XP',
+                                          style: TextStyle(
+                                            color: Colors.white.withValues(alpha: 0.4),
+                                            fontSize: 10,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        _buildChallengeItem(
-                          icon: '🃏',
-                          title: 'Win 3 Hands',
-                          progress: 3,
-                          total: 3,
-                          xp: 100,
-                          isComplete: true,
-                        ),
-                        const SizedBox(height: 8),
-                        _buildChallengeItem(
-                          icon: '💰',
-                          title: 'Win 10,000 Chips',
-                          progress: 7500,
-                          total: 10000,
-                          xp: 150,
-                          isComplete: false,
-                        ),
-                        const SizedBox(height: 8),
-                        _buildChallengeItem(
-                          icon: '🔥',
-                          title: 'Win 3 Games in a Row',
-                          progress: 1,
-                          total: 3,
-                          xp: 250,
-                          isComplete: false,
-                          isWeekly: true,
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Premium Pass Button - Enhanced
-                  GestureDetector(
-                    onTap: () => _showPremiumPassDialog(context),
-                    child: Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            const Color(0xFFD4AF37).withValues(alpha: 0.2),
-                            const Color(0xFFB8860B).withValues(alpha: 0.1),
-                          ],
-                        ),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(
-                          color: const Color(0xFFD4AF37).withValues(alpha: 0.4),
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                colors: [Color(0xFFD4AF37), Color(0xFFB8860B)],
-                              ),
-                              borderRadius: BorderRadius.circular(12),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: const Color(0xFFD4AF37).withValues(alpha: 0.4),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: const Center(child: Text('👑', style: TextStyle(fontSize: 22))),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    const Text(
-                                      'Premium Pass',
-                                      style: TextStyle(
-                                        color: Color(0xFFD4AF37),
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFEF4444),
-                                        borderRadius: BorderRadius.circular(4),
-                                      ),
-                                      child: const Text(
-                                        '-20%',
+                                  Row(
+                                    children: [
+                                      const Text('💎', style: TextStyle(fontSize: 12)),
+                                      const SizedBox(width: 3),
+                                      const Text(
+                                        '400',
                                         style: TextStyle(
                                           color: Colors.white,
-                                          fontSize: 9,
+                                          fontSize: 14,
                                           fontWeight: FontWeight.w700,
                                         ),
                                       ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  'Unlock all premium rewards + 2x XP boost',
-                                  style: TextStyle(
-                                    color: Colors.white.withValues(alpha: 0.5),
-                                    fontSize: 11,
+                                    ],
                                   ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              Row(
-                                children: [
-                                  const Text('💎', style: TextStyle(fontSize: 14)),
                                   const SizedBox(width: 4),
-                                  const Text(
-                                    '400',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w700,
-                                    ),
+                                  Icon(
+                                    Icons.chevron_right,
+                                    color: const Color(0xFFD4AF37).withValues(alpha: 0.7),
+                                    size: 18,
                                   ),
                                 ],
                               ),
-                              Text(
-                                '500',
-                                style: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.4),
-                                  fontSize: 11,
-                                  decoration: TextDecoration.lineThrough,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(width: 8),
-                          Icon(
-                            Icons.chevron_right,
-                            color: const Color(0xFFD4AF37),
-                            size: 20,
+                            ),
                           ),
                         ],
                       ),
@@ -2159,9 +2036,9 @@ class ProfileTabState extends State<ProfileTab> {
                           Row(
                             children: [
                               const Text(
-                                'SEASON 1',
+                                'ALLIN PRO',
                                 style: TextStyle(
-                                  color: Colors.white,
+                                  color: Color(0xFFD4AF37),
                                   fontSize: 18,
                                   fontWeight: FontWeight.w800,
                                   letterSpacing: 1,
@@ -2187,7 +2064,7 @@ class ProfileTabState extends State<ProfileTab> {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            'High Roller\'s Fortune',
+                            'Exclusive benefits & rewards',
                             style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12),
                           ),
                         ],
@@ -2370,7 +2247,7 @@ class ProfileTabState extends State<ProfileTab> {
                           const Text('👑', style: TextStyle(fontSize: 20)),
                           const SizedBox(width: 10),
                           const Text(
-                            'Upgrade to Premium',
+                            'Upgrade to Pro',
                             style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700),
                           ),
                           const SizedBox(width: 10),
@@ -2514,10 +2391,10 @@ class ProfileTabState extends State<ProfileTab> {
           ),
           const SizedBox(width: 8),
 
-          // Premium Reward
+          // Pro Reward
           Expanded(
             child: GestureDetector(
-              onTap: () => _showRewardDetails(context, premiumReward, 'Premium Reward', tier, isUnlocked),
+              onTap: () => _showRewardDetails(context, premiumReward, 'Pro Reward', tier, isUnlocked),
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                 decoration: BoxDecoration(
@@ -2803,7 +2680,7 @@ class ProfileTabState extends State<ProfileTab> {
                       ),
                       const SizedBox(height: 16),
                       const Text(
-                        'PREMIUM PASS',
+                        'ALLIN PRO',
                         style: TextStyle(
                           color: Color(0xFFD4AF37),
                           fontSize: 22,
@@ -2813,7 +2690,7 @@ class ProfileTabState extends State<ProfileTab> {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        'Season 1: High Roller\'s Fortune',
+                        'Unlock the ultimate poker experience',
                         style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12),
                       ),
                     ],
@@ -2920,8 +2797,7 @@ class ProfileTabState extends State<ProfileTab> {
                                   children: [
                                     const Text('👑', style: TextStyle(fontSize: 20)),
                                     const SizedBox(width: 10),
-                                    const Text('Premium Pass Activated!',
-                                        style: TextStyle(fontWeight: FontWeight.w600)),
+                                    const Text('Pro Activated!', style: TextStyle(fontWeight: FontWeight.w600)),
                                   ],
                                 ),
                                 backgroundColor: const Color(0xFFD4AF37),

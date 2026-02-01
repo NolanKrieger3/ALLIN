@@ -51,12 +51,14 @@ class HomeTabState extends State<HomeTab> {
   final GlobalKey _teamSectionKey = GlobalKey();
 
   // Swipeable play card
-  final PageController _playCardController = PageController(initialPage: 0);
+  PageController _playCardController = PageController(initialPage: 0);
   int _currentPlayMode = 0;
+  bool _lastProPassState = false;
 
   @override
   void initState() {
     super.initState();
+    _lastProPassState = UserPreferences.hasProPass;
     _friendsService.initialize();
     _loadFriendsData();
     _loadChipBalance();
@@ -2302,8 +2304,15 @@ class HomeTabState extends State<HomeTab> {
                     height: 140,
                     child: LayoutBuilder(
                       builder: (context, constraints) {
+                        // Recreate controller when Pro Pass status changes
+                        if (_lastProPassState != UserPreferences.hasProPass) {
+                          _lastProPassState = UserPreferences.hasProPass;
+                          _playCardController = PageController(initialPage: _currentPlayMode);
+                        }
                         final cardWidth = constraints.maxWidth;
                         return PageView.builder(
+                          // Key changes when Pro Pass status changes to force rebuild
+                          key: ValueKey('playCards_${UserPreferences.hasProPass}'),
                           controller: _playCardController,
                           onPageChanged: (index) => setState(() => _currentPlayMode = index),
                           itemCount: 5,
