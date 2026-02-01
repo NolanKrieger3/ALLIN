@@ -55,15 +55,26 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   int _numberOfBots = 1;
   String _difficulty = 'Medium'; // Easy, Medium, Hard
 
+  // Blind level settings
+  int _selectedBlindIndex = 0;
+  static const List<Map<String, dynamic>> _blindLevels = [
+    {'name': 'Micro', 'bigBlind': 100, 'minBuyIn': 5000, 'maxBuyIn': 10000},
+    {'name': 'Low', 'bigBlind': 500, 'minBuyIn': 25000, 'maxBuyIn': 50000},
+    {'name': 'Medium', 'bigBlind': 1000, 'minBuyIn': 50000, 'maxBuyIn': 100000},
+    {'name': 'High', 'bigBlind': 5000, 'minBuyIn': 250000, 'maxBuyIn': 500000},
+    {'name': 'VIP', 'bigBlind': 10000, 'minBuyIn': 500000, 'maxBuyIn': 1000000},
+  ];
+  int _buyInAmount = 5000; // Selected buy-in amount
+
   // Bot cards visibility is determined by _gamePhase == 'showdown'
 
   // Game state
   int _pot = 0;
-  int _playerChips = 50000;
+  int _playerChips = 0; // Table chips (from buy-in)
   int _playerBet = 0; // Player's current bet this round
   int _currentBet = 0; // The current bet to match
   int _lastRaiseAmount = 0; // For minimum raise calculation
-  final int _bigBlind = 100;
+  int _bigBlind = 100; // Now dynamic based on selected blind level
   bool _isPlayerTurn = true;
   String _gamePhase = 'preflop'; // preflop, flop, turn, river, showdown
   int _dealerPosition = 0; // 0 = player, 1+ = bots
@@ -137,12 +148,14 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   }
 
   void _initializeBots() {
+    // Bots get the same buy-in amount as the player for fair play
+    final botChips = _buyInAmount > 0 ? _buyInAmount : _blindLevels[_selectedBlindIndex]['minBuyIn'] as int;
     _bots = List.generate(
         _numberOfBots,
         (index) => Bot(
               id: index,
               name: 'Bot ${index + 1}',
-              chips: 50000,
+              chips: botChips,
             ));
   }
 
@@ -397,7 +410,8 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
           _pot += allInAmount;
           _playerBet = newTotalBet;
           _playerChips = 0;
-          // If this is a raise, update the current bet and last raise
+
+          // Update current bet if this all-in is higher
           if (newTotalBet > _currentBet) {
             int raiseBy = newTotalBet - _currentBet;
             if (raiseBy >= _lastRaiseAmount) {
@@ -405,13 +419,16 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
             }
             _currentBet = newTotalBet;
             _bbHasOption = false;
-            // Reset all other players' acted flags since there's a new bet to respond to
-            for (var bot in _bots) {
-              if (bot.isActive && !bot.isAllIn && bot.chips > 0) {
-                bot.hasActed = false;
-              }
+          }
+
+          // ALWAYS reset acted flags for all active bots when player goes all-in
+          // This gives them the chance to call or fold
+          for (var bot in _bots) {
+            if (bot.isActive && !bot.isAllIn && bot.chips > 0 && bot.currentBet < _currentBet) {
+              bot.hasActed = false;
             }
           }
+
           _moveToNextPlayer();
           break;
       }
@@ -856,245 +873,709 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     // Remove bots with no chips
     _bots = _bots.where((b) => b.chips > 0).toList();
 
+    // If player runs out of chips, show buy-back dialog
     if (_playerChips <= 0) {
-      _showGameOver(false);
-    } else if (_bots.isEmpty) {
-      _showGameOver(true);
-    } else {
-      _startNewHand();
+      _showBuyBackDialog();
+      return; // Don't continue until player decides
     }
+
+    // If all bots are eliminated, add new ones to keep the game going
+    if (_bots.isEmpty) {
+      setState(() {
+        _initializeBots(); // Re-add bots with fresh chips
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('You eliminated all bots! New opponents joining...'),
+          duration: Duration(seconds: 2),
+          backgroundColor: Color(0xFF22C55E),
+        ),
+      );
+    }
+
+    // Continue to next hand
+    _startNewHand();
   }
 
-  void _showGameOver(bool playerWon) {
+  void _showBuyBackDialog() {
+    final userBalance = UserPreferences.chips;
+    final minBuyIn = _blindLevels[_selectedBlindIndex]['minBuyIn'] as int;
+    final maxBuyIn = _blindLevels[_selectedBlindIndex]['maxBuyIn'] as int;
+    final canBuyBack = userBalance >= minBuyIn;
+    int selectedBuyIn = minBuyIn.clamp(minBuyIn, userBalance.clamp(minBuyIn, maxBuyIn));
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: const Color(0xFF1A1A1A),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Column(
+            children: [
+              Text('💀', style: TextStyle(fontSize: 48)),
+              SizedBox(height: 8),
+              Text(
+                'YOU BUSTED!',
+                style: TextStyle(
+                  color: Colors.red,
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // User balance display
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.05),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text('💰', style: TextStyle(fontSize: 24)),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Balance: ${_formatChipsLong(userBalance)}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              if (canBuyBack) ...[
+                Text(
+                  'Buy back in?',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.7),
+                    fontSize: 16,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                // Buy-in slider
+                Text(
+                  _formatChipsLong(selectedBuyIn),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 32,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                SliderTheme(
+                  data: SliderTheme.of(context).copyWith(
+                    activeTrackColor: const Color(0xFFD4AF37),
+                    inactiveTrackColor: Colors.white.withValues(alpha: 0.1),
+                    thumbColor: const Color(0xFFD4AF37),
+                    overlayColor: const Color(0xFFD4AF37).withValues(alpha: 0.2),
+                  ),
+                  child: Slider(
+                    value: selectedBuyIn.toDouble(),
+                    min: minBuyIn.toDouble(),
+                    max: userBalance.clamp(minBuyIn, maxBuyIn).toDouble(),
+                    onChanged: (value) {
+                      setDialogState(() => selectedBuyIn = value.toInt());
+                    },
+                  ),
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      _formatChipsLong(minBuyIn),
+                      style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 12),
+                    ),
+                    Text(
+                      _formatChipsLong(userBalance.clamp(minBuyIn, maxBuyIn)),
+                      style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 12),
+                    ),
+                  ],
+                ),
+              ] else ...[
+                const Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 48),
+                const SizedBox(height: 8),
+                Text(
+                  'Not enough chips!\nNeed at least ${_formatChipsLong(minBuyIn)} to continue.',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.7),
+                    fontSize: 14,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ],
+          ),
+          actions: [
+            // Exit button
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context); // Close dialog
+                Navigator.pop(context); // Exit game
+              },
+              child: const Text('Exit', style: TextStyle(color: Colors.white54)),
+            ),
+            // Shop button (if can't afford)
+            if (!canBuyBack)
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context); // Close dialog
+                  Navigator.pop(context); // Exit game
+                  // Navigate to shop - this will be handled by home screen
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF6366F1),
+                ),
+                child: const Text('Go to Shop', style: TextStyle(color: Colors.white)),
+              ),
+            // Buy back button (if can afford)
+            if (canBuyBack)
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  _processBuyBack(selectedBuyIn);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFD4AF37),
+                ),
+                child: const Text('Buy In', style: TextStyle(color: Colors.white)),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _processBuyBack(int amount) async {
+    // Deduct from user balance and wait for it to persist
+    final newBalance = UserPreferences.chips - amount;
+    await UserPreferences.setChips(newBalance);
+
+    setState(() {
+      _playerChips = amount;
+    });
+
+    // If all bots are eliminated, add new ones
+    if (_bots.isEmpty) {
+      _initializeBots();
+    }
+
+    // Continue game
+    _startNewHand();
+  }
+
+  void _showCashOutDialog() {
+    final profit = _playerChips - _buyInAmount;
+    final profitColor = profit >= 0 ? const Color(0xFF22C55E) : const Color(0xFFEF4444);
+    final profitSign = profit >= 0 ? '+' : '';
+
+    // Check if player has money in the pot (mid-round)
+    final bool hasPotContribution = _playerBet > 0 || (_gamePhase != 'preflop' && _gamePhase != 'showdown' && _pot > 0);
+    final int potLoss = _playerBet; // What they'd forfeit by leaving now
+
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1A1A),
-        title: Text(
-          playerWon ? '🏆 YOU WIN!' : '💀 GAME OVER',
-          style: TextStyle(
-            color: playerWon ? Colors.green : Colors.red,
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-          ),
+        backgroundColor: const Color(0xFF1A1A2E),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text(
+          'Cash Out',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
           textAlign: TextAlign.center,
         ),
-        content: Text(
-          playerWon ? 'Congratulations! You\'ve eliminated all opponents!' : 'You\'ve run out of chips.',
-          style: const TextStyle(color: Colors.white70),
-          textAlign: TextAlign.center,
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.attach_money, color: Color(0xFFD4AF37), size: 48),
+            const SizedBox(height: 16),
+            Text(
+              _formatChipsLong(_playerChips),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 36,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '$profitSign${_formatChipsLong(profit)} from buy-in',
+              style: TextStyle(
+                color: profitColor,
+                fontSize: 14,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Your chips will be added to your balance.',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.7),
+                fontSize: 14,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            // Warning if leaving mid-round
+            if (hasPotContribution) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEF4444).withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.warning_amber, color: Color(0xFFEF4444), size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        potLoss > 0
+                            ? 'You\'ll forfeit ${_formatChipsLong(potLoss)} in the pot!'
+                            : 'Hand in progress - pot will be forfeited!',
+                        style: const TextStyle(
+                          color: Color(0xFFEF4444),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
         ),
         actions: [
           TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              Navigator.pop(context);
-            },
-            child: const Text('Exit'),
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Keep Playing', style: TextStyle(color: Colors.white54)),
           ),
           ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              setState(() {
-                _playerChips = 50000;
-                _dealerPosition = 0;
-                _bots.clear();
-                _initializeBots();
-              });
-              _startNewHand();
+            onPressed: () async {
+              // Capture navigator before async gap
+              final navigator = Navigator.of(context);
+
+              // Add chips to user balance
+              final newBalance = UserPreferences.chips + _playerChips;
+              await UserPreferences.setChips(newBalance);
+
+              navigator.pop(); // Close dialog
+              navigator.pop(); // Exit game
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFD4AF37),
             ),
-            child: const Text('Play Again', style: TextStyle(color: Colors.white)),
+            child: const Text('Cash Out', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
     );
   }
 
+  String _formatChipsLong(int chips) {
+    if (chips >= 1000000) {
+      return '${(chips / 1000000).toStringAsFixed(1)}M';
+    } else if (chips >= 1000) {
+      final k = chips / 1000;
+      if (k == k.roundToDouble()) {
+        return '${k.toInt()}K';
+      }
+      return '${k.toStringAsFixed(1)}K';
+    }
+    return chips.toString();
+  }
+
   Widget _buildSetupScreen() {
-    // Difficulty labels for display
-    final difficultyLabels = {
-      'Easy': 'BEGINNER',
-      'Medium': 'INTERMEDIATE',
-      'Hard': 'EXPERT',
-    };
+    final userBalance = UserPreferences.chips;
+    final selectedLevel = _blindLevels[_selectedBlindIndex];
+    final minBuyIn = selectedLevel['minBuyIn'] as int;
+    final maxBuyIn = selectedLevel['maxBuyIn'] as int;
+    final canAfford = userBalance >= minBuyIn;
 
     return MobileWrapper(
       child: Scaffold(
         backgroundColor: const Color(0xFF0A0A0A),
         body: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
             child: Column(
               children: [
-                const SizedBox(height: 24),
-                // Back button
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: _AnimatedPressButton(
-                    onTap: () => Navigator.pop(context),
-                    child: Container(
-                      width: 44,
-                      height: 44,
+                const SizedBox(height: 16),
+                // Top bar with back button and balance
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _AnimatedPressButton(
+                      onTap: () => Navigator.pop(context),
+                      child: Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.06),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(Icons.arrow_back, color: Colors.white, size: 20),
+                      ),
+                    ),
+                    // User balance
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       decoration: BoxDecoration(
                         color: Colors.white.withValues(alpha: 0.06),
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(20),
                       ),
-                      child: const Icon(Icons.arrow_back, color: Colors.white, size: 20),
+                      child: Row(
+                        children: [
+                          const Text('💰', style: TextStyle(fontSize: 16)),
+                          const SizedBox(width: 6),
+                          Text(
+                            _formatChipsLong(userBalance),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ),
-
-                const Spacer(flex: 1),
-
-                // Opponents display
-                Text(
-                  '$_numberOfBots',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 64,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: -2,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  _numberOfBots == 1 ? 'OPPONENT' : 'OPPONENTS',
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.4),
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    letterSpacing: 4,
-                  ),
+                  ],
                 ),
 
                 const SizedBox(height: 24),
 
-                // Difficulty display
-                Text(
-                  difficultyLabels[_difficulty] ?? _difficulty.toUpperCase(),
+                // Title
+                const Text(
+                  'PRACTICE',
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.6),
+                    color: Colors.white,
                     fontSize: 28,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 2,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'DIFFICULTY',
+                  'Play against AI bots',
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.3),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                    letterSpacing: 3,
-                  ),
-                ),
-
-                const SizedBox(height: 48),
-
-                // Opponents Slider
-                SliderTheme(
-                  data: SliderTheme.of(context).copyWith(
-                    activeTrackColor: Colors.white,
-                    inactiveTrackColor: Colors.white.withValues(alpha: 0.1),
-                    thumbColor: Colors.white,
-                    overlayColor: Colors.white.withValues(alpha: 0.1),
-                    trackHeight: 4,
-                    thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
-                  ),
-                  child: Slider(
-                    value: _numberOfBots.toDouble(),
-                    min: 1,
-                    max: 7,
-                    divisions: 6,
-                    onChanged: (value) {
-                      setState(() => _numberOfBots = value.round());
-                    },
-                  ),
-                ),
-
-                // Min/Max labels for opponents
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        '1',
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.3),
-                          fontSize: 12,
-                        ),
-                      ),
-                      Text(
-                        '7',
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.3),
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
+                    color: Colors.white.withValues(alpha: 0.5),
+                    fontSize: 14,
                   ),
                 ),
 
                 const SizedBox(height: 32),
 
-                // Difficulty selection
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: ['Easy', 'Medium', 'Hard'].map((diff) {
-                    final isSelected = _difficulty == diff;
-                    return _AnimatedPressButton(
-                      onTap: () {
-                        setState(() => _difficulty = diff);
-                      },
+                // Blind Level Selection
+                Text(
+                  'SELECT STAKES',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.4),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: 3,
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // Blind level cards
+                ...List.generate(_blindLevels.length, (index) {
+                  final level = _blindLevels[index];
+                  final isSelected = _selectedBlindIndex == index;
+                  final levelMinBuyIn = level['minBuyIn'] as int;
+                  final isLocked = userBalance < levelMinBuyIn;
+
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: _AnimatedPressButton(
+                      onTap: isLocked
+                          ? null
+                          : () {
+                              setState(() {
+                                _selectedBlindIndex = index;
+                                _buyInAmount = levelMinBuyIn;
+                              });
+                            },
                       child: Container(
-                        width: 80,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.06),
-                          borderRadius: BorderRadius.circular(12),
+                          color: isSelected
+                              ? const Color(0xFFD4AF37).withValues(alpha: 0.2)
+                              : Colors.white.withValues(alpha: isLocked ? 0.02 : 0.06),
+                          borderRadius: BorderRadius.circular(16),
+                          border: isSelected ? Border.all(color: const Color(0xFFD4AF37), width: 2) : null,
                         ),
-                        child: Center(
-                          child: Text(
-                            diff,
-                            style: TextStyle(
-                              color: isSelected ? const Color(0xFF0A0A0A) : Colors.white.withValues(alpha: 0.6),
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
+                        child: Row(
+                          children: [
+                            // Level info
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Text(
+                                        level['name'] as String,
+                                        style: TextStyle(
+                                          color: isLocked ? Colors.white38 : Colors.white,
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      if (isLocked) ...[
+                                        const SizedBox(width: 8),
+                                        const Icon(Icons.lock, color: Colors.white38, size: 16),
+                                      ],
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Blinds: ${_formatChipsLong((level['bigBlind'] as int) ~/ 2)}/${_formatChipsLong(level['bigBlind'] as int)}',
+                                    style: TextStyle(
+                                      color: isLocked ? Colors.white24 : Colors.white54,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
+                            // Buy-in range
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Text(
+                                  '${_formatChipsLong(level['minBuyIn'] as int)} - ${_formatChipsLong(level['maxBuyIn'] as int)}',
+                                  style: TextStyle(
+                                    color: isLocked ? Colors.white24 : Colors.white70,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                if (isLocked)
+                                  Text(
+                                    'Need ${_formatChipsLong(levelMinBuyIn)}',
+                                    style: const TextStyle(
+                                      color: Colors.orange,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ],
                         ),
                       ),
-                    );
-                  }).toList(),
+                    ),
+                  );
+                }),
+
+                const SizedBox(height: 24),
+
+                // Buy-in slider (only if can afford selected level)
+                if (canAfford) ...[
+                  Text(
+                    'BUY-IN AMOUNT',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.4),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      letterSpacing: 3,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    _formatChipsLong(_buyInAmount),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 36,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  SliderTheme(
+                    data: SliderTheme.of(context).copyWith(
+                      activeTrackColor: const Color(0xFFD4AF37),
+                      inactiveTrackColor: Colors.white.withValues(alpha: 0.1),
+                      thumbColor: const Color(0xFFD4AF37),
+                      overlayColor: const Color(0xFFD4AF37).withValues(alpha: 0.2),
+                      trackHeight: 4,
+                      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 10),
+                    ),
+                    child: Slider(
+                      value: _buyInAmount
+                          .toDouble()
+                          .clamp(minBuyIn.toDouble(), userBalance.clamp(minBuyIn, maxBuyIn).toDouble()),
+                      min: minBuyIn.toDouble(),
+                      max: userBalance.clamp(minBuyIn, maxBuyIn).toDouble(),
+                      onChanged: (value) {
+                        setState(() => _buyInAmount = value.toInt());
+                      },
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(_formatChipsLong(minBuyIn),
+                            style: TextStyle(color: Colors.white.withValues(alpha: 0.3), fontSize: 12)),
+                        Text(_formatChipsLong(userBalance.clamp(minBuyIn, maxBuyIn)),
+                            style: TextStyle(color: Colors.white.withValues(alpha: 0.3), fontSize: 12)),
+                      ],
+                    ),
+                  ),
+                ],
+
+                const SizedBox(height: 24),
+
+                // Opponents and Difficulty in a row
+                Row(
+                  children: [
+                    // Opponents
+                    Expanded(
+                      child: Column(
+                        children: [
+                          Text(
+                            'OPPONENTS',
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.4),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                              letterSpacing: 2,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              _AnimatedPressButton(
+                                onTap: _numberOfBots > 1 ? () => setState(() => _numberOfBots--) : null,
+                                child: Container(
+                                  width: 36,
+                                  height: 36,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Icon(Icons.remove,
+                                      color: _numberOfBots > 1 ? Colors.white : Colors.white24, size: 20),
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Text(
+                                '$_numberOfBots',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 28,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              _AnimatedPressButton(
+                                onTap: _numberOfBots < 7 ? () => setState(() => _numberOfBots++) : null,
+                                child: Container(
+                                  width: 36,
+                                  height: 36,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Icon(Icons.add,
+                                      color: _numberOfBots < 7 ? Colors.white : Colors.white24, size: 20),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Difficulty
+                    Expanded(
+                      child: Column(
+                        children: [
+                          Text(
+                            'DIFFICULTY',
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.4),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                              letterSpacing: 2,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.06),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: ['Easy', 'Medium', 'Hard'].map((diff) {
+                                final isSelected = _difficulty == diff;
+                                final label = diff == 'Easy'
+                                    ? '😊'
+                                    : diff == 'Medium'
+                                        ? '😐'
+                                        : '😈';
+                                return _AnimatedPressButton(
+                                  onTap: () => setState(() => _difficulty = diff),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    decoration: BoxDecoration(
+                                      color: isSelected ? Colors.white : Colors.transparent,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      label,
+                                      style: const TextStyle(fontSize: 18),
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
 
-                const Spacer(flex: 2),
+                const SizedBox(height: 32),
 
                 // Play button
                 _AnimatedPressButton(
-                  onTap: () {
-                    setState(() {
-                      _gameStarted = true;
-                    });
-                    _startNewHand();
-                  },
+                  onTap: canAfford
+                      ? () async {
+                          // Deduct buy-in from user balance
+                          await UserPreferences.setChips(userBalance - _buyInAmount);
+
+                          setState(() {
+                            _gameStarted = true;
+                            _playerChips = _buyInAmount;
+                            _bigBlind = selectedLevel['bigBlind'] as int;
+                          });
+                          _startNewHand();
+                        }
+                      : null,
                   child: Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 20),
+                    padding: const EdgeInsets.symmetric(vertical: 18),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: canAfford ? const Color(0xFFD4AF37) : Colors.white.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(16),
                     ),
-                    child: const Center(
+                    child: Center(
                       child: Text(
-                        'PLAY',
+                        canAfford ? 'PLAY' : 'NOT ENOUGH CHIPS',
                         style: TextStyle(
-                          color: Color(0xFF0A0A0A),
+                          color: canAfford ? Colors.white : Colors.white38,
                           fontSize: 18,
                           fontWeight: FontWeight.w700,
                           letterSpacing: 2,
@@ -1104,7 +1585,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                   ),
                 ),
 
-                const SizedBox(height: 48),
+                const SizedBox(height: 32),
               ],
             ),
           ),
@@ -1156,7 +1637,14 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       child: Row(
         children: [
           _AnimatedPressButton(
-            onTap: () => Navigator.pop(context),
+            onTap: () {
+              // If game is in progress and player has chips, show cash out dialog
+              if (_gameStarted && _playerChips > 0) {
+                _showCashOutDialog();
+              } else {
+                Navigator.pop(context);
+              }
+            },
             child: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
           ),
           const Spacer(),
@@ -2604,11 +3092,11 @@ class _AnimatedGameButtonState extends State<_AnimatedGameButton> with SingleTic
 // Generic animated press button for setup screen and dialogs
 class _AnimatedPressButton extends StatefulWidget {
   final Widget child;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   const _AnimatedPressButton({
     required this.child,
-    required this.onTap,
+    this.onTap,
   });
 
   @override
@@ -2643,19 +3131,22 @@ class _AnimatedPressButtonState extends State<_AnimatedPressButton> with SingleT
 
   @override
   Widget build(BuildContext context) {
+    final isEnabled = widget.onTap != null;
     return GestureDetector(
-      onTapDown: (_) => _controller.forward(),
-      onTapUp: (_) {
-        _controller.reverse();
-        widget.onTap();
-      },
-      onTapCancel: () => _controller.reverse(),
+      onTapDown: isEnabled ? (_) => _controller.forward() : null,
+      onTapUp: isEnabled
+          ? (_) {
+              _controller.reverse();
+              widget.onTap!();
+            }
+          : null,
+      onTapCancel: isEnabled ? () => _controller.reverse() : null,
       child: AnimatedBuilder(
         animation: _controller,
         builder: (context, child) => Transform.scale(
           scale: _scaleAnimation.value,
           child: Opacity(
-            opacity: _opacityAnimation.value,
+            opacity: isEnabled ? _opacityAnimation.value : 0.5,
             child: child,
           ),
         ),

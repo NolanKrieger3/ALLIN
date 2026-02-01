@@ -611,12 +611,12 @@ class RoomService {
           shouldDelete = true;
           reason = 'finished';
         }
-        // Delete waiting rooms with only 1 player after 60 seconds
-        else if (room.status == 'waiting' && room.players.length == 1) {
-          final waitTime = now.difference(room.createdAt).inSeconds;
-          if (waitTime > 60) {
+        // Delete waiting rooms older than 5 minutes (stale lobbies)
+        else if (room.status == 'waiting') {
+          final waitTime = now.difference(room.createdAt).inMinutes;
+          if (waitTime >= 5) {
             shouldDelete = true;
-            reason = 'waiting too long (${waitTime}s)';
+            reason = 'stale lobby (${waitTime}min)';
           }
         }
         // Delete in_progress rooms older than 30 minutes (stale games)
