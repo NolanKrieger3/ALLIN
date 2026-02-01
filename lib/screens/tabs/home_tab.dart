@@ -65,15 +65,26 @@ class HomeTabState extends State<HomeTab> {
     _syncUserDataFromFirestore();
 
     // Listen to auth state changes to reload team when user is confirmed
-    _authSub = _authService.authStateChanges.listen((user) {
-      if (user != null) {
-        if (_userTeam == null) {
-          _loadUserTeam();
-        }
-        // Sync all user data whenever auth state changes (e.g., sign in)
-        _syncUserDataFromFirestore();
-      }
-    });
+    // Wrapped with try-catch for Windows desktop Firebase threading issues
+    _authSub = _authService.authStateChanges.listen(
+      (user) {
+        if (!mounted) return;
+        // Use post frame callback to ensure we're on the UI thread
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          if (user != null) {
+            if (_userTeam == null) {
+              _loadUserTeam();
+            }
+            // Sync all user data whenever auth state changes (e.g., sign in)
+            _syncUserDataFromFirestore();
+          }
+        });
+      },
+      onError: (e) {
+        debugPrint('Auth state listener error: $e');
+      },
+    );
 
     _friendsSub = _friendsService.friendsStream.listen((friends) {
       if (mounted) setState(() => _friends = friends);

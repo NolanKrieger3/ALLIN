@@ -43,17 +43,32 @@ class ProfileTabState extends State<ProfileTab> {
       if (mounted) setState(() => _friends = friends);
     });
     // Listen for auth state changes to refresh username
-    _authSub = AuthService().authStateChanges.listen((user) async {
-      if (user != null && mounted) {
-        // Sync data from Firestore when user changes
-        await UserService().syncAllUserData();
-        if (mounted) {
-          setState(() {
-            _displayUsername = UserPreferences.username;
-          });
-        }
-      }
-    });
+    // Wrapped with try-catch for Windows desktop Firebase threading issues
+    _authSub = AuthService().authStateChanges.listen(
+      (user) async {
+        if (!mounted) return;
+        // Use post frame callback to ensure we're on the UI thread
+        WidgetsBinding.instance.addPostFrameCallback((_) async {
+          if (!mounted) return;
+          if (user != null) {
+            // Sync data from Firestore when user changes
+            try {
+              await UserService().syncAllUserData();
+              if (mounted) {
+                setState(() {
+                  _displayUsername = UserPreferences.username;
+                });
+              }
+            } catch (e) {
+              debugPrint('Profile sync error: $e');
+            }
+          }
+        });
+      },
+      onError: (e) {
+        debugPrint('Auth state listener error: $e');
+      },
+    );
   }
 
   @override
@@ -2062,7 +2077,9 @@ class ProfileTabState extends State<ProfileTab> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
                 decoration: BoxDecoration(
-                  color: isPositive ? const Color(0xFF10B981).withValues(alpha: 0.2) : const Color(0xFFEF4444).withValues(alpha: 0.2),
+                  color: isPositive
+                      ? const Color(0xFF10B981).withValues(alpha: 0.2)
+                      : const Color(0xFFEF4444).withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
@@ -4501,9 +4518,9 @@ class AdvancedChipGraphPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     // Sample data - chip balance over time (normalized 0-1)
     final dataPoints = [0.35, 0.42, 0.38, 0.55, 0.48, 0.72, 0.85];
-    
+
     final stepWidth = size.width / (dataPoints.length - 1);
-    
+
     // Create gradient for the line
     final lineGradient = LinearGradient(
       colors: [
@@ -4517,7 +4534,7 @@ class AdvancedChipGraphPainter extends CustomPainter {
     final gridPaint = Paint()
       ..color = Colors.white.withValues(alpha: 0.04)
       ..strokeWidth = 1;
-    
+
     for (int i = 1; i < 4; i++) {
       final y = size.height * (i / 4);
       canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
@@ -4526,7 +4543,7 @@ class AdvancedChipGraphPainter extends CustomPainter {
     // Build smooth bezier path
     final path = Path();
     final fillPath = Path();
-    
+
     // Calculate points
     final points = <Offset>[];
     for (int i = 0; i < dataPoints.length; i++) {
@@ -4534,26 +4551,26 @@ class AdvancedChipGraphPainter extends CustomPainter {
       final y = size.height * (1 - dataPoints[i]);
       points.add(Offset(x, y));
     }
-    
+
     // Start paths
     path.moveTo(points[0].dx, points[0].dy);
     fillPath.moveTo(0, size.height);
     fillPath.lineTo(points[0].dx, points[0].dy);
-    
+
     // Draw smooth curves using cubic bezier
     for (int i = 0; i < points.length - 1; i++) {
       final current = points[i];
       final next = points[i + 1];
       final controlX = (current.dx + next.dx) / 2;
-      
+
       path.cubicTo(controlX, current.dy, controlX, next.dy, next.dx, next.dy);
       fillPath.cubicTo(controlX, current.dy, controlX, next.dy, next.dx, next.dy);
     }
-    
+
     // Complete fill path
     fillPath.lineTo(size.width, size.height);
     fillPath.close();
-    
+
     // Draw gradient fill
     final fillPaint = Paint()
       ..shader = LinearGradient(
@@ -4566,9 +4583,9 @@ class AdvancedChipGraphPainter extends CustomPainter {
         ],
         stops: const [0.0, 0.5, 1.0],
       ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
-    
+
     canvas.drawPath(fillPath, fillPaint);
-    
+
     // Draw glow effect
     final glowPaint = Paint()
       ..shader = lineGradient
@@ -4577,7 +4594,7 @@ class AdvancedChipGraphPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
     canvas.drawPath(path, glowPaint);
-    
+
     // Draw main line
     final linePaint = Paint()
       ..shader = lineGradient
@@ -4585,11 +4602,11 @@ class AdvancedChipGraphPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;
     canvas.drawPath(path, linePaint);
-    
+
     // Draw dots at data points
     for (int i = 0; i < points.length; i++) {
       final point = points[i];
-      
+
       // Outer glow
       canvas.drawCircle(
         point,
@@ -4598,7 +4615,7 @@ class AdvancedChipGraphPainter extends CustomPainter {
           ..color = const Color(0xFF6366F1).withValues(alpha: 0.3)
           ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
       );
-      
+
       // White ring
       canvas.drawCircle(
         point,
@@ -4607,7 +4624,7 @@ class AdvancedChipGraphPainter extends CustomPainter {
           ..color = const Color(0xFF1A1A1A)
           ..style = PaintingStyle.fill,
       );
-      
+
       // Colored center
       canvas.drawCircle(
         point,
@@ -4633,13 +4650,13 @@ class WinLossDonutPainter extends CustomPainter {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = size.width / 2 - 8;
     final strokeWidth = 12.0;
-    
+
     // Win percentage (68% wins)
     const winPercentage = 0.68;
     const lossPercentage = 1 - winPercentage;
-    
+
     final rect = Rect.fromCircle(center: center, radius: radius);
-    
+
     // Background track
     final trackPaint = Paint()
       ..color = Colors.white.withValues(alpha: 0.05)
@@ -4647,21 +4664,21 @@ class WinLossDonutPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;
     canvas.drawCircle(center, radius, trackPaint);
-    
+
     // Loss arc (draw first, underneath)
     final lossPaint = Paint()
       ..color = const Color(0xFFEF4444)
       ..strokeWidth = strokeWidth
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;
-    
+
     const startAngle = -1.5708; // -90 degrees in radians (top)
     final winSweep = 2 * 3.14159 * winPercentage;
     final lossSweep = 2 * 3.14159 * lossPercentage;
-    
+
     // Draw loss arc
     canvas.drawArc(rect, startAngle + winSweep, lossSweep, false, lossPaint);
-    
+
     // Win arc with gradient
     final winPaint = Paint()
       ..shader = SweepGradient(
@@ -4675,9 +4692,9 @@ class WinLossDonutPainter extends CustomPainter {
       ..strokeWidth = strokeWidth
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;
-    
+
     canvas.drawArc(rect, startAngle, winSweep, false, winPaint);
-    
+
     // Glow effect on win arc
     final glowPaint = Paint()
       ..color = const Color(0xFF10B981).withValues(alpha: 0.3)
@@ -4686,7 +4703,7 @@ class WinLossDonutPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
     canvas.drawArc(rect, startAngle, winSweep, false, glowPaint);
-    
+
     // Center text
     final textPainter = TextPainter(
       text: const TextSpan(
@@ -4704,7 +4721,7 @@ class WinLossDonutPainter extends CustomPainter {
       canvas,
       Offset(center.dx - textPainter.width / 2, center.dy - textPainter.height / 2 - 4),
     );
-    
+
     // Sub text
     final subTextPainter = TextPainter(
       text: TextSpan(
