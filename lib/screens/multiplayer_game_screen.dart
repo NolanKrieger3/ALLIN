@@ -1455,8 +1455,13 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
     String message = 'Wait for the next hand';
     bool showSpinner = false;
 
-    if (room.status == 'waiting' && room.players.length == 1) {
-      message = 'Finding opponent...';
+    // Priority 1: Not enough players to start - show waiting message
+    if (room.status == 'waiting' && room.players.length < 2) {
+      message = 'Waiting for opponent...';
+      showSpinner = true;
+    } else if (room.status == 'waiting') {
+      // Waiting status but have 2+ players - game should start soon
+      message = 'Starting game...';
       showSpinner = true;
     } else if (room.phase == 'waiting_for_players') {
       message = 'Waiting for players...';
