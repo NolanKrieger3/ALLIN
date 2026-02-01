@@ -265,7 +265,15 @@ class RoomService {
     final room = GameRoom(
       id: roomId,
       hostId: userId,
-      players: [GamePlayer(uid: userId, displayName: currentUserName, chips: startingChips)],
+      players: [
+        GamePlayer(
+          uid: userId,
+          displayName: currentUserName,
+          chips: startingChips,
+          lastActiveAt: DateTime.now(),
+          isReady: true,
+        )
+      ],
       maxPlayers: 6,
       bigBlind: bigBlind,
       smallBlind: bigBlind ~/ 2,
@@ -287,6 +295,7 @@ class RoomService {
       throw Exception('Failed to create room: ${response.body}');
     }
 
+    print('🎰 Created Sit & Go room: $roomId');
     return room;
   }
 
@@ -297,8 +306,6 @@ class RoomService {
 
     final token = await getAuthToken();
 
-    print('JOIN ATTEMPT: userId=$userId, name=$currentUserName, roomId=$roomId');
-
     final response = await http.get(Uri.parse('$databaseUrl/game_rooms/$roomId.json?auth=$token'));
 
     if (response.statusCode != 200 || response.body == 'null') {
@@ -307,8 +314,6 @@ class RoomService {
 
     final roomData = jsonDecode(response.body) as Map<String, dynamic>;
     final room = GameRoom.fromJson(roomData, roomId);
-
-    print('ROOM PLAYERS: ${room.players.map((p) => "${p.displayName} (${p.uid})").join(", ")}');
 
     if (room.isFull) throw Exception('Room is full');
 
@@ -324,9 +329,7 @@ class RoomService {
     // Check if player is already in the room
     final existingPlayerIndex = room.players.indexWhere((p) => p.uid == userId);
     if (existingPlayerIndex != -1) {
-      print('ALREADY IN ROOM: User $userId is already a player');
-
-      // If room is in 'waiting' status, reset player's stale state (hasFolded, hasActed, etc.)
+      // If room is in 'waiting' status, reset player's stale state
       if (room.status == RoomStatus.waiting) {
         final existingPlayer = room.players[existingPlayerIndex];
         final resetPlayer = existingPlayer.copyWith(
@@ -351,9 +354,8 @@ class RoomService {
           }),
         );
         if (patchResponse.statusCode != 200) {
-          print('⚠️ Failed to reset player state: ${patchResponse.statusCode}');
+          print('⚠️ Failed to reset player state');
         }
-        print('✅ Reset stale player state for user $userId in waiting room');
       }
       return;
     }
@@ -387,7 +389,7 @@ class RoomService {
       throw Exception('Failed to join room');
     }
 
-    print('✅ Successfully joined room $roomId with ${updatedPlayers.length} players');
+    print('✅ Joined room $roomId (${updatedPlayers.length} players)');
   }
 
   /// Leave a room
@@ -541,6 +543,38 @@ class RoomService {
     return fetchAvailableRooms('sitandgo');
   }
 
+  /// Leave ALL rooms the user is currently in (cleanup before joining new room)
+  Future<void> leaveAllRooms() async {
+    final userId = currentUserId;
+    if (userId == null) return;
+
+    final token = await getAuthToken();
+
+    final response = await http.get(
+      Uri.parse('$databaseUrl/game_rooms.json?auth=$token'),
+    );
+
+    if (response.statusCode != 200 || response.body == 'null') return;
+
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+
+    for (final entry in data.entries) {
+      final roomId = entry.key;
+      final roomData = Map<String, dynamic>.from(entry.value as Map);
+      final room = GameRoom.fromJson(roomData, roomId);
+
+      // Check if user is in this room
+      if (room.players.any((p) => p.uid == userId)) {
+        print('🚪 Leaving room $roomId (user was still in it)');
+        try {
+          await leaveRoom(roomId);
+        } catch (e) {
+          print('⚠️ Failed to leave room $roomId: $e');
+        }
+      }
+    }
+  }
+
   Future<List<GameRoom>> fetchAvailableRooms(String gameType) async {
     final token = await getAuthToken();
     final userId = currentUserId;
@@ -561,10 +595,14 @@ class RoomService {
     final allRooms =
         data.entries.map((e) => GameRoom.fromJson(Map<String, dynamic>.from(e.value as Map), e.key)).toList();
 
-    print('📋 Total rooms in database: ${allRooms.length}');
-    for (final room in allRooms) {
+    print('📋 Found ${allRooms.length} total rooms, filtering for gameType=$gameType');
+
+    // Debug: Show Sit & Go rooms specifically
+    final sitAndGoRooms = allRooms.where((r) => r.gameType == 'sitandgo').toList();
+    for (final room in sitAndGoRooms) {
+      final userInRoom = room.players.any((p) => p.uid == userId);
       print(
-          '   Room ${room.id}: gameType=${room.gameType}, status=${room.status}, players=${room.players.length}/${room.maxPlayers}, isFull=${room.isFull}');
+          '🎰 SitAndGo Room ${room.id}: status=${room.status}, players=${room.players.length}/${room.maxPlayers}, isFull=${room.isFull}, userInRoom=$userInRoom');
     }
 
     final filteredRooms = allRooms
@@ -605,6 +643,19 @@ class RoomService {
 
     print('🔍 Total rooms in database: ${allRooms.length}');
 
+    // Debug: Show ALL rooms with sitandgo in gameType
+    final sitAndGoRooms = allRooms.where((r) => r.gameType.contains('sitandgo')).toList();
+    print('🎰 Found ${sitAndGoRooms.length} Sit&Go rooms:');
+    for (final room in sitAndGoRooms) {
+      final userInRoom = room.players.any((p) => p.uid == userId);
+      final matchesBlind = room.bigBlind == bigBlind;
+      final matchesGameType = room.gameType == gameType;
+      print(
+          '   Room ${room.id}: gameType=${room.gameType}, blind=${room.bigBlind}, status=${room.status}, players=${room.players.length}/${room.maxPlayers}');
+      print(
+          '      matchesBlind=$matchesBlind, matchesGameType=$matchesGameType, userInRoom=$userInRoom, isFull=${room.isFull}');
+    }
+
     final joinableRooms = allRooms.where((room) {
       final isCorrectBlind = room.bigBlind == bigBlind;
       final isCorrectGameType = room.gameType == gameType;
@@ -624,11 +675,6 @@ class RoomService {
         hasSpace = room.players.length < (maxPlayers ?? room.maxPlayers);
       } else {
         hasSpace = room.players.length < 6;
-      }
-
-      // Debug log for each room
-      if (!isCorrectBlind && room.gameType == gameType) {
-        print('❌ Room ${room.id}: wrong blind (${room.bigBlind} != $bigBlind)');
       }
 
       return isCorrectBlind &&

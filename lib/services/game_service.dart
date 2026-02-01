@@ -91,6 +91,9 @@ class GameService {
   /// Delete all game rooms (admin function)
   Future<void> deleteAllRooms() => _roomService.deleteAllRooms();
 
+  /// Leave all rooms the user is currently in
+  Future<void> leaveAllRooms() => _roomService.leaveAllRooms();
+
   // ============================================================================
   // GAME FLOW (delegated to GameFlowService)
   // ============================================================================

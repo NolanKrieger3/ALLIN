@@ -49,6 +49,9 @@ class _SitAndGoScreenState extends State<SitAndGoScreen> {
     setState(() => _isLoading = true);
 
     try {
+      // IMPORTANT: Leave any rooms we're currently in before joining a new one
+      await _gameService.leaveAllRooms();
+
       final buyInLevel = _buyInLevels[_selectedBuyInIndex];
       final entry = buyInLevel['entry'] as int;
       final startingChips = buyInLevel['startingChips'] as int;

@@ -159,6 +159,163 @@ User taps PLAY button
 └─────────────────────────────────────────────────────────────────┘
 ```
 
+---
+
+## Sit & Go Tournament Flow
+
+### Overview
+
+Sit & Go tournaments differ from Quick Play:
+- **Quick Play**: 2 players, starts immediately when both ready
+- **Sit & Go**: 6 players required, uses a waiting lobby screen
+
+### Entry Point: `lobby_screen.dart` → `_joinSitAndGo()`
+
+```
+User taps Sit & Go buy-in level
+         │
+         ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  _joinSitAndGo(buyIn) in lobby_screen.dart                       │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  1. Fetch available Sit & Go rooms:                              │
+│     └── _gameService.fetchAvailableSitAndGoRooms()               │
+│         └── room_service.fetchAvailableRooms('sitandgo')         │
+│             └── Filters: status='waiting', !isFull, !isPrivate   │
+│                          gameType='sitandgo', user not in room   │
+│                                                                  │
+│  2. Filter rooms by buy-in level (bigBlind):                     │
+│     └── matchingRooms = rooms.where(r => r.bigBlind == buyIn)    │
+│                                                                  │
+│  3. Prioritize rooms with most players (fill existing lobbies):  │
+│     └── Sort by players.length descending                        │
+│     └── Pick first non-empty room, else any matching room        │
+│                                                                  │
+│  4. Join or Create:                                              │
+│     │                                                            │
+│     ├── IF room found:                                           │
+│     │   └── _gameService.joinRoom(room.id, startingChips)        │
+│     │                                                            │
+│     └── ELSE (no rooms):                                         │
+│         └── _gameService.createSitAndGoRoom(bigBlind, chips)     │
+│             └── Creates room with maxPlayers=6, gameType='sitandgo'│
+│                                                                  │
+│  5. Navigate to SitAndGoWaitingScreen (NOT MultiplayerGameScreen)│
+│     └── SitAndGoWaitingScreen(roomId, buyIn, requiredPlayers: 6) │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Sit & Go Room Creation: `room_service.dart` → `createSitAndGoRoom()`
+
+```dart
+FUNCTION: createSitAndGoRoom({startingChips, bigBlind})
+│
+├── 1. Generate room ID
+│
+├── 2. Create GameRoom with Sit & Go specific settings:
+│      └── GameRoom(
+│            maxPlayers: 6,              // Always 6 for Sit & Go
+│            gameType: 'sitandgo',       // Different from 'quickplay'
+│            bigBlind: bigBlind,
+│            players: [hostPlayer],
+│          )
+│
+├── 3. HTTP PUT to Firebase with:
+│      └── 'defaultChips': startingChips  // For new joiners
+│      └── 'lastActivityAt': timestamp    // For stale room cleanup
+│
+└── 4. Return GameRoom
+```
+
+### Waiting Screen: `sit_and_go_waiting_screen.dart`
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  SitAndGoWaitingScreen                                           │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  STATE:                                                          │
+│  - roomId: String (the room to watch)                            │
+│  - requiredPlayers: int (default 6)                              │
+│  - _room: GameRoom? (current room state)                         │
+│  - _isStarting: bool (prevent double-start)                      │
+│                                                                  │
+│  ON INIT:                                                        │
+│  1. Subscribe to room updates:                                   │
+│     └── _gameService.watchRoom(roomId).listen((room) {...})      │
+│                                                                  │
+│  2. Start heartbeat timer (every 10 seconds):                    │
+│     └── _gameService.sendHeartbeat(roomId)                       │
+│                                                                  │
+│  ON ROOM UPDATE:                                                 │
+│  │                                                               │
+│  ├── Update UI with current player count                         │
+│  │                                                               │
+│  ├── IF players.length >= requiredPlayers && !_isStarting:       │
+│  │   └── _startGame()                                            │
+│  │       ├── If host: _gameService.startGame(roomId)             │
+│  │       └── Navigate to MultiplayerGameScreen                   │
+│  │                                                               │
+│  └── IF room.status == 'playing' && !_isStarting:                │
+│      └── _navigateToGame() (someone else started it)             │
+│                                                                  │
+│  ON DISPOSE:                                                     │
+│  - If not starting game: _gameService.leaveRoom(roomId)          │
+│  - Cancel heartbeat timer                                        │
+│                                                                  │
+│  UI FEATURES:                                                    │
+│  - Progress indicator (e.g., "3/6 Players")                      │
+│  - List of joined players                                        │
+│  - "Fill with Bots" button (for testing)                         │
+│  - "Leave" button                                                │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Sit & Go vs Quick Play Comparison
+
+| Aspect | Quick Play | Sit & Go |
+|--------|------------|----------|
+| **Players** | 2 | 6 |
+| **Game Type** | `'quickplay'` | `'sitandgo'` |
+| **Matchmaking** | Join or create, start immediately | Join waiting lobby, wait for 6 |
+| **Navigation** | → `MultiplayerGameScreen` | → `SitAndGoWaitingScreen` → `MultiplayerGameScreen` |
+| **Start Trigger** | Host auto-starts when 2 ready | Auto-starts when 6 players join |
+| **Fetch Function** | `fetchJoinableRoomsByBlind()` | `fetchAvailableSitAndGoRooms()` |
+| **Create Function** | `createRoom()` | `createSitAndGoRoom()` |
+
+### Sit & Go Debugging
+
+**Bug: Players 3+ can't join lobby**
+
+Debug points in `room_service.dart` → `fetchAvailableRooms()`:
+```
+Check filter conditions:
+  □ room.status == 'waiting' (not 'playing')
+  □ room.isFull == false (players < maxPlayers)
+  □ room.gameType == 'sitandgo'
+  □ room.isPrivate == false
+  □ User not already in room.players
+```
+
+**Bug: Game starts with wrong player count**
+
+Check:
+- `requiredPlayers` passed to `SitAndGoWaitingScreen` (should be 6)
+- `requiredPlayers` passed to `MultiplayerGameScreen`
+- Room's `maxPlayers` value in Firebase
+
+**Bug: Waiting screen stuck**
+
+Check:
+- Is `watchRoom()` stream receiving updates?
+- Is heartbeat being sent (keeps room alive)?
+- Is room being cleaned up by `cleanupStaleRooms()`? (5 min timeout for waiting rooms)
+
+---
+
 ### Room Creation: `room_service.dart` → `createRoom()`
 
 ```dart

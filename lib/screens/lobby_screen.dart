@@ -213,13 +213,16 @@ class _LobbyScreenState extends State<LobbyScreen> {
     });
 
     try {
+      // IMPORTANT: Leave any rooms we're currently in before joining a new one
+      await _gameService.leaveAllRooms();
+
       final rooms = await _gameService.fetchAvailableSitAndGoRooms();
 
       // Filter for rooms at this buy-in level
       final matchingRooms =
           rooms.where((r) => r.bigBlind == buyIn.buyIn || (buyIn.buyIn == 0 && r.bigBlind == 100)).toList();
 
-      // Prioritize rooms that already have players (non-empty lobbies)
+      // Prioritize rooms that already have players (fill existing lobbies first)
       final nonEmptyRooms = matchingRooms.where((r) => r.players.isNotEmpty).toList();
       nonEmptyRooms.sort((a, b) => b.players.length.compareTo(a.players.length));
 
@@ -228,9 +231,11 @@ class _LobbyScreenState extends State<LobbyScreen> {
 
       String roomId;
       if (roomToJoin != null) {
+        print('🎰 Joining Sit & Go room ${roomToJoin.id} (${roomToJoin.players.length}/6 players)');
         await _gameService.joinRoom(roomToJoin.id, startingChips: buyIn.prizePool ~/ 2);
         roomId = roomToJoin.id;
       } else {
+        print('🎰 Creating new Sit & Go room');
         final room = await _gameService.createSitAndGoRoom(
           bigBlind: buyIn.buyIn > 0 ? buyIn.buyIn : 100,
           startingChips: buyIn.prizePool ~/ 2,
@@ -245,12 +250,13 @@ class _LobbyScreenState extends State<LobbyScreen> {
             builder: (context) => SitAndGoWaitingScreen(
               roomId: roomId,
               buyIn: buyIn.buyIn > 0 ? buyIn.buyIn : 100,
-              requiredPlayers: 6, // Sit & Go tournaments need 6 players
+              requiredPlayers: 6,
             ),
           ),
         );
       }
     } catch (e) {
+      print('❌ Sit & Go error: $e');
       setState(() => _error = 'Failed to join tournament: $e');
     }
 

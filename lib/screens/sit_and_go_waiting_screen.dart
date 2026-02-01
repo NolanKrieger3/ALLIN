@@ -15,7 +15,7 @@ class SitAndGoWaitingScreen extends StatefulWidget {
     super.key,
     required this.roomId,
     required this.buyIn,
-    this.requiredPlayers = 8,
+    this.requiredPlayers = 6, // Standard Sit & Go table size
   });
 
   @override
