@@ -394,13 +394,28 @@ class GameActionService {
       }
     }
 
-    // Check if all players are all-in
+    // Players who can still make betting decisions (not folded, have chips)
     final playersWhoCanAct = updatedPlayers.where((p) => !p.hasFolded && p.chips > 0).toList();
-    final allPlayersAllIn = playersWhoCanAct.isEmpty || playersWhoCanAct.length <= 1;
 
-    if (allPlayersAllIn) {
-      await _dealToShowdown(roomId, room, updatedPlayers, pot);
-      return;
+    // Check if we should deal to showdown (run out the board)
+    // This happens ONLY when:
+    // 1. All active players have acted in this round, AND
+    // 2. Either everyone is all-in, OR only one player has chips and all bets are matched
+    //
+    // Key poker rule: A player going all-in does NOT skip other players' turns.
+    // Other players must still get a chance to call/fold/raise.
+
+    // First, check if any player still needs to respond to the current bet
+    final playersNeedingToRespond = playersWhoCanAct.where((p) => !p.hasActed || p.currentBet < currentBet).toList();
+
+    // Only consider all-in showdown if NO players need to respond
+    if (playersNeedingToRespond.isEmpty && activePlayers.length >= 2) {
+      // Now check if we should run out the board:
+      // - No one can bet anymore (0 or 1 players have chips)
+      if (playersWhoCanAct.length <= 1) {
+        await _dealToShowdown(roomId, room, updatedPlayers, pot);
+        return;
+      }
     }
 
     // Check if betting round is complete
