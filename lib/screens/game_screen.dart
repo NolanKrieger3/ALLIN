@@ -55,6 +55,9 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   int _numberOfBots = 1;
   String _difficulty = 'Medium'; // Easy, Medium, Hard
 
+  // Bot cards visibility
+  bool _showBotCards = false;
+
   // Game state
   int _pot = 0;
   int _playerChips = 50000;
@@ -77,7 +80,6 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
 
   // Bots
   List<Bot> _bots = [];
-  bool _showBotCards = false;
   String _winnerDescription = '';
 
   // Showdown animation
@@ -135,226 +137,6 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     if (mounted) setState(() => _isFolding = false);
   }
 
-  void _showGameSettingsDialog() {
-    int selectedBots = _numberOfBots;
-    String selectedDifficulty = _difficulty;
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          backgroundColor: const Color(0xFF1A1A1A),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-            side: BorderSide(
-              color: const Color(0xFFD4AF37).withValues(alpha: 0.3),
-            ),
-          ),
-          title: const Row(
-            children: [
-              Icon(Icons.settings, color: Color(0xFFD4AF37)),
-              SizedBox(width: 12),
-              Text(
-                'Game Settings',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Number of Bots
-              const Text(
-                'Number of Opponents',
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [1, 2, 3, 4, 5, 6, 7].map((num) {
-                  final isSelected = selectedBots == num;
-                  return _AnimatedPressButton(
-                    onTap: () {
-                      setDialogState(() => selectedBots = num);
-                    },
-                    child: Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: isSelected ? const Color(0xFFD4AF37) : Colors.white.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: isSelected ? const Color(0xFFD4AF37) : Colors.white.withValues(alpha: 0.2),
-                          width: 2,
-                        ),
-                      ),
-                      child: Center(
-                        child: Text(
-                          '$num',
-                          style: TextStyle(
-                            color: isSelected ? Colors.black : Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 24),
-              // Difficulty
-              const Text(
-                'Bot Difficulty',
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: ['Easy', 'Medium', 'Hard'].map((diff) {
-                  final isSelected = selectedDifficulty == diff;
-                  Color diffColor;
-                  switch (diff) {
-                    case 'Easy':
-                      diffColor = Colors.green;
-                      break;
-                    case 'Medium':
-                      diffColor = Colors.orange;
-                      break;
-                    case 'Hard':
-                      diffColor = Colors.red;
-                      break;
-                    default:
-                      diffColor = Colors.grey;
-                  }
-                  return Expanded(
-                    child: _AnimatedPressButton(
-                      onTap: () {
-                        setDialogState(() => selectedDifficulty = diff);
-                      },
-                      child: Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 4),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        decoration: BoxDecoration(
-                          color: isSelected ? diffColor.withValues(alpha: 0.3) : Colors.white.withValues(alpha: 0.05),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: isSelected ? diffColor : Colors.white.withValues(alpha: 0.2),
-                            width: 2,
-                          ),
-                        ),
-                        child: Column(
-                          children: [
-                            Icon(
-                              diff == 'Easy'
-                                  ? Icons.sentiment_satisfied
-                                  : diff == 'Medium'
-                                      ? Icons.sentiment_neutral
-                                      : Icons.sentiment_very_dissatisfied,
-                              color: isSelected ? diffColor : Colors.white54,
-                              size: 28,
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              diff,
-                              style: TextStyle(
-                                color: isSelected ? diffColor : Colors.white70,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 16),
-              // Difficulty description
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.05),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.info_outline, color: Colors.white38, size: 18),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        selectedDifficulty == 'Easy'
-                            ? 'Bots play passively and make mistakes often.'
-                            : selectedDifficulty == 'Medium'
-                                ? 'Bots play a balanced style with some bluffs.'
-                                : 'Bots play aggressively and rarely make mistakes.',
-                        style: const TextStyle(
-                          color: Colors.white54,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                Navigator.of(context).pop(); // Go back to previous screen
-              },
-              child: Text(
-                'Cancel',
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.6),
-                ),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                setState(() {
-                  _numberOfBots = selectedBots;
-                  _difficulty = selectedDifficulty;
-                  _gameStarted = true;
-                });
-                _startNewHand();
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFD4AF37),
-                foregroundColor: Colors.black,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              ),
-              child: const Text(
-                'Start Game',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   void _initializeBots() {
     _bots = List.generate(
         _numberOfBots,
@@ -366,18 +148,6 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   }
 
   int _getTotalPlayers() => 1 + _bots.length; // Player + bots
-
-  // Get position index relative to dealer (0 = dealer, 1 = SB, 2 = BB, etc.)
-  int _getPositionFromDealer(int seatIndex) {
-    final totalPlayers = _getTotalPlayers();
-    return (seatIndex - _dealerPosition + totalPlayers) % totalPlayers;
-  }
-
-  // Get seat index from position relative to dealer
-  int _getSeatFromPosition(int position) {
-    final totalPlayers = _getTotalPlayers();
-    return (_dealerPosition + position) % totalPlayers;
-  }
 
   // Get list of active players (not folded and have chips or are all-in)
   List<int> _getActivePlayers() {
@@ -2142,28 +1912,6 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildPlayerCards({bool isDimmed = false}) {
-    // Use SizedBox with Stack for proper overlap without overflow
-    const cardWidth = 70.0;
-    const overlap = 20.0;
-    final totalWidth = _playerCards.length > 1 ? (cardWidth * 2 - overlap) : cardWidth;
-
-    return SizedBox(
-      width: totalWidth,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          if (_playerCards.isNotEmpty) _buildMinimalCard(_playerCards[0], isLarge: true, isDimmed: isDimmed),
-          if (_playerCards.length > 1)
-            Positioned(
-              left: cardWidth - overlap,
-              child: _buildMinimalCard(_playerCards[1], isLarge: true, isDimmed: isDimmed),
-            ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildPlayerCardsLarge({bool isDimmed = false}) {
     // Use SizedBox with Stack for proper overlap without overflow
     const cardWidth = 90.0;
@@ -2334,67 +2082,6 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildPlayerAvatar() {
-    final isDealer = _dealerPosition == 0;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withValues(alpha: 0.1),
-                border: Border.all(
-                  color: _isPlayerTurn ? const Color(0xFFD4AF37) : const Color(0xFF3B82F6),
-                  width: 2,
-                ),
-              ),
-              child: Center(
-                child: Text(UserPreferences.avatar, style: const TextStyle(fontSize: 24)),
-              ),
-            ),
-            // Dealer badge
-            if (isDealer)
-              Positioned(
-                bottom: -2,
-                right: -2,
-                child: Container(
-                  width: 18,
-                  height: 18,
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Center(
-                    child: Text('D',
-                        style: TextStyle(
-                          color: Colors.black,
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                        )),
-                  ),
-                ),
-              ),
-          ],
-        ),
-        const SizedBox(height: 4),
-        Text(
-          _formatChips(_playerChips),
-          style: TextStyle(
-            color: Colors.white70,
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildPlayerAvatarLarge() {
     final isDealer = _dealerPosition == 0;
     final isMyTurn = _isPlayerTurn && _gamePhase != 'showdown';
@@ -2516,29 +2203,6 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
               ),
             ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildCardBack({double width = 56, double height = 78}) {
-    return Container(
-      width: width,
-      height: height,
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFFE57373), Color(0xFFEF5350)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.white, width: 2),
-      ),
-      child: Center(
-        child: Icon(
-          Icons.radio_button_checked,
-          color: Colors.white.withValues(alpha: 0.6),
-          size: 28,
-        ),
       ),
     );
   }
@@ -2741,87 +2405,6 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
             ),
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildCard(PlayingCard card, {bool faceDown = false, bool isLarge = false, bool isSmall = false}) {
-    final isRed = card.suit == '♥' || card.suit == '♦';
-    double width = isLarge
-        ? 56.0
-        : isSmall
-            ? 32.0
-            : 42.0;
-    double height = isLarge
-        ? 80.0
-        : isSmall
-            ? 46.0
-            : 60.0;
-
-    if (faceDown) {
-      return Container(
-        width: width,
-        height: height,
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              const Color(0xFF2A2A3E),
-              const Color(0xFF1A1A2E),
-            ],
-          ),
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(
-            color: Colors.white.withValues(alpha: 0.08),
-          ),
-        ),
-      );
-    }
-
-    return Container(
-      width: width,
-      height: height,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(6),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.2),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            card.rank,
-            style: TextStyle(
-              color: isRed ? Colors.red.shade700 : Colors.black87,
-              fontSize: isLarge
-                  ? 18
-                  : isSmall
-                      ? 11
-                      : 14,
-              fontWeight: FontWeight.bold,
-              height: 1,
-            ),
-          ),
-          Text(
-            card.suit,
-            style: TextStyle(
-              color: isRed ? Colors.red.shade700 : Colors.black87,
-              fontSize: isLarge
-                  ? 16
-                  : isSmall
-                      ? 10
-                      : 12,
-              height: 1.2,
-            ),
-          ),
-        ],
       ),
     );
   }
