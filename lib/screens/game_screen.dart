@@ -55,8 +55,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   int _numberOfBots = 1;
   String _difficulty = 'Medium'; // Easy, Medium, Hard
 
-  // Bot cards visibility
-  bool _showBotCards = false;
+  // Bot cards visibility is determined by _gamePhase == 'showdown'
 
   // Game state
   int _pot = 0;
@@ -224,7 +223,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
         _playerBet = bb;
         _playerChips -= bb;
         _pot += bb;
-        _currentBet = bb > _playerBet ? bb : _playerBet;
+        _currentBet = bb; // Current bet is the big blind amount
       } else {
         final bot = _bots[bbSeat - 1];
         int bb = _bigBlind > bot.chips ? bot.chips : _bigBlind;
@@ -239,7 +238,6 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
 
       _lastRaiseAmount = _bigBlind;
       _gamePhase = 'preflop';
-      _showBotCards = false;
       _winnerDescription = '';
       _showdownAnimationComplete = false;
       _winningSeat = null;
@@ -387,7 +385,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
           _bbHasOption = false;
           // Reset all other players' acted flags since there's a new bet to respond to
           for (var bot in _bots) {
-            if (bot.isActive && !bot.isAllIn) {
+            if (bot.isActive && !bot.isAllIn && bot.chips > 0) {
               bot.hasActed = false;
             }
           }
@@ -407,9 +405,9 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
             }
             _currentBet = newTotalBet;
             _bbHasOption = false;
-            // Reset all other players' acted flags
+            // Reset all other players' acted flags since there's a new bet to respond to
             for (var bot in _bots) {
-              if (bot.isActive && !bot.isAllIn) {
+              if (bot.isActive && !bot.isAllIn && bot.chips > 0) {
                 bot.hasActed = false;
               }
             }
@@ -444,8 +442,12 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
 
       if (nextSeat == 0) {
         // Player's turn
-        if (!_playerHasFolded && _playerChips > 0) {
-          if (!_playerHasActed || _playerBet < _currentBet) {
+        if (!_playerHasFolded) {
+          // Player needs to act if:
+          // 1. They haven't acted yet AND have chips, OR
+          // 2. They haven't matched the current bet AND have chips
+          bool needsToAct = (!_playerHasActed && _playerChips > 0) || (_playerBet < _currentBet && _playerChips > 0);
+          if (needsToAct) {
             setState(() {
               _currentActorIndex = 0;
               _isPlayerTurn = true;
@@ -457,7 +459,11 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
         // Bot's turn
         final bot = _bots[nextSeat - 1];
         if (bot.isActive && !bot.isAllIn) {
-          if (!bot.hasActed || bot.currentBet < _currentBet) {
+          // Bot needs to act if:
+          // 1. They haven't acted yet AND have chips, OR
+          // 2. They haven't matched the current bet AND have chips
+          bool needsToAct = (!bot.hasActed && bot.chips > 0) || (bot.currentBet < _currentBet && bot.chips > 0);
+          if (needsToAct) {
             setState(() {
               _currentActorIndex = nextSeat;
               _isPlayerTurn = false;
@@ -575,11 +581,16 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
           _currentBet = totalBet;
           _bbHasOption = false;
 
-          // Reset all other players' acted flags
-          _playerHasActed = false;
-          for (var otherBot in _bots) {
-            if (otherBot.id != bot.id && otherBot.isActive && !otherBot.isAllIn) {
-              otherBot.hasActed = false;
+          // Reset all other players' acted flags since there's a new bet to respond to
+          // Only reset if this was a meaningful raise (not just a call that happens to be the max)
+          if (raiseBy > 0) {
+            if (!_playerHasFolded && _playerChips > 0) {
+              _playerHasActed = false;
+            }
+            for (var otherBot in _bots) {
+              if (otherBot.id != bot.id && otherBot.isActive && !otherBot.isAllIn && otherBot.chips > 0) {
+                otherBot.hasActed = false;
+              }
             }
           }
 
@@ -613,21 +624,33 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
 
     for (int seat in activePlayers) {
       if (seat == 0) {
+        // Player can act if they have chips
         if (_playerChips > 0) playersCanAct++;
-        if (_playerBet < _currentBet && _playerChips > 0) {
-          allMatched = false;
-        }
-        if (!_playerHasActed && _playerChips > 0) {
-          allMatched = false;
+
+        // Player needs to act if:
+        // 1. They haven't matched the current bet AND have chips to do so
+        // 2. OR they haven't acted at all this round AND have chips
+        if (_playerChips > 0) {
+          if (_playerBet < _currentBet) {
+            allMatched = false;
+          } else if (!_playerHasActed) {
+            allMatched = false;
+          }
         }
       } else {
         final bot = _bots[seat - 1];
+        // Bot can act if they have chips
         if (bot.chips > 0) playersCanAct++;
-        if (bot.currentBet < _currentBet && bot.chips > 0) {
-          allMatched = false;
-        }
-        if (!bot.hasActed && bot.chips > 0) {
-          allMatched = false;
+
+        // Bot needs to act if:
+        // 1. They haven't matched the current bet AND have chips to do so
+        // 2. OR they haven't acted at all this round AND have chips
+        if (bot.chips > 0) {
+          if (bot.currentBet < _currentBet) {
+            allMatched = false;
+          } else if (!bot.hasActed) {
+            allMatched = false;
+          }
         }
       }
     }
@@ -702,7 +725,6 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
           _communityCards.add(_deck.removeLast());
           break;
       }
-      _showBotCards = true;
       _gamePhase = 'showdown';
     });
 
@@ -722,7 +744,6 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
 
   void _showdown() {
     setState(() {
-      _showBotCards = true;
       _gamePhase = 'showdown';
       _showdownAnimationComplete = false;
 

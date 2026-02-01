@@ -77,7 +77,7 @@ class TeamService {
     final teamId = _generateTeamId();
 
     final captain = TeamMember(
-      odeid: userId,
+      uid: userId,
       displayName: currentUserName,
       rank: 'captain',
       joinedAt: DateTime.now(),
@@ -137,7 +137,7 @@ class TeamService {
     if (team.isMember(userId)) throw Exception('You are already in this team');
 
     final newMember = TeamMember(
-      odeid: userId,
+      uid: userId,
       displayName: currentUserName,
       rank: 'member',
       joinedAt: DateTime.now(),
@@ -179,7 +179,7 @@ class TeamService {
       }
     }
 
-    final updatedMembers = team.members.where((m) => m.odeid != userId).toList();
+    final updatedMembers = team.members.where((m) => m.uid != userId).toList();
 
     await http.patch(
       Uri.parse('$_databaseUrl/teams/$teamId.json?auth=$token'),
@@ -330,7 +330,7 @@ class TeamService {
   }
 
   /// Promote member to officer (Captain only)
-  Future<void> promoteMember(String teamId, String memberuid) async {
+  Future<void> promoteMember(String teamId, String memberUid) async {
     final userId = currentUserId;
     if (userId == null) throw Exception('Must be logged in');
 
@@ -338,7 +338,7 @@ class TeamService {
     if (team == null) throw Exception('Team not found');
     if (!team.isCaptain(userId)) throw Exception('Only captain can promote members');
 
-    final memberIndex = team.members.indexWhere((m) => m.odeid == memberuid);
+    final memberIndex = team.members.indexWhere((m) => m.uid == memberUid);
     if (memberIndex == -1) throw Exception('Member not found');
     if (team.members[memberIndex].rank != 'member') throw Exception('Member is already an officer');
 
@@ -353,7 +353,7 @@ class TeamService {
   }
 
   /// Demote officer to member (Captain only)
-  Future<void> demoteMember(String teamId, String memberuid) async {
+  Future<void> demoteMember(String teamId, String memberUid) async {
     final userId = currentUserId;
     if (userId == null) throw Exception('Must be logged in');
 
@@ -361,7 +361,7 @@ class TeamService {
     if (team == null) throw Exception('Team not found');
     if (!team.isCaptain(userId)) throw Exception('Only captain can demote members');
 
-    final memberIndex = team.members.indexWhere((m) => m.odeid == memberuid);
+    final memberIndex = team.members.indexWhere((m) => m.uid == memberUid);
     if (memberIndex == -1) throw Exception('Member not found');
     if (team.members[memberIndex].rank != 'officer') throw Exception('Member is not an officer');
 
@@ -376,7 +376,7 @@ class TeamService {
   }
 
   /// Kick a member (Captain/Officer only, cannot kick officers unless captain)
-  Future<void> kickMember(String teamId, String memberuid) async {
+  Future<void> kickMember(String teamId, String memberUid) async {
     final userId = currentUserId;
     if (userId == null) throw Exception('Must be logged in');
 
@@ -385,7 +385,7 @@ class TeamService {
     if (!team.isOfficer(userId)) throw Exception('Only officers and captain can kick members');
 
     final member =
-        team.members.firstWhere((m) => m.odeid == memberuid, orElse: () => throw Exception('Member not found'));
+        team.members.firstWhere((m) => m.uid == memberUid, orElse: () => throw Exception('Member not found'));
 
     // Cannot kick captain
     if (member.rank == 'captain') throw Exception('Cannot kick the captain');
@@ -395,7 +395,7 @@ class TeamService {
       throw Exception('Only captain can kick officers');
     }
 
-    final updatedMembers = team.members.where((m) => m.odeid != memberuid).toList();
+    final updatedMembers = team.members.where((m) => m.uid != memberUid).toList();
 
     final token = await _getAuthToken();
     await http.patch(
@@ -404,11 +404,11 @@ class TeamService {
     );
 
     // Clear kicked user's team ID
-    await http.delete(Uri.parse('$_databaseUrl/user_teams/$memberuid.json?auth=$token'));
+    await http.delete(Uri.parse('$_databaseUrl/user_teams/$memberUid.json?auth=$token'));
   }
 
   /// Transfer captaincy (Captain only)
-  Future<void> transferCaptaincy(String teamId, String newCaptainuid) async {
+  Future<void> transferCaptaincy(String teamId, String newCaptainUid) async {
     final userId = currentUserId;
     if (userId == null) throw Exception('Must be logged in');
 
@@ -416,13 +416,13 @@ class TeamService {
     if (team == null) throw Exception('Team not found');
     if (!team.isCaptain(userId)) throw Exception('Only captain can transfer leadership');
 
-    final newCaptainIndex = team.members.indexWhere((m) => m.odeid == newCaptainuid);
+    final newCaptainIndex = team.members.indexWhere((m) => m.uid == newCaptainUid);
     if (newCaptainIndex == -1) throw Exception('Member not found');
 
     final updatedMembers = team.members.map((m) {
-      if (m.odeid == userId) {
+      if (m.uid == userId) {
         return m.copyWith(rank: 'officer'); // Old captain becomes officer
-      } else if (m.odeid == newCaptainuid) {
+      } else if (m.uid == newCaptainUid) {
         return m.copyWith(rank: 'captain');
       }
       return m;
@@ -432,7 +432,7 @@ class TeamService {
     await http.patch(
       Uri.parse('$_databaseUrl/teams/$teamId.json?auth=$token'),
       body: jsonEncode({
-        'captainId': newCaptainuid,
+        'captainId': newCaptainUid,
         'members': updatedMembers.map((m) => m.toJson()).toList(),
       }),
     );
@@ -459,7 +459,7 @@ class TeamService {
 
     final chatMessage = TeamChatMessage(
       id: messageId,
-      senderuid: userId,
+      senderUid: userId,
       senderName: currentUserName,
       message: message.trim(),
       timestamp: DateTime.now(),
@@ -555,7 +555,7 @@ class TeamService {
 
     // Add member to team
     final newMember = TeamMember(
-      odeid: userId,
+      uid: userId,
       displayName: currentUserName,
       rank: 'member',
       joinedAt: DateTime.now(),

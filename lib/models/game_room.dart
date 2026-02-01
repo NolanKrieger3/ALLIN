@@ -35,7 +35,7 @@ class GameRoom {
     required this.id,
     required this.hostId,
     required this.players,
-    this.maxPlayers = 2,
+    this.maxPlayers = 6,
     this.bigBlind = 100,
     this.smallBlind = 50,
     this.status = 'waiting',
@@ -90,7 +90,7 @@ class GameRoom {
       players: (json['players'] as List<dynamic>)
           .map((p) => GamePlayer.fromJson(Map<String, dynamic>.from(p as Map)))
           .toList(),
-      maxPlayers: json['maxPlayers'] as int? ?? 2,
+      maxPlayers: json['maxPlayers'] as int? ?? 6,
       bigBlind: json['bigBlind'] as int? ?? 100,
       smallBlind: json['smallBlind'] as int? ?? 50,
       status: json['status'] as String? ?? 'waiting',

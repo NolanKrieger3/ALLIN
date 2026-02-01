@@ -2,14 +2,14 @@ import 'dart:ui' show Color;
 
 /// Team member with their rank
 class TeamMember {
-  final String odeid;
+  final String uid;
   final String displayName;
   final String rank; // 'captain', 'officer', 'member'
   final DateTime joinedAt;
   final int totalWinnings; // Track contributions
 
   TeamMember({
-    required this.odeid,
+    required this.uid,
     required this.displayName,
     this.rank = 'member',
     required this.joinedAt,
@@ -17,7 +17,7 @@ class TeamMember {
   });
 
   Map<String, dynamic> toJson() => {
-        'uid': odeid,
+        'uid': uid,
         'displayName': displayName,
         'rank': rank,
         'joinedAt': joinedAt.millisecondsSinceEpoch,
@@ -26,7 +26,7 @@ class TeamMember {
 
   factory TeamMember.fromJson(Map<String, dynamic> json) {
     return TeamMember(
-      odeid: json['uid'] as String,
+      uid: json['uid'] as String,
       displayName: json['displayName'] as String,
       rank: json['rank'] as String? ?? 'member',
       joinedAt: DateTime.fromMillisecondsSinceEpoch(json['joinedAt'] as int? ?? 0),
@@ -35,14 +35,14 @@ class TeamMember {
   }
 
   TeamMember copyWith({
-    String? odeid,
+    String? uid,
     String? displayName,
     String? rank,
     DateTime? joinedAt,
     int? totalWinnings,
   }) {
     return TeamMember(
-      odeid: odeid ?? this.odeid,
+      uid: uid ?? this.uid,
       displayName: displayName ?? this.displayName,
       rank: rank ?? this.rank,
       joinedAt: joinedAt ?? this.joinedAt,
@@ -78,14 +78,14 @@ class TeamMember {
 /// Chat message in team chat
 class TeamChatMessage {
   final String id;
-  final String senderuid;
+  final String senderUid;
   final String senderName;
   final String message;
   final DateTime timestamp;
 
   TeamChatMessage({
     required this.id,
-    required this.senderuid,
+    required this.senderUid,
     required this.senderName,
     required this.message,
     required this.timestamp,
@@ -93,7 +93,7 @@ class TeamChatMessage {
 
   Map<String, dynamic> toJson() => {
         'id': id,
-        'senderUid': senderuid,
+        'senderUid': senderUid,
         'senderName': senderName,
         'message': message,
         'timestamp': timestamp.millisecondsSinceEpoch,
@@ -102,7 +102,7 @@ class TeamChatMessage {
   factory TeamChatMessage.fromJson(Map<String, dynamic> json) {
     return TeamChatMessage(
       id: json['id'] as String,
-      senderuid: json['senderUid'] as String,
+      senderUid: json['senderUid'] as String,
       senderName: json['senderName'] as String,
       message: json['message'] as String,
       timestamp: DateTime.fromMillisecondsSinceEpoch(json['timestamp'] as int? ?? 0),
@@ -314,17 +314,17 @@ class Team {
   int get totalWinnings => members.fold(0, (sum, m) => sum + m.totalWinnings);
 
   /// Check if user is captain
-  bool isCaptain(String odeid) => captainId == odeid;
+  bool isCaptain(String userId) => captainId == userId;
 
   /// Check if user is officer or captain
-  bool isOfficer(String odeid) {
-    final member = members.firstWhere((m) => m.odeid == odeid,
-        orElse: () => TeamMember(odeid: '', displayName: '', joinedAt: DateTime.now()));
+  bool isOfficer(String userId) {
+    final member = members.firstWhere((m) => m.uid == userId,
+        orElse: () => TeamMember(uid: '', displayName: '', joinedAt: DateTime.now()));
     return member.rank == 'officer' || member.rank == 'captain';
   }
 
   /// Check if user is member
-  bool isMember(String odeid) => members.any((m) => m.odeid == odeid);
+  bool isMember(String userId) => members.any((m) => m.uid == userId);
 
   /// Get sorted members (captain first, then officers, then by winnings)
   List<TeamMember> get sortedMembers {

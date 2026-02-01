@@ -563,7 +563,7 @@ class HomeTabState extends State<HomeTab> {
                     itemCount: messages.length > 15 ? 15 : messages.length,
                     itemBuilder: (context, index) {
                       final msg = messages[messages.length - 1 - index];
-                      final isMe = msg.senderuid == _teamService.currentUserId;
+                      final isMe = msg.senderUid == _teamService.currentUserId;
                       return Padding(
                         padding: EdgeInsets.only(
                           bottom: 8,
@@ -813,7 +813,7 @@ class HomeTabState extends State<HomeTab> {
                   itemCount: _userTeam!.sortedMembers.length,
                   itemBuilder: (context, index) {
                     final member = _userTeam!.sortedMembers[index];
-                    final isMe = member.odeid == _teamService.currentUserId;
+                    final isMe = member.uid == _teamService.currentUserId;
                     final canKick = isCaptain && !isMe;
 
                     return GestureDetector(
@@ -1363,7 +1363,7 @@ class HomeTabState extends State<HomeTab> {
 
     if (confirm == true && _userTeam != null) {
       try {
-        await _teamService.kickMember(_userTeam!.id, member.odeid);
+        await _teamService.kickMember(_userTeam!.id, member.uid);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('${member.displayName} has been kicked'), backgroundColor: const Color(0xFF00D46A)),

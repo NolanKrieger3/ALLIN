@@ -15,7 +15,7 @@ class RoomService {
   String? get currentUserId => _auth.currentUser?.uid;
 
   /// Get current user display name
-  /// Priority: 1) Saved username in preferences, 2) Firebase displayName, 3) Email prefix, 4) Random fallback
+  /// Priority: 1) Saved username in preferences, 2) Firebase displayName, 3) Email prefix, 4) Consistent random fallback
   String get currentUserName {
     // First check UserPreferences - this is where the app actually stores the username
     final hasSetUsername = UserPreferences.hasSetUsername;
@@ -23,7 +23,12 @@ class RoomService {
 
     print('🔍 USERNAME CHECK: hasSetUsername=$hasSetUsername, savedUsername=$savedUsername');
 
-    if (hasSetUsername && savedUsername.isNotEmpty) {
+    // Check if we have a valid saved username (either flag is set OR username doesn't look random)
+    // Random names follow pattern: AdjectiveNoun## (e.g., "LuckyShark42")
+    final looksLikeSavedUsername =
+        savedUsername.isNotEmpty && !RegExp(r'^[A-Z][a-z]+[A-Z][a-z]+\d{1,2}$').hasMatch(savedUsername);
+
+    if (hasSetUsername || looksLikeSavedUsername) {
       print('✅ Using saved username: $savedUsername');
       return savedUsername;
     }
@@ -42,14 +47,11 @@ class RoomService {
         print('✅ Using email prefix: $emailPrefix');
         return emailPrefix;
       }
-      final fallbackName = 'Player${user.uid.substring(0, 4).toUpperCase()}';
-      print('⚠️ Using UID fallback: $fallbackName');
-      return fallbackName;
     }
 
-    // Final fallback - generate random name
-    print('⚠️ No user, using UserPreferences fallback');
-    return UserPreferences.username;
+    // Final fallback - use UserPreferences which now caches the random name
+    print('⚠️ Using UserPreferences fallback: $savedUsername');
+    return savedUsername;
   }
 
   /// Get auth token for authenticated requests
@@ -74,7 +76,7 @@ class RoomService {
     int startingChips = 1000,
     bool isPrivate = false,
     String gameType = 'cash',
-    int maxPlayers = 2,
+    int maxPlayers = 6,
   }) async {
     final userId = currentUserId;
     if (userId == null) throw Exception('Must be logged in to create a room');

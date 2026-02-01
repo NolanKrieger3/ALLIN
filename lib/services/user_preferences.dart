@@ -99,6 +99,9 @@ class UserPreferences {
 
   static SharedPreferences? _prefs;
 
+  /// Cached random name for the session (so it doesn't change on every access)
+  static String? _cachedRandomName;
+
   /// Initialize shared preferences
   static Future<void> init() async {
     _prefs = await SharedPreferences.getInstance();
@@ -146,20 +149,24 @@ class UserPreferences {
     if (saved != null && saved.isNotEmpty) {
       return saved;
     }
-    // Generate random name for testing
-    return _generateRandomName();
+    // Use cached random name if available, otherwise generate and cache one
+    // This ensures the name stays consistent within a session
+    _cachedRandomName ??= _generateRandomName();
+    return _cachedRandomName!;
   }
 
   /// Save username
   static Future<void> setUsername(String username) async {
     await _prefs?.setString(_usernameKey, username);
     await _prefs?.setBool(_hasSetUsernameKey, true);
+    _cachedRandomName = null; // Clear cached random name when real username is set
   }
 
   /// Clear username (for testing)
   static Future<void> clearUsername() async {
     await _prefs?.remove(_usernameKey);
     await _prefs?.setBool(_hasSetUsernameKey, false);
+    _cachedRandomName = null; // Clear cached random name
   }
 
   /// Get cached Firebase UID
@@ -190,6 +197,7 @@ class UserPreferences {
     await _prefs?.remove(_cachedPasswordKey);
     await _prefs?.setInt(_chipsKey, _defaultChips);
     await _prefs?.setInt(_gemsKey, _defaultGems);
+    _cachedRandomName = null; // Clear cached random name
   }
 
   /// Generate a random fun name for testing

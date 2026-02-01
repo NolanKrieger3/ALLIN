@@ -32,7 +32,7 @@ class GameService {
     int startingChips = 1000,
     bool isPrivate = false,
     String gameType = 'cash',
-    int maxPlayers = 2,
+    int maxPlayers = 6,
   }) =>
       _roomService.createRoom(
         bigBlind: bigBlind,
