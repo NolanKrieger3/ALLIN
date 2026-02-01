@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import '../services/game_service.dart';
 import '../services/bot_service.dart';
-import '../services/user_preferences.dart';
+import '../services/currency_service.dart';
 import '../widgets/mobile_wrapper.dart';
 import 'multiplayer_game_screen.dart';
 
@@ -19,19 +19,8 @@ class _QuickPlayScreenState extends State<QuickPlayScreen> {
   final BotService _botService = BotService();
 
   bool _isLoading = false;
-  int _selectedBlindIndex = 2; // Default to medium blinds
+  int _selectedBlindIndex = 1; // Default to second level
   int _chipBalance = 0;
-
-  // Blind levels (small blind / big blind / buy-in)
-  static const List<Map<String, dynamic>> _blindLevels = [
-    {'small': 10, 'big': 20, 'label': '10/20', 'buyIn': 1000, 'buyInLabel': '1K'},
-    {'small': 25, 'big': 50, 'label': '25/50', 'buyIn': 2500, 'buyInLabel': '2.5K'},
-    {'small': 50, 'big': 100, 'label': '50/100', 'buyIn': 5000, 'buyInLabel': '5K'},
-    {'small': 100, 'big': 200, 'label': '100/200', 'buyIn': 10000, 'buyInLabel': '10K'},
-    {'small': 250, 'big': 500, 'label': '250/500', 'buyIn': 25000, 'buyInLabel': '25K'},
-    {'small': 500, 'big': 1000, 'label': '500/1K', 'buyIn': 50000, 'buyInLabel': '50K'},
-    {'small': 1000, 'big': 2000, 'label': '1K/2K', 'buyIn': 100000, 'buyInLabel': '100K'},
-  ];
 
   @override
   void initState() {
@@ -42,25 +31,35 @@ class _QuickPlayScreenState extends State<QuickPlayScreen> {
 
   void _loadChipBalance() {
     setState(() {
-      _chipBalance = UserPreferences.chips;
+      _chipBalance = CurrencyService.chips;
       // Auto-select the highest affordable blind level
-      _selectedBlindIndex = _getHighestAffordableIndex();
+      _selectedBlindIndex = BlindLevels.getHighestAffordableIndex(_chipBalance);
     });
   }
 
   /// Get the highest blind level index the user can afford
   int _getHighestAffordableIndex() {
-    for (int i = _blindLevels.length - 1; i >= 0; i--) {
-      if (_chipBalance >= (_blindLevels[i]['buyIn'] as int)) {
-        return i;
-      }
-    }
-    return 0; // Default to lowest if can't afford any
+    return BlindLevels.getHighestAffordableIndex(_chipBalance);
   }
 
   /// Check if user can afford a specific blind level
   bool _canAfford(int index) {
-    return _chipBalance >= (_blindLevels[index]['buyIn'] as int);
+    return BlindLevels.canAfford(index, _chipBalance);
+  }
+
+  /// Show message when user tries to select unaffordable level
+  void _showUnaffordableMessage(int attemptedIndex) {
+    final level = BlindLevels.all[attemptedIndex];
+    ScaffoldMessenger.of(context).clearSnackBars();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Need ${CurrencyService.formatChips(level.buyIn)} chips for ${level.label} blinds. You have ${CurrencyService.formatChips(_chipBalance)}.',
+        ),
+        backgroundColor: Colors.orange.shade700,
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   Future<void> _ensureAuthenticated() async {
@@ -74,8 +73,8 @@ class _QuickPlayScreenState extends State<QuickPlayScreen> {
       await _authService.signInAnonymously();
     }
 
-    final blindLevel = _blindLevels[_selectedBlindIndex];
-    final buyIn = blindLevel['buyIn'] as int;
+    final blindLevel = BlindLevels.all[_selectedBlindIndex];
+    final buyIn = blindLevel.buyIn;
 
     // Check if user can afford the buy-in
     if (_chipBalance < buyIn) {
@@ -83,7 +82,7 @@ class _QuickPlayScreenState extends State<QuickPlayScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-                'Not enough chips! You need ${UserPreferences.formatChips(buyIn)} but only have ${UserPreferences.formatChips(_chipBalance)}'),
+                'Not enough chips! You need ${CurrencyService.formatChips(buyIn)} but only have ${CurrencyService.formatChips(_chipBalance)}'),
             backgroundColor: const Color(0xFFFF4444),
           ),
         );
@@ -94,7 +93,7 @@ class _QuickPlayScreenState extends State<QuickPlayScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final bigBlind = blindLevel['big'] as int;
+      final bigBlind = blindLevel.big;
 
       String? roomId;
 
@@ -198,8 +197,8 @@ class _QuickPlayScreenState extends State<QuickPlayScreen> {
       await _authService.signInAnonymously();
     }
 
-    final blindLevel = _blindLevels[_selectedBlindIndex];
-    final buyIn = blindLevel['buyIn'] as int;
+    final blindLevel = BlindLevels.all[_selectedBlindIndex];
+    final buyIn = blindLevel.buyIn;
 
     // Check if user can afford the buy-in
     if (_chipBalance < buyIn) {
@@ -207,7 +206,7 @@ class _QuickPlayScreenState extends State<QuickPlayScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-                'Not enough chips! You need ${UserPreferences.formatChips(buyIn)} but only have ${UserPreferences.formatChips(_chipBalance)}'),
+                'Not enough chips! You need ${CurrencyService.formatChips(buyIn)} but only have ${CurrencyService.formatChips(_chipBalance)}'),
             backgroundColor: const Color(0xFFFF4444),
           ),
         );
@@ -218,7 +217,7 @@ class _QuickPlayScreenState extends State<QuickPlayScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final bigBlind = blindLevel['big'] as int;
+      final bigBlind = blindLevel.big;
 
       // Create a new private room for testing
       print('🤖 Creating test room with bots');
@@ -261,7 +260,7 @@ class _QuickPlayScreenState extends State<QuickPlayScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final blindLevel = _blindLevels[_selectedBlindIndex];
+    final blindLevel = BlindLevels.all[_selectedBlindIndex];
     final canAffordSelected = _canAfford(_selectedBlindIndex);
     final maxAffordableIndex = _getHighestAffordableIndex();
 
@@ -303,7 +302,7 @@ class _QuickPlayScreenState extends State<QuickPlayScreen> {
                           Icon(Icons.monetization_on, color: Colors.amber.withValues(alpha: 0.8), size: 18),
                           const SizedBox(width: 8),
                           Text(
-                            UserPreferences.formatChips(_chipBalance),
+                            CurrencyService.formatChips(_chipBalance),
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 16,
@@ -320,7 +319,7 @@ class _QuickPlayScreenState extends State<QuickPlayScreen> {
 
                 // Blinds display
                 Text(
-                  blindLevel['label'] as String,
+                  blindLevel.label,
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 64,
@@ -341,34 +340,44 @@ class _QuickPlayScreenState extends State<QuickPlayScreen> {
 
                 const SizedBox(height: 24),
 
-                // Buy-in display
+                // Buy-in display with affordability indicator
                 Text(
-                  '\$${blindLevel['buyInLabel']}',
+                  '\$${blindLevel.buyInLabel}',
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.6),
+                    color: canAffordSelected ? Colors.white.withValues(alpha: 0.6) : Colors.red.withValues(alpha: 0.8),
                     fontSize: 28,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  'BUY-IN',
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.3),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                    letterSpacing: 3,
-                  ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    if (!canAffordSelected) ...[
+                      Icon(Icons.lock, color: Colors.red.withValues(alpha: 0.6), size: 12),
+                      const SizedBox(width: 4),
+                    ],
+                    Text(
+                      canAffordSelected ? 'BUY-IN' : 'INSUFFICIENT CHIPS',
+                      style: TextStyle(
+                        color:
+                            canAffordSelected ? Colors.white.withValues(alpha: 0.3) : Colors.red.withValues(alpha: 0.5),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        letterSpacing: 3,
+                      ),
+                    ),
+                  ],
                 ),
 
                 const SizedBox(height: 48),
 
-                // Slider
+                // Slider - shows message when trying to select unaffordable levels
                 SliderTheme(
                   data: SliderTheme.of(context).copyWith(
-                    activeTrackColor: Colors.white,
+                    activeTrackColor: canAffordSelected ? Colors.white : Colors.red.withValues(alpha: 0.6),
                     inactiveTrackColor: Colors.white.withValues(alpha: 0.1),
-                    thumbColor: Colors.white,
+                    thumbColor: canAffordSelected ? Colors.white : Colors.red.withValues(alpha: 0.8),
                     overlayColor: Colors.white.withValues(alpha: 0.1),
                     trackHeight: 4,
                     thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
@@ -376,31 +385,44 @@ class _QuickPlayScreenState extends State<QuickPlayScreen> {
                   child: Slider(
                     value: _selectedBlindIndex.toDouble(),
                     min: 0,
-                    max: (_blindLevels.length - 1).toDouble(),
-                    divisions: _blindLevels.length - 1,
+                    max: (BlindLevels.all.length - 1).toDouble(),
+                    divisions: BlindLevels.all.length - 1,
                     onChanged: (value) {
-                      setState(() => _selectedBlindIndex = value.round());
+                      final newIndex = value.round();
+                      // Show message if trying to select unaffordable level
+                      if (newIndex > maxAffordableIndex) {
+                        _showUnaffordableMessage(newIndex);
+                        // Still clamp to max affordable
+                        setState(() => _selectedBlindIndex = maxAffordableIndex);
+                      } else {
+                        setState(() => _selectedBlindIndex = newIndex);
+                      }
                     },
                   ),
                 ),
 
-                // Min/Max labels
+                // Min/Max labels with affordability indicators
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 8),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        _blindLevels.first['label'] as String,
+                        BlindLevels.all.first.label,
                         style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.3),
+                          color:
+                              _canAfford(0) ? Colors.white.withValues(alpha: 0.3) : Colors.red.withValues(alpha: 0.3),
                           fontSize: 12,
                         ),
                       ),
                       Text(
-                        _blindLevels.last['label'] as String,
+                        maxAffordableIndex < BlindLevels.all.length - 1
+                            ? 'Max: ${BlindLevels.all[maxAffordableIndex].label}'
+                            : BlindLevels.all.last.label,
                         style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.3),
+                          color: maxAffordableIndex < BlindLevels.all.length - 1
+                              ? Colors.amber.withValues(alpha: 0.5)
+                              : Colors.white.withValues(alpha: 0.3),
                           fontSize: 12,
                         ),
                       ),
@@ -410,14 +432,14 @@ class _QuickPlayScreenState extends State<QuickPlayScreen> {
 
                 const Spacer(flex: 2),
 
-                // Play button
+                // Play button - disabled if can't afford
                 GestureDetector(
-                  onTap: _isLoading ? null : _startGame,
+                  onTap: (_isLoading || !canAffordSelected) ? null : _startGame,
                   child: Container(
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(vertical: 20),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: canAffordSelected ? Colors.white : Colors.white.withValues(alpha: 0.3),
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Center(
@@ -430,11 +452,11 @@ class _QuickPlayScreenState extends State<QuickPlayScreen> {
                                 color: Color(0xFF0A0A0A),
                               ),
                             )
-                          : const Text(
-                              'PLAY',
+                          : Text(
+                              canAffordSelected ? 'PLAY' : 'NOT ENOUGH CHIPS',
                               style: TextStyle(
-                                color: Color(0xFF0A0A0A),
-                                fontSize: 18,
+                                color: const Color(0xFF0A0A0A),
+                                fontSize: canAffordSelected ? 18 : 14,
                                 fontWeight: FontWeight.w700,
                                 letterSpacing: 2,
                               ),
@@ -445,27 +467,41 @@ class _QuickPlayScreenState extends State<QuickPlayScreen> {
 
                 const SizedBox(height: 12),
 
-                // Test with bots button
+                // Test with bots button - also disabled if can't afford
                 GestureDetector(
-                  onTap: _isLoading ? null : _startGameWithBots,
+                  onTap: (_isLoading || !canAffordSelected) ? null : _startGameWithBots,
                   child: Container(
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.08),
+                      color: canAffordSelected
+                          ? Colors.white.withValues(alpha: 0.08)
+                          : Colors.white.withValues(alpha: 0.03),
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                      border: Border.all(
+                        color: canAffordSelected
+                            ? Colors.white.withValues(alpha: 0.1)
+                            : Colors.white.withValues(alpha: 0.05),
+                      ),
                     ),
                     child: Center(
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.smart_toy, color: Colors.white.withValues(alpha: 0.6), size: 18),
+                          Icon(
+                            Icons.smart_toy,
+                            color: canAffordSelected
+                                ? Colors.white.withValues(alpha: 0.6)
+                                : Colors.white.withValues(alpha: 0.2),
+                            size: 18,
+                          ),
                           const SizedBox(width: 8),
                           Text(
                             'TEST WITH 2 BOTS',
                             style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.7),
+                              color: canAffordSelected
+                                  ? Colors.white.withValues(alpha: 0.7)
+                                  : Colors.white.withValues(alpha: 0.3),
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
                               letterSpacing: 1,

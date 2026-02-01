@@ -3,11 +3,13 @@ import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'firebase_options.dart';
 import 'config/theme.dart';
 import 'config/routes.dart';
 import 'providers/app_state.dart';
 import 'services/user_preferences.dart';
+import 'services/currency_service.dart';
 import 'services/user_service.dart';
 import 'screens/home_screen.dart';
 
@@ -22,6 +24,11 @@ void main() async {
   }
 
   await UserPreferences.init();
+
+  // Initialize CurrencyService with SharedPreferences
+  final prefs = await SharedPreferences.getInstance();
+  await CurrencyService.init(prefs);
+
   runApp(const MyApp());
 }
 

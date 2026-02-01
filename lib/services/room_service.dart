@@ -413,6 +413,46 @@ class RoomService {
     } else {
       final newHostId = room.hostId == userId ? updatedPlayers.first.uid : room.hostId;
 
+      // CRITICAL: If game is in progress and only 1 player remains, they win!
+      if (room.status == RoomStatus.playing && updatedPlayers.length == 1) {
+        final winner = updatedPlayers.first;
+        final winnerWithPot = GamePlayer(
+          uid: winner.uid,
+          username: winner.username,
+          chips: winner.chips + room.pot,
+          cards: winner.cards,
+          hasFolded: winner.hasFolded,
+          hasActed: winner.hasActed,
+          currentBet: winner.currentBet,
+          totalContributed: winner.totalContributed,
+          isReady: winner.isReady,
+          lastActiveAt: winner.lastActiveAt,
+          lastAction: winner.lastAction,
+          avatarEmoji: winner.avatarEmoji,
+        );
+
+        print('🏆 Player left mid-game! Awarding pot (${room.pot}) to ${winner.username}');
+
+        final patchResponse = await http.patch(
+          Uri.parse('$databaseUrl/game_rooms/$roomId.json?auth=$token'),
+          headers: _jsonHeaders,
+          body: jsonEncode({
+            'players': [winnerWithPot.toJson()],
+            'hostId': newHostId,
+            'status': RoomStatus.finished,
+            'phase': 'showdown',
+            'pot': 0,
+            'winnerId': winner.uid,
+            'winningHandName': 'Opponent Left',
+            'lastActivityAt': DateTime.now().millisecondsSinceEpoch,
+          }),
+        );
+        if (patchResponse.statusCode != 200) {
+          print('⚠️ Failed to award pot to remaining player');
+        }
+        return;
+      }
+
       final patchResponse = await http.patch(
         Uri.parse('$databaseUrl/game_rooms/$roomId.json?auth=$token'),
         headers: _jsonHeaders,
@@ -698,6 +738,46 @@ class RoomService {
         }
       } else {
         final newHostId = activePlayers.any((p) => p.uid == room.hostId) ? room.hostId : activePlayers.first.uid;
+
+        // CRITICAL: If game is in progress and only 1 active player remains, they win!
+        if (room.status == RoomStatus.playing && activePlayers.length == 1) {
+          final winner = activePlayers.first;
+          final winnerWithPot = GamePlayer(
+            uid: winner.uid,
+            username: winner.username,
+            chips: winner.chips + room.pot,
+            cards: winner.cards,
+            hasFolded: winner.hasFolded,
+            hasActed: winner.hasActed,
+            currentBet: winner.currentBet,
+            totalContributed: winner.totalContributed,
+            isReady: winner.isReady,
+            lastActiveAt: winner.lastActiveAt,
+            lastAction: winner.lastAction,
+            avatarEmoji: winner.avatarEmoji,
+          );
+
+          print('🏆 Opponent disconnected! Awarding pot (${room.pot}) to ${winner.username}');
+
+          final patchResponse = await http.patch(
+            Uri.parse('$databaseUrl/game_rooms/$roomId.json?auth=$token'),
+            headers: _jsonHeaders,
+            body: jsonEncode({
+              'players': [winnerWithPot.toJson()],
+              'hostId': newHostId,
+              'status': RoomStatus.finished,
+              'phase': 'showdown',
+              'pot': 0,
+              'winnerId': winner.uid,
+              'winningHandName': 'Opponent Disconnected',
+              'lastActivityAt': DateTime.now().millisecondsSinceEpoch,
+            }),
+          );
+          if (patchResponse.statusCode != 200) {
+            print('⚠️ Failed to award pot to remaining player');
+          }
+          return;
+        }
 
         final patchResponse = await http.patch(
           Uri.parse('$databaseUrl/game_rooms/$roomId.json?auth=$token'),
