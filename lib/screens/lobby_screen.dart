@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import '../services/game_service.dart';
+import '../services/sit_and_go_service.dart';
 import '../widgets/mobile_wrapper.dart';
 import 'multiplayer_game_screen.dart';
 import 'sit_and_go_waiting_screen.dart';
@@ -53,6 +54,7 @@ class LobbyScreen extends StatefulWidget {
 class _LobbyScreenState extends State<LobbyScreen> {
   final AuthService _authService = AuthService();
   final GameService _gameService = GameService();
+  final SitAndGoService _sitAndGoService = SitAndGoService();
   final TextEditingController _roomCodeController = TextEditingController();
 
   bool _isLoading = false;
@@ -213,35 +215,15 @@ class _LobbyScreenState extends State<LobbyScreen> {
     });
 
     try {
-      // IMPORTANT: Leave any rooms we're currently in before joining a new one
-      await _gameService.leaveAllRooms();
+      // Use dedicated Sit & Go service for matchmaking
+      final actualBuyIn = buyIn.buyIn > 0 ? buyIn.buyIn : 100;
+      final startingChips = buyIn.prizePool ~/ 2;
 
-      final rooms = await _gameService.fetchAvailableSitAndGoRooms();
-
-      // Filter for rooms at this buy-in level
-      final matchingRooms =
-          rooms.where((r) => r.bigBlind == buyIn.buyIn || (buyIn.buyIn == 0 && r.bigBlind == 100)).toList();
-
-      // Prioritize rooms that already have players (fill existing lobbies first)
-      final nonEmptyRooms = matchingRooms.where((r) => r.players.isNotEmpty).toList();
-      nonEmptyRooms.sort((a, b) => b.players.length.compareTo(a.players.length));
-
-      final roomToJoin =
-          nonEmptyRooms.isNotEmpty ? nonEmptyRooms.first : (matchingRooms.isNotEmpty ? matchingRooms.first : null);
-
-      String roomId;
-      if (roomToJoin != null) {
-        print('🎰 Joining Sit & Go room ${roomToJoin.id} (${roomToJoin.players.length}/6 players)');
-        await _gameService.joinRoom(roomToJoin.id, startingChips: buyIn.prizePool ~/ 2);
-        roomId = roomToJoin.id;
-      } else {
-        print('🎰 Creating new Sit & Go room');
-        final room = await _gameService.createSitAndGoRoom(
-          bigBlind: buyIn.buyIn > 0 ? buyIn.buyIn : 100,
-          startingChips: buyIn.prizePool ~/ 2,
-        );
-        roomId = room.id;
-      }
+      final roomId = await _sitAndGoService.joinSitAndGo(
+        buyIn: actualBuyIn,
+        startingChips: startingChips,
+        maxPlayers: 6,
+      );
 
       if (mounted) {
         Navigator.push(
@@ -249,7 +231,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
           MaterialPageRoute(
             builder: (context) => SitAndGoWaitingScreen(
               roomId: roomId,
-              buyIn: buyIn.buyIn > 0 ? buyIn.buyIn : 100,
+              buyIn: actualBuyIn,
               requiredPlayers: 6,
             ),
           ),

@@ -299,97 +299,121 @@ class RoomService {
     return room;
   }
 
-  /// Join an existing room
+  /// Join an existing room with retry logic to handle race conditions
   Future<void> joinRoom(String roomId, {int? startingChips}) async {
     final userId = currentUserId;
     if (userId == null) throw Exception('Must be logged in to join a room');
 
     final token = await getAuthToken();
 
-    final response = await http.get(Uri.parse('$databaseUrl/game_rooms/$roomId.json?auth=$token'));
+    // Retry up to 5 times to handle race conditions where multiple players
+    // try to join simultaneously and overwrite each other's updates
+    const maxRetries = 5;
+    for (int attempt = 0; attempt < maxRetries; attempt++) {
+      final response = await http.get(Uri.parse('$databaseUrl/game_rooms/$roomId.json?auth=$token'));
 
-    if (response.statusCode != 200 || response.body == 'null') {
-      throw Exception('Room not found');
-    }
-
-    final roomData = jsonDecode(response.body) as Map<String, dynamic>;
-    final room = GameRoom.fromJson(roomData, roomId);
-
-    if (room.isFull) throw Exception('Room is full');
-
-    bool isJoinable;
-    if (room.gameType == 'quickplay') {
-      isJoinable = room.status == RoomStatus.waiting || room.status == RoomStatus.playing;
-    } else {
-      isJoinable = room.status == RoomStatus.waiting ||
-          (room.status == RoomStatus.playing && room.phase == 'waiting_for_players');
-    }
-    if (!isJoinable) throw Exception('Game already in progress');
-
-    // Check if player is already in the room
-    final existingPlayerIndex = room.players.indexWhere((p) => p.uid == userId);
-    if (existingPlayerIndex != -1) {
-      // If room is in 'waiting' status, reset player's stale state
-      if (room.status == RoomStatus.waiting) {
-        final existingPlayer = room.players[existingPlayerIndex];
-        final resetPlayer = existingPlayer.copyWith(
-          hasFolded: false,
-          hasActed: false,
-          currentBet: 0,
-          totalContributed: 0,
-          cards: [],
-          lastAction: null,
-          lastActiveAt: DateTime.now(),
-        );
-
-        final updatedPlayers = List<GamePlayer>.from(room.players);
-        updatedPlayers[existingPlayerIndex] = resetPlayer;
-
-        final patchResponse = await http.patch(
-          Uri.parse('$databaseUrl/game_rooms/$roomId.json?auth=$token'),
-          headers: _jsonHeaders,
-          body: jsonEncode({
-            'players': updatedPlayers.map((p) => p.toJson()).toList(),
-            'lastActivityAt': DateTime.now().millisecondsSinceEpoch,
-          }),
-        );
-        if (patchResponse.statusCode != 200) {
-          print('⚠️ Failed to reset player state');
-        }
+      if (response.statusCode != 200 || response.body == 'null') {
+        throw Exception('Room not found');
       }
-      return;
+
+      final roomData = jsonDecode(response.body) as Map<String, dynamic>;
+      final room = GameRoom.fromJson(roomData, roomId);
+
+      if (room.isFull) throw Exception('Room is full');
+
+      bool isJoinable;
+      if (room.gameType == 'quickplay') {
+        isJoinable = room.status == RoomStatus.waiting || room.status == RoomStatus.playing;
+      } else {
+        isJoinable = room.status == RoomStatus.waiting ||
+            (room.status == RoomStatus.playing && room.phase == 'waiting_for_players');
+      }
+      if (!isJoinable) throw Exception('Game already in progress');
+
+      // Check if player is already in the room
+      final existingPlayerIndex = room.players.indexWhere((p) => p.uid == userId);
+      if (existingPlayerIndex != -1) {
+        // If room is in 'waiting' status, reset player's stale state
+        if (room.status == RoomStatus.waiting) {
+          final existingPlayer = room.players[existingPlayerIndex];
+          final resetPlayer = existingPlayer.copyWith(
+            hasFolded: false,
+            hasActed: false,
+            currentBet: 0,
+            totalContributed: 0,
+            cards: [],
+            lastAction: null,
+            lastActiveAt: DateTime.now(),
+          );
+
+          final updatedPlayers = List<GamePlayer>.from(room.players);
+          updatedPlayers[existingPlayerIndex] = resetPlayer;
+
+          final patchResponse = await http.patch(
+            Uri.parse('$databaseUrl/game_rooms/$roomId.json?auth=$token'),
+            headers: _jsonHeaders,
+            body: jsonEncode({
+              'players': updatedPlayers.map((p) => p.toJson()).toList(),
+              'lastActivityAt': DateTime.now().millisecondsSinceEpoch,
+            }),
+          );
+          if (patchResponse.statusCode != 200) {
+            print('⚠️ Failed to reset player state');
+          }
+        }
+        return; // Already in room, success
+      }
+
+      // Use room's default chips or first player's chips as fallback
+      final defaultChips = (roomData['defaultChips'] as int?) ?? room.players.first.chips;
+      final chips = startingChips ?? defaultChips;
+      final isJoiningMidGame = room.status == RoomStatus.playing && room.phase != 'waiting_for_players';
+
+      final newPlayer = GamePlayer(
+        uid: userId,
+        displayName: currentUserName,
+        chips: chips,
+        isReady: true,
+        hasFolded: isJoiningMidGame,
+        lastActiveAt: DateTime.now(),
+      );
+
+      final updatedPlayers = [...room.players, newPlayer];
+
+      final patchResponse = await http.patch(
+        Uri.parse('$databaseUrl/game_rooms/$roomId.json?auth=$token'),
+        headers: _jsonHeaders,
+        body: jsonEncode({
+          'players': updatedPlayers.map((p) => p.toJson()).toList(),
+          'lastActivityAt': DateTime.now().millisecondsSinceEpoch,
+        }),
+      );
+
+      if (patchResponse.statusCode != 200) {
+        throw Exception('Failed to join room');
+      }
+
+      // Verify the join was successful by re-reading the room
+      await Future.delayed(const Duration(milliseconds: 100));
+      final verifyResponse = await http.get(Uri.parse('$databaseUrl/game_rooms/$roomId.json?auth=$token'));
+
+      if (verifyResponse.statusCode == 200 && verifyResponse.body != 'null') {
+        final verifyData = jsonDecode(verifyResponse.body) as Map<String, dynamic>;
+        final verifyRoom = GameRoom.fromJson(verifyData, roomId);
+
+        if (verifyRoom.players.any((p) => p.uid == userId)) {
+          print('✅ Joined room $roomId (${verifyRoom.players.length} players)');
+          return; // Success!
+        }
+
+        // We're not in the room - our update was overwritten by another player
+        print('⚠️ Join attempt $attempt failed (race condition), retrying...');
+        await Future.delayed(Duration(milliseconds: 50 + (attempt * 100)));
+        continue;
+      }
     }
 
-    // Use room's default chips or first player's chips as fallback
-    final defaultChips = (roomData['defaultChips'] as int?) ?? room.players.first.chips;
-    final chips = startingChips ?? defaultChips;
-    final isJoiningMidGame = room.status == RoomStatus.playing && room.phase != 'waiting_for_players';
-
-    final newPlayer = GamePlayer(
-      uid: userId,
-      displayName: currentUserName,
-      chips: chips,
-      isReady: true,
-      hasFolded: isJoiningMidGame,
-      lastActiveAt: DateTime.now(),
-    );
-
-    final updatedPlayers = [...room.players, newPlayer];
-
-    final patchResponse = await http.patch(
-      Uri.parse('$databaseUrl/game_rooms/$roomId.json?auth=$token'),
-      headers: _jsonHeaders,
-      body: jsonEncode({
-        'players': updatedPlayers.map((p) => p.toJson()).toList(),
-        'lastActivityAt': DateTime.now().millisecondsSinceEpoch,
-      }),
-    );
-
-    if (patchResponse.statusCode != 200) {
-      throw Exception('Failed to join room');
-    }
-
-    print('✅ Joined room $roomId (${updatedPlayers.length} players)');
+    throw Exception('Failed to join room after $maxRetries attempts (race condition)');
   }
 
   /// Leave a room
