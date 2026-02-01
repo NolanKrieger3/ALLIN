@@ -154,8 +154,18 @@ class GameService {
     print('ROOM PLAYERS: ${room.players.map((p) => "${p.displayName} (${p.uid})").join(", ")}');
 
     if (room.isFull) throw Exception('Room is full');
-    // Allow joining rooms that are 'waiting' OR 'playing' with 'waiting_for_players' phase
-    final isJoinable = room.status == 'waiting' || (room.status == 'playing' && room.phase == 'waiting_for_players');
+
+    // Determine if room is joinable based on game type
+    // Quick Play (cash game): can join any time as long as room isn't full or finished
+    // Sit & Go (tournament): can only join during waiting phase
+    bool isJoinable;
+    if (room.gameType == 'quickplay') {
+      // Quick Play: allow joining waiting or playing rooms (not finished)
+      isJoinable = room.status == 'waiting' || room.status == 'playing';
+    } else {
+      // Other game types: only join waiting rooms or playing with waiting_for_players phase
+      isJoinable = room.status == 'waiting' || (room.status == 'playing' && room.phase == 'waiting_for_players');
+    }
     if (!isJoinable) throw Exception('Game already in progress');
     if (room.players.any((p) => p.uid == userId)) {
       print('ALREADY IN ROOM: User $userId is already a player');
@@ -165,6 +175,9 @@ class GameService {
     // Use provided chips or match the host's chips
     final chips = startingChips ?? room.players.first.chips;
 
+    // If joining a game already in progress, mark as folded so they wait for next hand
+    final isJoiningMidGame = room.status == 'playing' && room.phase != 'waiting_for_players';
+
     // Auto-ready the player so game can start immediately when matched
     // Include lastActiveAt for heartbeat tracking
     final newPlayer = GamePlayer(
@@ -172,9 +185,11 @@ class GameService {
       displayName: currentUserName,
       chips: chips,
       isReady: true,
+      hasFolded: isJoiningMidGame, // Folded if joining mid-game (will play next hand)
       lastActiveAt: DateTime.now(),
     );
-    print('ADDING PLAYER: ${newPlayer.displayName} (${newPlayer.uid}) with $chips chips - auto-ready');
+    print(
+        'ADDING PLAYER: ${newPlayer.displayName} (${newPlayer.uid}) with $chips chips - auto-ready${isJoiningMidGame ? ", waiting for next hand" : ""}');
 
     final updatedPlayers = [...room.players, newPlayer];
 
@@ -460,16 +475,24 @@ class GameService {
     // - Not full
     // - Not private
     // - User not already in room
-    // - Either waiting OR playing with phase='waiting_for_players'
-    // - For sit and go: join any room that isn't full
-    // - For quickplay (heads-up): only join rooms with exactly 1 player
+    // - For sit and go: only join rooms in 'waiting' status (can't join mid-tournament)
+    // - For quickplay: can join any room that isn't full (drop-in cash game style)
     final joinableRooms = allRooms.where((room) {
       final isCorrectBlind = room.bigBlind == bigBlind;
       final isCorrectGameType = room.gameType == gameType;
       final isNotFull = !room.isFull;
       final isNotPrivate = !room.isPrivate;
       final userNotInRoom = !room.players.any((p) => p.uid == userId);
-      final isJoinable = room.status == 'waiting' || (room.status == 'playing' && room.phase == 'waiting_for_players');
+
+      // For sit and go: only join rooms that are waiting (tournament can't have drop-ins)
+      // For quickplay: allow joining any non-finished room (cash game drop-in style)
+      bool isJoinable;
+      if (gameType.startsWith('sitandgo')) {
+        isJoinable = room.status == 'waiting';
+      } else {
+        // Quick Play: allow joining waiting OR playing rooms (not finished)
+        isJoinable = room.status == 'waiting' || room.status == 'playing';
+      }
 
       // For sit and go: join any room that isn't full (up to maxPlayers)
       // For quickplay: join any active game unless it has 6 players (full lobby)
@@ -483,7 +506,7 @@ class GameService {
       }
 
       print(
-          '🔍 Room ${room.id}: blind=${room.bigBlind}, gameType=${room.gameType}, status=${room.status}, players=${room.players.length}, hasSpace=$hasSpace, userNotInRoom=$userNotInRoom');
+          '🔍 Room ${room.id}: blind=${room.bigBlind}, gameType=${room.gameType}, status=${room.status}, players=${room.players.length}, hasSpace=$hasSpace, userNotInRoom=$userNotInRoom, isJoinable=$isJoinable');
 
       return isCorrectBlind &&
           isCorrectGameType &&

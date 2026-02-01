@@ -92,7 +92,12 @@ class _QuickPlayScreenState extends State<QuickPlayScreen> {
       // If no room found after retries, create a new one
       if (roomId == null) {
         print('📦 No joinable rooms found, creating new room');
-        final room = await _gameService.createRoom(bigBlind: bigBlind, startingChips: buyIn, gameType: 'quickplay');
+        final room = await _gameService.createRoom(
+          bigBlind: bigBlind,
+          startingChips: buyIn,
+          gameType: 'quickplay',
+          maxPlayers: 6, // Allow up to 6 players in Quick Play lobbies
+        );
         roomId = room.id;
         print('✅ Created room ${room.id}');
       }

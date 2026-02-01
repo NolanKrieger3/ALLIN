@@ -2135,28 +2135,46 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildPlayerCards({bool isDimmed = false}) {
-    return Row(
-      children: [
-        if (_playerCards.isNotEmpty) _buildMinimalCard(_playerCards[0], isLarge: true, isDimmed: isDimmed),
-        if (_playerCards.length > 1)
-          Transform.translate(
-            offset: const Offset(-20, 0),
-            child: _buildMinimalCard(_playerCards[1], isLarge: true, isDimmed: isDimmed),
-          ),
-      ],
+    // Use SizedBox with Stack for proper overlap without overflow
+    const cardWidth = 70.0;
+    const overlap = 20.0;
+    final totalWidth = _playerCards.length > 1 ? (cardWidth * 2 - overlap) : cardWidth;
+
+    return SizedBox(
+      width: totalWidth,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          if (_playerCards.isNotEmpty) _buildMinimalCard(_playerCards[0], isLarge: true, isDimmed: isDimmed),
+          if (_playerCards.length > 1)
+            Positioned(
+              left: cardWidth - overlap,
+              child: _buildMinimalCard(_playerCards[1], isLarge: true, isDimmed: isDimmed),
+            ),
+        ],
+      ),
     );
   }
 
   Widget _buildPlayerCardsLarge({bool isDimmed = false}) {
-    return Row(
-      children: [
-        if (_playerCards.isNotEmpty) _buildLargeCard(_playerCards[0], isDimmed: isDimmed),
-        if (_playerCards.length > 1)
-          Transform.translate(
-            offset: const Offset(-15, 0),
-            child: _buildLargeCard(_playerCards[1], isDimmed: isDimmed),
-          ),
-      ],
+    // Use SizedBox with Stack for proper overlap without overflow
+    const cardWidth = 90.0;
+    const overlap = 15.0;
+    final totalWidth = _playerCards.length > 1 ? (cardWidth * 2 - overlap) : cardWidth;
+
+    return SizedBox(
+      width: totalWidth,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          if (_playerCards.isNotEmpty) _buildLargeCard(_playerCards[0], isDimmed: isDimmed),
+          if (_playerCards.length > 1)
+            Positioned(
+              left: cardWidth - overlap,
+              child: _buildLargeCard(_playerCards[1], isDimmed: isDimmed),
+            ),
+        ],
+      ),
     );
   }
 
