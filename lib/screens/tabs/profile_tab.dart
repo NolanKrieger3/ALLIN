@@ -24,6 +24,8 @@ class ProfileTabState extends State<ProfileTab> {
   bool _statisticsExpanded = false;
   bool _referralExpanded = false;
   bool _straightPlusExpanded = false;
+  bool _showMMRGraph = false;
+  String _graphTimeRange = '7D';
   final FriendsService _friendsService = FriendsService();
   StreamSubscription? _friendsSub;
   StreamSubscription? _authSub;
@@ -1080,95 +1082,134 @@ class ProfileTabState extends State<ProfileTab> {
                     ),
                     const SizedBox(height: 16),
 
-                    // Chip Balance Graph - Premium Look
+                    // Graph Card with Toggle
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            Colors.white.withValues(alpha: 0.05),
-                            Colors.white.withValues(alpha: 0.02),
-                          ],
-                        ),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                        color: Colors.white.withValues(alpha: 0.03),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          // Header with toggle and dropdown
                           Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Chip Balance',
-                                    style: TextStyle(
-                                      color: Colors.white.withValues(alpha: 0.5),
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Row(
-                                    crossAxisAlignment: CrossAxisAlignment.end,
-                                    children: [
-                                      const Text(
-                                        '2.4M',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 28,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              // Graph type toggle
+                              Container(
+                                padding: const EdgeInsets.all(2),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.05),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    GestureDetector(
+                                      onTap: () => setState(() => _showMMRGraph = false),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                                         decoration: BoxDecoration(
-                                          color: const Color(0xFF10B981).withValues(alpha: 0.15),
-                                          borderRadius: BorderRadius.circular(4),
+                                          color: !_showMMRGraph ? const Color(0xFF6366F1) : Colors.transparent,
+                                          borderRadius: BorderRadius.circular(6),
                                         ),
-                                        child: Row(
-                                          children: [
-                                            Icon(Icons.arrow_upward, size: 10, color: const Color(0xFF10B981)),
-                                            const SizedBox(width: 2),
-                                            const Text(
-                                              '+340K',
-                                              style: TextStyle(
-                                                color: Color(0xFF10B981),
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                            ),
-                                          ],
+                                        child: Text(
+                                          'Chips',
+                                          style: TextStyle(
+                                            color: !_showMMRGraph ? Colors.white : Colors.white.withValues(alpha: 0.5),
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w500,
+                                          ),
                                         ),
                                       ),
-                                    ],
-                                  ),
-                                ],
+                                    ),
+                                    GestureDetector(
+                                      onTap: () => setState(() => _showMMRGraph = true),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                        decoration: BoxDecoration(
+                                          color: _showMMRGraph ? const Color(0xFFFFBB00) : Colors.transparent,
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: Text(
+                                          'MMR',
+                                          style: TextStyle(
+                                            color: _showMMRGraph ? Colors.white : Colors.white.withValues(alpha: 0.5),
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
+                              const Spacer(),
                               _buildTimeRangeSelector(),
                             ],
                           ),
+                          const SizedBox(height: 16),
+                          // Value display
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                _showMMRGraph ? '1,247' : '2.4M',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 28,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.arrow_upward, size: 10, color: Color(0xFF10B981)),
+                                    const SizedBox(width: 2),
+                                    Text(
+                                      _showMMRGraph ? '+47' : '+340K',
+                                      style: const TextStyle(
+                                        color: Color(0xFF10B981),
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                _showMMRGraph ? 'Ranked Rating' : 'Chip Balance',
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.4),
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ],
+                          ),
                           const SizedBox(height: 20),
-                          // Smooth animated graph
+                          // Graph
                           SizedBox(
                             height: 140,
                             child: CustomPaint(
                               size: const Size(double.infinity, 140),
-                              painter: AdvancedChipGraphPainter(),
+                              painter: _showMMRGraph ? MMRGraphPainter() : AdvancedChipGraphPainter(),
                             ),
                           ),
                           const SizedBox(height: 12),
                           // X-axis labels
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-                                .map((day) => Text(
-                                      day,
+                            children: _getXAxisLabels()
+                                .map((label) => Text(
+                                      label,
                                       style: TextStyle(
                                         color: Colors.white.withValues(alpha: 0.3),
                                         fontSize: 10,
@@ -2192,60 +2233,37 @@ class ProfileTabState extends State<ProfileTab> {
   }
 
   void _showBattlePassDialog(BuildContext context) {
-    showModalBottomSheet(
+    showDialog(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.9,
-        minChildSize: 0.5,
-        maxChildSize: 0.95,
-        builder: (context, scrollController) => Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [Color(0xFF1E1E2E), Color(0xFF0D0D0D)],
-            ),
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(24),
-              topRight: Radius.circular(24),
-            ),
+      barrierColor: Colors.black.withValues(alpha: 0.85),
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 420, maxHeight: 600),
+          decoration: BoxDecoration(
+            color: const Color(0xFF141414),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
           ),
           child: Column(
             children: [
-              // Handle bar
-              Container(
-                margin: const EdgeInsets.only(top: 12),
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-
               // Header
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  border: Border(bottom: BorderSide(color: Colors.white.withValues(alpha: 0.06))),
+                ),
                 child: Row(
                   children: [
                     Container(
-                      width: 50,
-                      height: 50,
+                      width: 44,
+                      height: 44,
                       decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFFD4AF37), Color(0xFFB8860B)],
-                        ),
-                        borderRadius: BorderRadius.circular(14),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFFD4AF37).withValues(alpha: 0.4),
-                            blurRadius: 12,
-                          ),
-                        ],
+                        color: const Color(0xFF7C3AED).withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                      child: const Center(child: Icon(Icons.casino, color: Colors.white, size: 28)),
+                      child: const Center(child: Icon(Icons.workspace_premium, color: Color(0xFF7C3AED), size: 24)),
                     ),
                     const SizedBox(width: 14),
                     Expanded(
@@ -2255,12 +2273,11 @@ class ProfileTabState extends State<ProfileTab> {
                           Row(
                             children: [
                               const Text(
-                                'ALLIN PRO',
+                                'Pro Pass',
                                 style: TextStyle(
-                                  color: Color(0xFFD4AF37),
+                                  color: Colors.white,
                                   fontSize: 18,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: 1,
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
                               const SizedBox(width: 8),
@@ -2268,18 +2285,18 @@ class ProfileTabState extends State<ProfileTab> {
                                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                 decoration: BoxDecoration(
                                   color: UserPreferences.hasProPass
-                                      ? const Color(0xFF10B981).withValues(alpha: 0.2)
-                                      : Colors.white.withValues(alpha: 0.1),
+                                      ? const Color(0xFF22C55E).withValues(alpha: 0.15)
+                                      : Colors.white.withValues(alpha: 0.08),
                                   borderRadius: BorderRadius.circular(4),
                                 ),
                                 child: Text(
                                   UserPreferences.hasProPass ? 'ACTIVE' : 'FREE',
                                   style: TextStyle(
                                     color: UserPreferences.hasProPass
-                                        ? const Color(0xFF10B981)
+                                        ? const Color(0xFF22C55E)
                                         : Colors.white.withValues(alpha: 0.5),
                                     fontSize: 9,
-                                    fontWeight: FontWeight.w700,
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
                               ),
@@ -2287,44 +2304,48 @@ class ProfileTabState extends State<ProfileTab> {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            UserPreferences.hasProPass ? 'Exclusive benefits & rewards' : 'Upgrade for premium rewards',
-                            style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12),
+                            'Exclusive benefits & rewards',
+                            style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 12),
                           ),
                         ],
                       ),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(10),
+                        color: Colors.white.withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(8),
                       ),
                       child: Column(
                         children: [
                           const Text(
                             '28',
-                            style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700),
+                            style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600),
                           ),
                           Text(
-                            'DAYS LEFT',
-                            style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 8),
+                            'days left',
+                            style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 9),
                           ),
                         ],
                       ),
+                    ),
+                    const SizedBox(width: 8),
+                    GestureDetector(
+                      onTap: () => Navigator.pop(context),
+                      child: Icon(Icons.close, color: Colors.white.withValues(alpha: 0.4), size: 22),
                     ),
                   ],
                 ),
               ),
 
-              // XP Progress - Connected to real data
+              // XP Progress
               Padding(
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.all(16),
                 child: Container(
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.05),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                    color: Colors.white.withValues(alpha: 0.03),
+                    borderRadius: BorderRadius.circular(12),
                   ),
                   child: Column(
                     children: [
@@ -2334,18 +2355,16 @@ class ProfileTabState extends State<ProfileTab> {
                           Row(
                             children: [
                               Container(
-                                width: 40,
-                                height: 40,
+                                width: 36,
+                                height: 36,
                                 decoration: BoxDecoration(
-                                  gradient: const LinearGradient(
-                                    colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
-                                  ),
-                                  borderRadius: BorderRadius.circular(10),
+                                  color: const Color(0xFF7C3AED).withValues(alpha: 0.2),
+                                  borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Center(
                                   child: Text('${UserPreferences.proPassTier}',
                                       style: const TextStyle(
-                                          color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700)),
+                                          color: Color(0xFF7C3AED), fontSize: 16, fontWeight: FontWeight.w700)),
                                 ),
                               ),
                               const SizedBox(width: 12),
@@ -2357,80 +2376,50 @@ class ProfileTabState extends State<ProfileTab> {
                                           color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
                                   Text(
                                       '${UserPreferences.proPassXp} / ${UserPreferences.xpForTier(UserPreferences.proPassTier)} XP',
-                                      style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 11)),
+                                      style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 11)),
                                 ],
                               ),
                             ],
                           ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF10B981).withValues(alpha: 0.2),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                                '+${UserPreferences.xpForTier(UserPreferences.proPassTier) - UserPreferences.proPassXp} XP to next',
-                                style: const TextStyle(
-                                    color: Color(0xFF10B981), fontSize: 11, fontWeight: FontWeight.w600)),
+                          Text(
+                            '+${UserPreferences.xpForTier(UserPreferences.proPassTier) - UserPreferences.proPassXp} XP to next',
+                            style: const TextStyle(color: Color(0xFF22C55E), fontSize: 11, fontWeight: FontWeight.w500),
                           ),
                         ],
                       ),
                       const SizedBox(height: 12),
-                      Stack(
-                        children: [
-                          Container(
-                            height: 10,
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(5),
-                            ),
-                          ),
-                          FractionallySizedBox(
-                            widthFactor: UserPreferences.xpForTier(UserPreferences.proPassTier) > 0
-                                ? (UserPreferences.proPassXp / UserPreferences.xpForTier(UserPreferences.proPassTier))
-                                    .clamp(0.0, 1.0)
-                                : 0.0,
-                            child: Container(
-                              height: 10,
-                              decoration: BoxDecoration(
-                                gradient: const LinearGradient(
-                                  colors: [Color(0xFF6366F1), Color(0xFF8B5CF6), Color(0xFFD4AF37)],
-                                ),
-                                borderRadius: BorderRadius.circular(5),
-                                boxShadow: [
-                                  BoxShadow(color: const Color(0xFF6366F1).withValues(alpha: 0.5), blurRadius: 8),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(3),
+                        child: LinearProgressIndicator(
+                          value: UserPreferences.xpForTier(UserPreferences.proPassTier) > 0
+                              ? (UserPreferences.proPassXp / UserPreferences.xpForTier(UserPreferences.proPassTier))
+                                  .clamp(0.0, 1.0)
+                              : 0.0,
+                          backgroundColor: Colors.white.withValues(alpha: 0.08),
+                          valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF7C3AED)),
+                          minHeight: 6,
+                        ),
                       ),
                     ],
                   ),
                 ),
               ),
 
-              // Tier Grid - Connected to real tier data
+              // Tier List
               Expanded(
                 child: ListView.builder(
-                  controller: scrollController,
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                   itemCount: 50,
                   itemBuilder: (context, index) {
                     final tier = index + 1;
                     final currentTier = UserPreferences.proPassTier;
                     final isUnlocked = tier <= currentTier;
                     final isCurrent = tier == currentTier;
-                    final isPremiumReward = tier % 5 == 0;
-                    final canClaim = isUnlocked && tier < currentTier;
 
-                    return _buildInteractiveTierRow(
-                      context: context,
+                    return _buildTierRowSimple(
                       tier: tier,
                       isUnlocked: isUnlocked,
                       isCurrent: isCurrent,
-                      isPremiumReward: isPremiumReward,
-                      canClaim: canClaim,
                       freeReward: _getTierFreeReward(tier),
                       premiumReward: _getTierPremiumReward(tier),
                     );
@@ -2438,68 +2427,38 @@ class ProfileTabState extends State<ProfileTab> {
                 ),
               ),
 
-              // Bottom Premium Button
+              // Bottom Button
               Container(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.transparent,
-                      const Color(0xFF0D0D0D).withValues(alpha: 0.9),
-                      const Color(0xFF0D0D0D),
-                    ],
-                  ),
+                  border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.06))),
                 ),
-                child: SafeArea(
-                  child: GestureDetector(
-                    onTap: () {
-                      Navigator.pop(context);
-                      _showPremiumPassDialog(context);
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFFD4AF37), Color(0xFFB8860B)],
+                child: GestureDetector(
+                  onTap: () {
+                    Navigator.pop(context);
+                    _showPremiumPassDialog(context);
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFD4A543),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.workspace_premium, color: Colors.white, size: 20),
+                        const SizedBox(width: 10),
+                        const Text(
+                          'Upgrade to Pro',
+                          style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600),
                         ),
-                        borderRadius: BorderRadius.circular(14),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFFD4AF37).withValues(alpha: 0.4),
-                            blurRadius: 12,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.workspace_premium, color: Color(0xFFFFD700), size: 22),
-                          const SizedBox(width: 10),
-                          const Text(
-                            'Upgrade to Pro',
-                            style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700),
-                          ),
-                          const SizedBox(width: 10),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.2),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.diamond, color: Color(0xFF00D4FF), size: 14),
-                                const SizedBox(width: 4),
-                                const Text('400',
-                                    style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
+                        const SizedBox(width: 10),
+                        const Icon(Icons.diamond, color: Color(0xFF00D4FF), size: 16),
+                        const SizedBox(width: 4),
+                        const Text('400',
+                            style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
+                      ],
                     ),
                   ),
                 ),
@@ -2507,6 +2466,139 @@ class ProfileTabState extends State<ProfileTab> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildTierRowSimple({
+    required int tier,
+    required bool isUnlocked,
+    required bool isCurrent,
+    required Map<String, dynamic> freeReward,
+    required Map<String, dynamic> premiumReward,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: isCurrent ? const Color(0xFF7C3AED).withValues(alpha: 0.1) : Colors.white.withValues(alpha: 0.02),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: isCurrent ? const Color(0xFF7C3AED).withValues(alpha: 0.3) : Colors.white.withValues(alpha: 0.05),
+        ),
+      ),
+      child: Row(
+        children: [
+          // Tier number
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color:
+                  isUnlocked ? const Color(0xFF22C55E).withValues(alpha: 0.15) : Colors.white.withValues(alpha: 0.05),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Center(
+              child: isUnlocked
+                  ? const Icon(Icons.check, color: Color(0xFF22C55E), size: 18)
+                  : Text(
+                      '$tier',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.5),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          // Free reward
+          Expanded(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.03),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Text(freeReward['icon'] as String, style: const TextStyle(fontSize: 18)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          freeReward['name'] as String,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.9),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        Text(
+                          'FREE',
+                          style: TextStyle(
+                            color: const Color(0xFF22C55E).withValues(alpha: 0.8),
+                            fontSize: 9,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          // Premium reward
+          Expanded(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF7C3AED).withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFF7C3AED).withValues(alpha: 0.2)),
+              ),
+              child: Row(
+                children: [
+                  Text(premiumReward['icon'] as String, style: const TextStyle(fontSize: 18)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          premiumReward['name'] as String,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.9),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        Row(
+                          children: [
+                            Icon(Icons.workspace_premium, color: const Color(0xFFD4A543), size: 10),
+                            const SizedBox(width: 2),
+                            Text(
+                              'PREMIUM',
+                              style: TextStyle(
+                                color: const Color(0xFFD4A543).withValues(alpha: 0.9),
+                                fontSize: 9,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -3773,6 +3865,7 @@ class ProfileTabState extends State<ProfileTab> {
 
   Widget _buildHeroStatCard(String value, String label, IconData icon, Color color, String trend) {
     final isPositive = trend.startsWith('+');
+    final hasTrend = trend.isNotEmpty;
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -3794,23 +3887,24 @@ class ProfileTabState extends State<ProfileTab> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Icon(icon, color: color, size: 16),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                decoration: BoxDecoration(
-                  color: isPositive
-                      ? const Color(0xFF10B981).withValues(alpha: 0.2)
-                      : const Color(0xFFEF4444).withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  trend,
-                  style: TextStyle(
-                    color: isPositive ? const Color(0xFF10B981) : const Color(0xFFEF4444),
-                    fontSize: 9,
-                    fontWeight: FontWeight.w600,
+              if (hasTrend)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: isPositive
+                        ? const Color(0xFF10B981).withValues(alpha: 0.2)
+                        : const Color(0xFFEF4444).withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    trend,
+                    style: TextStyle(
+                      color: isPositive ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                      fontSize: 9,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
-              ),
             ],
           ),
           const SizedBox(height: 8),
@@ -3837,39 +3931,97 @@ class ProfileTabState extends State<ProfileTab> {
   }
 
   Widget _buildTimeRangeSelector() {
-    return Container(
-      padding: const EdgeInsets.all(2),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(8),
+    return PopupMenuButton<String>(
+      onSelected: (value) => setState(() => _graphTimeRange = value),
+      offset: const Offset(0, 36),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      color: const Color(0xFF1E1E1E),
+      itemBuilder: (context) => [
+        _buildTimeMenuItem('7D', 'Last 7 Days'),
+        _buildTimeMenuItem('1M', 'Last Month'),
+        _buildTimeMenuItem('6M', 'Last 6 Months'),
+        _buildTimeMenuItem('1Y', 'Last Year'),
+        _buildTimeMenuItem('ALL', 'All Time'),
+      ],
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              _getTimeRangeLabel(_graphTimeRange),
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.7),
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(Icons.keyboard_arrow_down, color: Colors.white.withValues(alpha: 0.5), size: 16),
+          ],
+        ),
       ),
+    );
+  }
+
+  PopupMenuItem<String> _buildTimeMenuItem(String value, String label) {
+    final isSelected = _graphTimeRange == value;
+    return PopupMenuItem<String>(
+      value: value,
       child: Row(
-        mainAxisSize: MainAxisSize.min,
         children: [
-          _buildTimeButton('7D', true),
-          _buildTimeButton('1M', false),
-          _buildTimeButton('ALL', false),
+          if (isSelected) const Icon(Icons.check, color: Color(0xFF6366F1), size: 16) else const SizedBox(width: 16),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: TextStyle(
+              color: isSelected ? const Color(0xFF6366F1) : Colors.white.withValues(alpha: 0.8),
+              fontSize: 13,
+              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildTimeButton(String label, bool isSelected) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: isSelected ? const Color(0xFF6366F1) : Colors.transparent,
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.4),
-          fontSize: 10,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
+  String _getTimeRangeLabel(String value) {
+    switch (value) {
+      case '7D':
+        return 'Last 7 Days';
+      case '1M':
+        return 'Last Month';
+      case '6M':
+        return 'Last 6 Months';
+      case '1Y':
+        return 'Last Year';
+      case 'ALL':
+        return 'All Time';
+      default:
+        return 'Last 7 Days';
+    }
+  }
+
+  List<String> _getXAxisLabels() {
+    switch (_graphTimeRange) {
+      case '7D':
+        return ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      case '1M':
+        return ['Week 1', 'Week 2', 'Week 3', 'Week 4'];
+      case '6M':
+        return ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
+      case '1Y':
+        return ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
+      case 'ALL':
+        return ['2023', '2024', '2025'];
+      default:
+        return ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    }
   }
 
   Widget _buildLegendDot(Color color, String label) {
@@ -6645,6 +6797,137 @@ class AdvancedChipGraphPainter extends CustomPainter {
         3,
         Paint()
           ..color = i == points.length - 1 ? const Color(0xFF10B981) : const Color(0xFF6366F1)
+          ..style = PaintingStyle.fill,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+// ============================================================================
+// MMR GRAPH PAINTER
+// ============================================================================
+
+class MMRGraphPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    // Sample data - MMR over time (normalized 0-1)
+    final dataPoints = [0.45, 0.52, 0.48, 0.60, 0.55, 0.70, 0.75];
+
+    final stepWidth = size.width / (dataPoints.length - 1);
+
+    // Create gradient for the line (amber/gold for ranked)
+    final lineGradient = LinearGradient(
+      colors: [
+        const Color(0xFFF59E0B),
+        const Color(0xFFEAB308),
+        const Color(0xFFFBBF24),
+      ],
+    ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
+
+    // Grid lines
+    final gridPaint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.04)
+      ..strokeWidth = 1;
+
+    for (int i = 1; i < 4; i++) {
+      final y = size.height * (i / 4);
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
+    }
+
+    // Build smooth bezier path
+    final path = Path();
+    final fillPath = Path();
+
+    // Calculate points
+    final points = <Offset>[];
+    for (int i = 0; i < dataPoints.length; i++) {
+      final x = stepWidth * i;
+      final y = size.height * (1 - dataPoints[i]);
+      points.add(Offset(x, y));
+    }
+
+    // Start paths
+    path.moveTo(points[0].dx, points[0].dy);
+    fillPath.moveTo(0, size.height);
+    fillPath.lineTo(points[0].dx, points[0].dy);
+
+    // Draw smooth curves using cubic bezier
+    for (int i = 0; i < points.length - 1; i++) {
+      final current = points[i];
+      final next = points[i + 1];
+      final controlX = (current.dx + next.dx) / 2;
+
+      path.cubicTo(controlX, current.dy, controlX, next.dy, next.dx, next.dy);
+      fillPath.cubicTo(controlX, current.dy, controlX, next.dy, next.dx, next.dy);
+    }
+
+    // Complete fill path
+    fillPath.lineTo(size.width, size.height);
+    fillPath.close();
+
+    // Draw gradient fill
+    final fillPaint = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [
+          const Color(0xFFF59E0B).withValues(alpha: 0.25),
+          const Color(0xFFEAB308).withValues(alpha: 0.1),
+          const Color(0xFFEAB308).withValues(alpha: 0.0),
+        ],
+        stops: const [0.0, 0.5, 1.0],
+      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
+
+    canvas.drawPath(fillPath, fillPaint);
+
+    // Draw glow effect
+    final glowPaint = Paint()
+      ..shader = lineGradient
+      ..strokeWidth = 8
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
+    canvas.drawPath(path, glowPaint);
+
+    // Draw main line
+    final linePaint = Paint()
+      ..shader = lineGradient
+      ..strokeWidth = 3
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+    canvas.drawPath(path, linePaint);
+
+    // Draw dots at data points
+    for (int i = 0; i < points.length; i++) {
+      final point = points[i];
+
+      // Outer glow
+      canvas.drawCircle(
+        point,
+        8,
+        Paint()
+          ..color = const Color(0xFFF59E0B).withValues(alpha: 0.3)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
+      );
+
+      // Dark ring
+      canvas.drawCircle(
+        point,
+        5,
+        Paint()
+          ..color = const Color(0xFF1A1A1A)
+          ..style = PaintingStyle.fill,
+      );
+
+      // Colored center
+      canvas.drawCircle(
+        point,
+        3,
+        Paint()
+          ..color = i == points.length - 1 ? const Color(0xFFFBBF24) : const Color(0xFFF59E0B)
           ..style = PaintingStyle.fill,
       );
     }

@@ -313,6 +313,22 @@ class TeamService {
     );
   }
 
+  /// Update team color (Captain only)
+  Future<void> updateColor(String teamId, int colorIndex) async {
+    final userId = currentUserId;
+    if (userId == null) throw Exception('Must be logged in');
+
+    final team = await getTeam(teamId);
+    if (team == null) throw Exception('Team not found');
+    if (!team.isCaptain(userId)) throw Exception('Only captain can change team color');
+
+    final token = await _getAuthToken();
+    await http.patch(
+      Uri.parse('$_databaseUrl/teams/$teamId.json?auth=$token'),
+      body: jsonEncode({'colorIndex': colorIndex}),
+    );
+  }
+
   /// Update team open/invite-only status (Captain only)
   Future<void> updateIsOpen(String teamId, bool isOpen) async {
     final userId = currentUserId;

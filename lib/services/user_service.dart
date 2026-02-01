@@ -364,4 +364,70 @@ class UserService {
       return UserPreferences.hasProPass;
     }
   }
+
+  /// Get another user's profile by their UID
+  Future<Map<String, dynamic>?> getUserProfileById(String uid) async {
+    try {
+      final doc = await _firestore.collection('users').doc(uid).get();
+      if (!doc.exists) return null;
+      return doc.data();
+    } catch (e) {
+      debugPrint('Error fetching user profile: $e');
+      return null;
+    }
+  }
+
+  /// Get another user's stats by their UID
+  /// Returns a map with all available stats
+  Future<Map<String, dynamic>> getUserStatsById(String uid) async {
+    try {
+      final doc = await _firestore.collection('users').doc(uid).get();
+      if (!doc.exists) {
+        return _defaultStats();
+      }
+      final data = doc.data() ?? {};
+      return {
+        'gamesPlayed': data['gamesPlayed'] as int? ?? 0,
+        'gamesWon': data['gamesWon'] as int? ?? 0,
+        'handsPlayed': data['handsPlayed'] as int? ?? 0,
+        'handsWon': data['handsWon'] as int? ?? 0,
+        'totalChipsWon': data['totalChipsWon'] as int? ?? 0,
+        'biggestPot': data['biggestPot'] as int? ?? 0,
+        'allInsWon': data['allInsWon'] as int? ?? 0,
+        'sitAndGoWins': data['sitAndGoWins'] as int? ?? 0,
+        'bestWinStreak': data['bestWinStreak'] as int? ?? 0,
+        'royalFlushes': data['royalFlushes'] as int? ?? 0,
+        'straightFlushes': data['straightFlushes'] as int? ?? 0,
+        'fourOfKinds': data['fourOfKinds'] as int? ?? 0,
+        'fullHouses': data['fullHouses'] as int? ?? 0,
+        'flushes': data['flushes'] as int? ?? 0,
+        'straights': data['straights'] as int? ?? 0,
+        'chips': data['chips'] as int? ?? 0,
+      };
+    } catch (e) {
+      debugPrint('Error fetching user stats: $e');
+      return _defaultStats();
+    }
+  }
+
+  Map<String, dynamic> _defaultStats() {
+    return {
+      'gamesPlayed': 0,
+      'gamesWon': 0,
+      'handsPlayed': 0,
+      'handsWon': 0,
+      'totalChipsWon': 0,
+      'biggestPot': 0,
+      'allInsWon': 0,
+      'sitAndGoWins': 0,
+      'bestWinStreak': 0,
+      'royalFlushes': 0,
+      'straightFlushes': 0,
+      'fourOfKinds': 0,
+      'fullHouses': 0,
+      'flushes': 0,
+      'straights': 0,
+      'chips': 0,
+    };
+  }
 }

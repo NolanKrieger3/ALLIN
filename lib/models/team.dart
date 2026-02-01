@@ -224,12 +224,32 @@ class TeamEmblem {
   }
 }
 
+/// Team color presets
+class TeamColors {
+  static const List<int> colors = [
+    0xFF00D46A, // Green (default)
+    0xFF3B82F6, // Blue
+    0xFF8B5CF6, // Purple
+    0xFFEF4444, // Red
+    0xFFF59E0B, // Amber
+    0xFFEC4899, // Pink
+    0xFF06B6D4, // Cyan
+    0xFFD4AF37, // Gold
+  ];
+
+  static Color getColor(int index) {
+    if (index < 0 || index >= colors.length) return Color(colors[0]);
+    return Color(colors[index]);
+  }
+}
+
 /// Represents a team
 class Team {
   final String id;
   final String name;
   final String description;
   final int emblemIndex;
+  final int colorIndex; // Team color (0-7)
   final String captainId;
   final List<TeamMember> members;
   final DateTime createdAt;
@@ -241,6 +261,7 @@ class Team {
     required this.name,
     this.description = '',
     this.emblemIndex = 0,
+    this.colorIndex = 0,
     required this.captainId,
     required this.members,
     required this.createdAt,
@@ -248,11 +269,15 @@ class Team {
     this.isOpen = true,
   });
 
+  /// Get team color
+  Color get color => TeamColors.getColor(colorIndex);
+
   Map<String, dynamic> toJson() => {
         'id': id,
         'name': name,
         'description': description,
         'emblemIndex': emblemIndex,
+        'colorIndex': colorIndex,
         'captainId': captainId,
         'members': members.map((m) => m.toJson()).toList(),
         'createdAt': createdAt.millisecondsSinceEpoch,
@@ -266,6 +291,7 @@ class Team {
       name: json['name'] as String,
       description: json['description'] as String? ?? '',
       emblemIndex: json['emblemIndex'] as int? ?? 0,
+      colorIndex: json['colorIndex'] as int? ?? 0,
       captainId: json['captainId'] as String,
       members: (json['members'] as List<dynamic>?)
               ?.map((m) => TeamMember.fromJson(Map<String, dynamic>.from(m as Map)))
@@ -282,6 +308,7 @@ class Team {
     String? name,
     String? description,
     int? emblemIndex,
+    int? colorIndex,
     String? captainId,
     List<TeamMember>? members,
     DateTime? createdAt,
@@ -293,6 +320,7 @@ class Team {
       name: name ?? this.name,
       description: description ?? this.description,
       emblemIndex: emblemIndex ?? this.emblemIndex,
+      colorIndex: colorIndex ?? this.colorIndex,
       captainId: captainId ?? this.captainId,
       members: members ?? this.members,
       createdAt: createdAt ?? this.createdAt,

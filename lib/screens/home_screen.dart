@@ -35,6 +35,13 @@ class _HomeScreenState extends State<HomeScreen> {
             HomeTab(
               key: _homeTabKey,
               onNavigateToShop: () => setState(() => _currentIndex = 0),
+              onNavigateToShopTab: (tabIndex) {
+                setState(() => _currentIndex = 0);
+                // Use post frame callback to ensure the shop tab is visible first
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  _shopTabKey.currentState?.navigateToTab(tabIndex);
+                });
+              },
             ),
             ProfileTab(onChipsChanged: _refreshAllBalances),
           ],

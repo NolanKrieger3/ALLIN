@@ -25,6 +25,14 @@ class ShopTabState extends State<ShopTab> with SingleTickerProviderStateMixin {
     setState(() {});
   }
 
+  /// Navigate to a specific tab by index (0=Featured, 1=Currency, 2=Cosmetics, 3=Chests)
+  void navigateToTab(int index) {
+    if (index >= 0 && index < _categories.length) {
+      _tabController.animateTo(index);
+      setState(() => _selectedCategory = index);
+    }
+  }
+
   @override
   void initState() {
     super.initState();
