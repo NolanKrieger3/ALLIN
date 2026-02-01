@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'dart:async';
 import 'dart:math';
 import '../../widgets/shared_widgets.dart';
@@ -27,7 +27,7 @@ class ProfileTabState extends State<ProfileTab> {
   StreamSubscription? _friendsSub;
   StreamSubscription? _authSub;
   String _displayUsername = '';
-  String _selectedAvatar = '👤';
+  String _selectedAvatar = 'ðŸ‘¤';
 
   @override
   void initState() {
@@ -254,7 +254,7 @@ class ProfileTabState extends State<ProfileTab> {
                             setState(() {});
                             parentScaffoldMessenger.showSnackBar(
                               SnackBar(
-                                content: Text('Added 1000 gems! Total: $newGems 💎'),
+                                content: Text('Added 1000 gems! Total: $newGems'),
                                 backgroundColor: const Color(0xFF00BCD4),
                               ),
                             );
@@ -495,6 +495,169 @@ class ProfileTabState extends State<ProfileTab> {
     );
   }
 
+  // Achievement category chip builder
+  Widget _buildCategoryChip(String label, IconData icon, bool isSelected) {
+    return Container(
+      margin: const EdgeInsets.only(right: 8),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            // TODO: Filter achievements by category
+          },
+          borderRadius: BorderRadius.circular(18),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              gradient: isSelected
+                  ? const LinearGradient(
+                      colors: [Color(0xFFFFD700), Color(0xFFFF8C00)],
+                    )
+                  : null,
+              color: isSelected ? null : Colors.white.withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(18),
+              border: isSelected ? null : Border.all(color: Colors.white.withValues(alpha: 0.1)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  icon,
+                  size: 14,
+                  color: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.5),
+                ),
+                const SizedBox(width: 5),
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.6),
+                    fontSize: 11,
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Rarity badge builder for legend
+  Widget _buildRarityBadge(String label, Color color) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: color.withValues(alpha: 0.5),
+                blurRadius: 4,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: TextStyle(
+            color: color,
+            fontSize: 10,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Tier icon builder for achievement tiers
+  Widget _buildTierIcon(String tier, Color color) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.05),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+          ),
+          child: Center(
+            child: _getTierMedalIcon(tier, color, 22),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          tier,
+          style: TextStyle(
+            color: color,
+            fontSize: 9,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Get medal icon with tier-appropriate styling
+  Widget _getTierMedalIcon(String tier, Color color, double size) {
+    IconData iconData;
+    List<Color> gradientColors;
+
+    switch (tier.toLowerCase()) {
+      case 'bronze':
+        iconData = Icons.military_tech_rounded;
+        gradientColors = [const Color(0xFFCD7F32), const Color(0xFF8B4513)];
+        break;
+      case 'silver':
+        iconData = Icons.military_tech_rounded;
+        gradientColors = [const Color(0xFFC0C0C0), const Color(0xFF808080)];
+        break;
+      case 'gold':
+        iconData = Icons.military_tech_rounded;
+        gradientColors = [const Color(0xFFFFD700), const Color(0xFFDAA520)];
+        break;
+      case 'platinum':
+        iconData = Icons.military_tech_rounded;
+        gradientColors = [const Color(0xFFE5E4E2), const Color(0xFFB8B8B8)];
+        break;
+      case 'diamond':
+        iconData = Icons.diamond_rounded;
+        gradientColors = [const Color(0xFFB9F2FF), const Color(0xFF00CED1)];
+        break;
+      case 'champion':
+        iconData = Icons.emoji_events_rounded;
+        gradientColors = [const Color(0xFFFF6B6B), const Color(0xFFEE5253)];
+        break;
+      case 'legend':
+        iconData = Icons.auto_awesome_rounded;
+        gradientColors = [const Color(0xFFDA70D6), const Color(0xFF9932CC)];
+        break;
+      default:
+        iconData = Icons.military_tech_rounded;
+        gradientColors = [color, color.withValues(alpha: 0.7)];
+    }
+
+    return ShaderMask(
+      shaderCallback: (bounds) => LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: gradientColors,
+      ).createShader(bounds),
+      child: Icon(
+        iconData,
+        size: size,
+        color: Colors.white,
+      ),
+    );
+  }
+
   Widget _buildAccountOption(
     BuildContext dialogContext,
     ScaffoldMessengerState scaffoldMessenger,
@@ -700,7 +863,7 @@ class ProfileTabState extends State<ProfileTab> {
                             color: Colors.white.withValues(alpha: 0.05),
                             borderRadius: BorderRadius.circular(10),
                           ),
-                          child: const Center(child: Text('🏅', style: TextStyle(fontSize: 18))),
+                          child: const Center(child: Icon(Icons.emoji_events, color: Color(0xFFFFD700), size: 20)),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
@@ -857,7 +1020,7 @@ class ProfileTabState extends State<ProfileTab> {
                               ),
                               borderRadius: BorderRadius.circular(10),
                             ),
-                            child: const Center(child: Text('📊', style: TextStyle(fontSize: 18))),
+                            child: const Center(child: Icon(Icons.analytics_rounded, color: Colors.white, size: 20)),
                           ),
                           const SizedBox(width: 12),
                           Expanded(
@@ -1081,11 +1244,12 @@ class ProfileTabState extends State<ProfileTab> {
                         Expanded(
                           child: Column(
                             children: [
-                              _buildMiniStatCard('🔥', 'Best Streak', '12', const Color(0xFFFF6B35)),
+                              _buildMiniStatCard(
+                                  Icons.local_fire_department, 'Best Streak', '12', const Color(0xFFFF6B35)),
                               const SizedBox(height: 8),
-                              _buildMiniStatCard('💰', 'Biggest Win', '450K', const Color(0xFFFFBB00)),
+                              _buildMiniStatCard(Icons.monetization_on, 'Biggest Win', '450K', const Color(0xFFFFBB00)),
                               const SizedBox(height: 8),
-                              _buildMiniStatCard('📈', 'ROI', '+24.7%', const Color(0xFF10B981)),
+                              _buildMiniStatCard(Icons.trending_up, 'ROI', '+24.7%', const Color(0xFF10B981)),
                             ],
                           ),
                         ),
@@ -1216,61 +1380,117 @@ class ProfileTabState extends State<ProfileTab> {
               ),
             ),
 
-          // Achievements Dropdown - Minimalist
+          // Achievements Section - HD Poker Style
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Main Header - Clickable
                   GestureDetector(
                     onTap: () => setState(() => _achievementsExpanded = !_achievementsExpanded),
                     child: Container(
-                      padding: const EdgeInsets.all(14),
+                      padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.03),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            const Color(0xFFFFD700).withValues(alpha: 0.15),
+                            const Color(0xFFFF8C00).withValues(alpha: 0.08),
+                            Colors.transparent,
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: const Color(0xFFFFD700).withValues(alpha: 0.3),
+                        ),
                       ),
                       child: Row(
                         children: [
+                          // Trophy Icon with Glow
                           Container(
-                            width: 36,
-                            height: 36,
+                            width: 48,
+                            height: 48,
                             decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.05),
-                              borderRadius: BorderRadius.circular(10),
+                              gradient: const LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [Color(0xFFFFD700), Color(0xFFFF8C00)],
+                              ),
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFFFFD700).withValues(alpha: 0.4),
+                                  blurRadius: 12,
+                                  spreadRadius: 1,
+                                ),
+                              ],
                             ),
-                            child: const Center(child: Text('🏆', style: TextStyle(fontSize: 18))),
+                            child: const Center(
+                              child: Icon(Icons.emoji_events_rounded, color: Colors.white, size: 26),
+                            ),
                           ),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: 14),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  'Achievements',
+                                const Text(
+                                  'ACHIEVEMENTS',
                                   style: TextStyle(
-                                    color: Colors.white.withValues(alpha: 0.9),
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFFFFD700),
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 1.5,
                                   ),
                                 ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  '0 / 100 Unlocked',
-                                  style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 11),
+                                const SizedBox(height: 6),
+                                // Progress bar
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(4),
+                                        child: LinearProgressIndicator(
+                                          value: 0.0, // 0/100 unlocked
+                                          backgroundColor: Colors.white.withValues(alpha: 0.1),
+                                          valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFFFFD700)),
+                                          minHeight: 6,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Text(
+                                      '0 / 20',
+                                      style: TextStyle(
+                                        color: Colors.white.withValues(alpha: 0.6),
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
                           ),
+                          const SizedBox(width: 8),
                           AnimatedRotation(
                             turns: _achievementsExpanded ? 0.5 : 0,
                             duration: const Duration(milliseconds: 200),
-                            child: Icon(
-                              Icons.keyboard_arrow_down,
-                              color: Colors.white.withValues(alpha: 0.4),
-                              size: 22,
+                            child: Container(
+                              width: 32,
+                              height: 32,
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.05),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Icon(
+                                Icons.keyboard_arrow_down_rounded,
+                                color: Colors.white.withValues(alpha: 0.5),
+                                size: 22,
+                              ),
                             ),
                           ),
                         ],
@@ -1282,20 +1502,66 @@ class ProfileTabState extends State<ProfileTab> {
             ),
           ),
 
-          // Achievement Grid (Expandable)
+          // Achievement Categories Filter (when expanded)
+          if (_achievementsExpanded)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+                child: SizedBox(
+                  height: 36,
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    children: [
+                      _buildCategoryChip('All', Icons.grid_view_rounded, true),
+                      _buildCategoryChip('Hands', Icons.style_rounded, false),
+                      _buildCategoryChip('Wins', Icons.emoji_events_rounded, false),
+                      _buildCategoryChip('Chips', Icons.paid_rounded, false),
+                      _buildCategoryChip('Social', Icons.group_rounded, false),
+                      _buildCategoryChip('Skills', Icons.psychology_rounded, false),
+                      _buildCategoryChip('Special', Icons.auto_awesome_rounded, false),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+          // Rarity Legend (when expanded) - Now shows tiers
+          if (_achievementsExpanded)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                child: SizedBox(
+                  height: 70,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      _buildTierIcon('Bronze', const Color(0xFFCD7F32)),
+                      _buildTierIcon('Silver', const Color(0xFFC0C0C0)),
+                      _buildTierIcon('Gold', const Color(0xFFFFD700)),
+                      _buildTierIcon('Platinum', const Color(0xFFE5E4E2)),
+                      _buildTierIcon('Diamond', const Color(0xFFB9F2FF)),
+                      _buildTierIcon('Champion', const Color(0xFFFF6B6B)),
+                      _buildTierIcon('Legend', const Color(0xFFDA70D6)),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+          // Achievement Grid (Expandable) - Larger cards
           if (_achievementsExpanded)
             SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+              padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
               sliver: SliverGrid(
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 4,
-                  mainAxisSpacing: 8,
-                  crossAxisSpacing: 8,
+                  crossAxisCount: 3,
+                  mainAxisSpacing: 10,
+                  crossAxisSpacing: 10,
                   childAspectRatio: 0.75,
                 ),
                 delegate: SliverChildBuilderDelegate(
                   (context, index) => AchievementCard.fromIndex(index),
-                  childCount: 100,
+                  childCount: 20,
                 ),
               ),
             ),
@@ -1351,7 +1617,7 @@ class ProfileTabState extends State<ProfileTab> {
                                     ),
                                   ],
                                 ),
-                                child: const Center(child: Text('🎰', style: TextStyle(fontSize: 24))),
+                                child: const Center(child: Icon(Icons.casino, color: Colors.white, size: 26)),
                               ),
                               const SizedBox(width: 14),
                               Expanded(
@@ -1400,7 +1666,7 @@ class ProfileTabState extends State<ProfileTab> {
                                         ),
                                         const SizedBox(width: 6),
                                         Text(
-                                          '• Tap to view all',
+                                          'â€¢ Tap to view all',
                                           style: TextStyle(
                                             color: const Color(0xFF6366F1).withValues(alpha: 0.8),
                                             fontSize: 11,
@@ -1578,7 +1844,8 @@ class ProfileTabState extends State<ProfileTab> {
                                       ),
                                       borderRadius: BorderRadius.circular(10),
                                     ),
-                                    child: const Center(child: Text('👑', style: TextStyle(fontSize: 18))),
+                                    child: Center(
+                                        child: Icon(Icons.workspace_premium, color: const Color(0xFFFFD700), size: 20)),
                                   ),
                                   const SizedBox(width: 10),
                                   Expanded(
@@ -1625,7 +1892,7 @@ class ProfileTabState extends State<ProfileTab> {
                                   ),
                                   Row(
                                     children: [
-                                      const Text('💎', style: TextStyle(fontSize: 12)),
+                                      const Icon(Icons.diamond, color: Color(0xFF00D4FF), size: 14),
                                       const SizedBox(width: 3),
                                       const Text(
                                         '400',
@@ -1681,7 +1948,7 @@ class ProfileTabState extends State<ProfileTab> {
                               color: Colors.white.withValues(alpha: 0.05),
                               borderRadius: BorderRadius.circular(10),
                             ),
-                            child: const Center(child: Text('🎁', style: TextStyle(fontSize: 18))),
+                            child: const Center(child: Text('ðŸŽ', style: TextStyle(fontSize: 18))),
                           ),
                           const SizedBox(width: 12),
                           Expanded(
@@ -1790,7 +2057,7 @@ class ProfileTabState extends State<ProfileTab> {
                             children: [
                               Column(
                                 children: [
-                                  const Text('🪙', style: TextStyle(fontSize: 24)),
+                                  const Icon(Icons.paid, color: Color(0xFFFFD700), size: 26),
                                   const SizedBox(height: 4),
                                   const Text(
                                     '5,000',
@@ -1809,7 +2076,7 @@ class ProfileTabState extends State<ProfileTab> {
                               Container(width: 1, height: 40, color: Colors.white.withValues(alpha: 0.1)),
                               Column(
                                 children: [
-                                  const Text('💎', style: TextStyle(fontSize: 24)),
+                                  const Icon(Icons.diamond, color: Color(0xFF00D4FF), size: 26),
                                   const SizedBox(height: 4),
                                   const Text(
                                     '50',
@@ -1877,7 +2144,7 @@ class ProfileTabState extends State<ProfileTab> {
                   gradient: const LinearGradient(colors: [Color(0xFFE91E63), Color(0xFFC2185B)]),
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: const Center(child: Text('⚔️', style: TextStyle(fontSize: 36))),
+                child: const Center(child: Text('âš”ï¸', style: TextStyle(fontSize: 36))),
               ),
               const SizedBox(height: 20),
               Text(
@@ -1966,7 +2233,7 @@ class ProfileTabState extends State<ProfileTab> {
                   gradient: const LinearGradient(colors: [Color(0xFF4CAF50), Color(0xFF388E3C)]),
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: const Center(child: Text('🎁', style: TextStyle(fontSize: 36))),
+                child: const Center(child: Text('ðŸŽ', style: TextStyle(fontSize: 36))),
               ),
               const SizedBox(height: 20),
               Text(
@@ -1977,11 +2244,11 @@ class ProfileTabState extends State<ProfileTab> {
               Row(
                 children: [
                   Expanded(
-                    child: GiftOption(emoji: '🪙', label: 'Chips', amount: '1,000', isSelected: true),
+                    child: GiftOption(icon: Icons.paid, label: 'Chips', amount: '1,000', isSelected: true),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: GiftOption(emoji: '💎', label: 'Gems', amount: '10', isSelected: false),
+                    child: GiftOption(icon: Icons.diamond, label: 'Gems', amount: '10', isSelected: false),
                   ),
                 ],
               ),
@@ -2086,7 +2353,7 @@ class ProfileTabState extends State<ProfileTab> {
                           ),
                         ],
                       ),
-                      child: const Center(child: Text('🎰', style: TextStyle(fontSize: 26))),
+                      child: const Center(child: Icon(Icons.casino, color: Colors.white, size: 28)),
                     ),
                     const SizedBox(width: 14),
                     Expanded(
@@ -2304,7 +2571,7 @@ class ProfileTabState extends State<ProfileTab> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Text('👑', style: TextStyle(fontSize: 20)),
+                          const Icon(Icons.workspace_premium, color: Color(0xFFFFD700), size: 22),
                           const SizedBox(width: 10),
                           const Text(
                             'Upgrade to Pro',
@@ -2319,7 +2586,7 @@ class ProfileTabState extends State<ProfileTab> {
                             ),
                             child: Row(
                               children: [
-                                const Text('💎', style: TextStyle(fontSize: 12)),
+                                const Icon(Icons.diamond, color: Color(0xFF00D4FF), size: 14),
                                 const SizedBox(width: 4),
                                 const Text('400',
                                     style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
@@ -2421,7 +2688,9 @@ class ProfileTabState extends State<ProfileTab> {
                 ),
                 child: Row(
                   children: [
-                    Text(freeReward['emoji'] as String, style: const TextStyle(fontSize: 22)),
+                    freeReward['icon'] is IconData
+                        ? Icon(freeReward['icon'] as IconData, color: Colors.white70, size: 24)
+                        : Text(freeReward['icon'].toString(), style: const TextStyle(fontSize: 22)),
                     const SizedBox(width: 8),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2476,7 +2745,9 @@ class ProfileTabState extends State<ProfileTab> {
                 ),
                 child: Row(
                   children: [
-                    Text(premiumReward['emoji'] as String, style: const TextStyle(fontSize: 22)),
+                    premiumReward['icon'] is IconData
+                        ? Icon(premiumReward['icon'] as IconData, color: const Color(0xFFFFD700), size: 24)
+                        : Text(premiumReward['icon'].toString(), style: const TextStyle(fontSize: 22)),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Column(
@@ -2495,7 +2766,7 @@ class ProfileTabState extends State<ProfileTab> {
                           ),
                           Row(
                             children: [
-                              const Text('👑', style: TextStyle(fontSize: 8)),
+                              const Icon(Icons.workspace_premium, color: Color(0xFFFFD700), size: 10),
                               const SizedBox(width: 2),
                               Text(
                                 'PREMIUM',
@@ -2581,7 +2852,11 @@ class ProfileTabState extends State<ProfileTab> {
                     ),
                   ],
                 ),
-                child: Center(child: Text(reward['emoji'] as String, style: const TextStyle(fontSize: 40))),
+                child: Center(
+                  child: reward['icon'] is IconData
+                      ? Icon(reward['icon'] as IconData, color: Colors.white, size: 42)
+                      : Text(reward['icon'].toString(), style: const TextStyle(fontSize: 40)),
+                ),
               ),
               const SizedBox(height: 16),
 
@@ -2741,7 +3016,7 @@ class ProfileTabState extends State<ProfileTab> {
                             ),
                           ],
                         ),
-                        child: const Center(child: Text('👑', style: TextStyle(fontSize: 44))),
+                        child: const Center(child: Icon(Icons.workspace_premium, color: Color(0xFFFFD700), size: 48)),
                       ),
                       const SizedBox(height: 16),
                       const Text(
@@ -2768,35 +3043,35 @@ class ProfileTabState extends State<ProfileTab> {
                   child: Column(
                     children: [
                       _buildPremiumBenefitCard(
-                        icon: '⚡',
+                        icon: 'âš¡',
                         title: '2X XP BOOST',
                         description: 'Level up twice as fast on all games',
                         color: const Color(0xFF6366F1),
                       ),
                       const SizedBox(height: 10),
                       _buildPremiumBenefitCard(
-                        icon: '🎴',
+                        icon: 'ðŸŽ´',
                         title: 'EXCLUSIVE CARD BACKS',
                         description: '5 premium animated card designs',
                         color: const Color(0xFF8B5CF6),
                       ),
                       const SizedBox(height: 10),
                       _buildPremiumBenefitCard(
-                        icon: '💰',
+                        icon: Icons.paid,
                         title: 'BONUS CHIPS',
                         description: 'Extra chips with every tier unlock',
                         color: const Color(0xFF10B981),
                       ),
                       const SizedBox(height: 10),
                       _buildPremiumBenefitCard(
-                        icon: '🖼️',
+                        icon: Icons.account_circle,
                         title: 'PREMIUM AVATAR FRAME',
                         description: 'Animated golden frame for your profile',
                         color: const Color(0xFFD4AF37),
                       ),
                       const SizedBox(height: 10),
                       _buildPremiumBenefitCard(
-                        icon: '💬',
+                        icon: Icons.chat_bubble,
                         title: 'EXCLUSIVE EMOTES',
                         description: '10 premium animated emotes',
                         color: const Color(0xFFEC4899),
@@ -2825,11 +3100,11 @@ class ProfileTabState extends State<ProfileTab> {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                               children: [
-                                _buildMiniReward('💎', '5K'),
-                                _buildMiniReward('🃏', 'Epic'),
-                                _buildMiniReward('🎭', 'Rare'),
-                                _buildMiniReward('✨', 'VIP'),
-                                _buildMiniReward('🏆', 'Legend'),
+                                _buildMiniReward(Icons.diamond, '5K'),
+                                _buildMiniReward(Icons.style, 'Epic'),
+                                _buildMiniReward(Icons.theater_comedy, 'Rare'),
+                                _buildMiniReward(Icons.auto_awesome, 'VIP'),
+                                _buildMiniReward(Icons.emoji_events, 'Legend'),
                               ],
                             ),
                           ],
@@ -2851,7 +3126,7 @@ class ProfileTabState extends State<ProfileTab> {
                           child: const Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Text('✓', style: TextStyle(fontSize: 20, color: Colors.white)),
+                              Text('âœ“', style: TextStyle(fontSize: 20, color: Colors.white)),
                               SizedBox(width: 8),
                               Text(
                                 'Already Activated!',
@@ -2898,7 +3173,7 @@ class ProfileTabState extends State<ProfileTab> {
                                       SnackBar(
                                         content: Row(
                                           children: [
-                                            const Text('👑', style: TextStyle(fontSize: 20)),
+                                            const Icon(Icons.workspace_premium, color: Color(0xFFFFD700), size: 22),
                                             const SizedBox(width: 10),
                                             const Text('Pro Activated!', style: TextStyle(fontWeight: FontWeight.w600)),
                                           ],
@@ -2911,7 +3186,7 @@ class ProfileTabState extends State<ProfileTab> {
                                     Navigator.pop(context);
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       const SnackBar(
-                                        content: Text('Not enough gems! You need 400 💎'),
+                                        content: Text('Not enough gems! You need 400'),
                                         backgroundColor: Colors.orange,
                                       ),
                                     );
@@ -2925,7 +3200,7 @@ class ProfileTabState extends State<ProfileTab> {
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                const Text('💎', style: TextStyle(fontSize: 18)),
+                                const Icon(Icons.diamond, color: Color(0xFF00D4FF), size: 20),
                                 const SizedBox(width: 8),
                                 Text(
                                   '400',
@@ -2980,7 +3255,7 @@ class ProfileTabState extends State<ProfileTab> {
   }
 
   Widget _buildPremiumBenefitCard({
-    required String icon,
+    required dynamic icon,
     required String title,
     required String description,
     required Color color,
@@ -3001,7 +3276,11 @@ class ProfileTabState extends State<ProfileTab> {
               color: color.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Center(child: Text(icon, style: const TextStyle(fontSize: 20))),
+            child: Center(
+              child: icon is IconData
+                  ? Icon(icon, color: color, size: 22)
+                  : Text(icon.toString(), style: const TextStyle(fontSize: 20)),
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -3031,7 +3310,7 @@ class ProfileTabState extends State<ProfileTab> {
     );
   }
 
-  Widget _buildMiniReward(String emoji, String label) {
+  Widget _buildMiniReward(dynamic icon, String label) {
     return Column(
       children: [
         Container(
@@ -3047,7 +3326,11 @@ class ProfileTabState extends State<ProfileTab> {
             borderRadius: BorderRadius.circular(8),
             border: Border.all(color: const Color(0xFFD4AF37).withValues(alpha: 0.3)),
           ),
-          child: Center(child: Text(emoji, style: const TextStyle(fontSize: 16))),
+          child: Center(
+            child: icon is IconData
+                ? Icon(icon, color: const Color(0xFFFFD700), size: 18)
+                : Text(icon.toString(), style: const TextStyle(fontSize: 16)),
+          ),
         ),
         const SizedBox(height: 4),
         Text(label, style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 9)),
@@ -3132,13 +3415,16 @@ class ProfileTabState extends State<ProfileTab> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text(
-                        freeReward['emoji'] as String,
-                        style: TextStyle(
-                          fontSize: 18,
-                          color: isUnlocked ? null : Colors.white.withValues(alpha: 0.3),
-                        ),
-                      ),
+                      freeReward['icon'] is IconData
+                          ? Icon(freeReward['icon'] as IconData,
+                              color: isUnlocked ? Colors.white70 : Colors.white.withValues(alpha: 0.3), size: 20)
+                          : Text(
+                              freeReward['icon'].toString(),
+                              style: TextStyle(
+                                fontSize: 18,
+                                color: isUnlocked ? null : Colors.white.withValues(alpha: 0.3),
+                              ),
+                            ),
                       const SizedBox(height: 2),
                       Text(
                         freeReward['label'] as String,
@@ -3185,13 +3471,17 @@ class ProfileTabState extends State<ProfileTab> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Text(
-                            premiumReward['emoji'] as String,
-                            style: TextStyle(
-                              fontSize: 18,
-                              color: isUnlocked ? null : Colors.white.withValues(alpha: 0.3),
-                            ),
-                          ),
+                          premiumReward['icon'] is IconData
+                              ? Icon(premiumReward['icon'] as IconData,
+                                  color: isUnlocked ? const Color(0xFFFFD700) : Colors.white.withValues(alpha: 0.3),
+                                  size: 20)
+                              : Text(
+                                  premiumReward['icon'].toString(),
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    color: isUnlocked ? null : Colors.white.withValues(alpha: 0.3),
+                                  ),
+                                ),
                           const SizedBox(height: 2),
                           Text(
                             premiumReward['label'] as String,
@@ -3218,7 +3508,7 @@ class ProfileTabState extends State<ProfileTab> {
                             color: const Color(0xFFD4AF37).withValues(alpha: 0.3),
                             borderRadius: BorderRadius.circular(3),
                           ),
-                          child: const Text('👑', style: TextStyle(fontSize: 8)),
+                          child: const Icon(Icons.workspace_premium, color: Color(0xFFFFD700), size: 10),
                         ),
                       ),
                   ],
@@ -3233,32 +3523,32 @@ class ProfileTabState extends State<ProfileTab> {
 
   Map<String, dynamic> _getTierFreeReward(int tier) {
     final rewards = [
-      {'emoji': '🪙', 'label': '500'},
-      {'emoji': '💫', 'label': 'XP'},
-      {'emoji': '🪙', 'label': '1K'},
-      {'emoji': '🎲', 'label': 'Dice'},
-      {'emoji': '🪙', 'label': '2K'},
-      {'emoji': '💫', 'label': 'XP'},
-      {'emoji': '🃏', 'label': 'Card'},
-      {'emoji': '🪙', 'label': '3K'},
-      {'emoji': '🎯', 'label': 'Chip'},
-      {'emoji': '🪙', 'label': '5K'},
+      {'icon': Icons.paid, 'label': '500'},
+      {'icon': Icons.auto_awesome, 'label': 'XP'},
+      {'icon': Icons.paid, 'label': '1K'},
+      {'icon': Icons.casino, 'label': 'Dice'},
+      {'icon': Icons.paid, 'label': '2K'},
+      {'icon': Icons.auto_awesome, 'label': 'XP'},
+      {'icon': Icons.style, 'label': 'Card'},
+      {'icon': Icons.paid, 'label': '3K'},
+      {'icon': Icons.circle, 'label': 'Chip'},
+      {'icon': Icons.paid, 'label': '5K'},
     ];
     return rewards[(tier - 1) % rewards.length];
   }
 
   Map<String, dynamic> _getTierPremiumReward(int tier) {
     final rewards = [
-      {'emoji': '💎', 'label': '50'},
-      {'emoji': '🎴', 'label': 'Skin'},
-      {'emoji': '💎', 'label': '100'},
-      {'emoji': '🎭', 'label': 'Emote'},
-      {'emoji': '👑', 'label': 'Epic'},
-      {'emoji': '💎', 'label': '150'},
-      {'emoji': '✨', 'label': 'Frame'},
-      {'emoji': '💎', 'label': '200'},
-      {'emoji': '🌟', 'label': 'Trail'},
-      {'emoji': '🏆', 'label': 'Legend'},
+      {'icon': Icons.diamond, 'label': '50'},
+      {'icon': Icons.style, 'label': 'Skin'},
+      {'icon': Icons.diamond, 'label': '100'},
+      {'icon': Icons.theater_comedy, 'label': 'Emote'},
+      {'icon': Icons.workspace_premium, 'label': 'Epic'},
+      {'icon': Icons.diamond, 'label': '150'},
+      {'icon': Icons.filter_frames, 'label': 'Frame'},
+      {'icon': Icons.diamond, 'label': '200'},
+      {'icon': Icons.stars, 'label': 'Trail'},
+      {'icon': Icons.emoji_events, 'label': 'Legend'},
     ];
     return rewards[(tier - 1) % rewards.length];
   }
@@ -3379,7 +3669,7 @@ class ProfileTabState extends State<ProfileTab> {
             ),
             child: Row(
               children: [
-                Text(isComplete ? '✓' : '⚡', style: const TextStyle(fontSize: 10)),
+                Text(isComplete ? 'âœ“' : 'âš¡', style: const TextStyle(fontSize: 10)),
                 const SizedBox(width: 3),
                 Text(
                   isComplete ? 'Done' : '+$xp',
@@ -3456,7 +3746,7 @@ class ProfileTabState extends State<ProfileTab> {
                             // Show unlock requirement
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
-                                content: Text('🔒 ${GameAvatars.getUnlockRequirement(index)}'),
+                                content: Text('ðŸ”’ ${GameAvatars.getUnlockRequirement(index)}'),
                                 backgroundColor: const Color(0xFF333333),
                               ),
                             );
@@ -3521,7 +3811,7 @@ class ProfileTabState extends State<ProfileTab> {
               ),
               const SizedBox(height: 16),
               Text(
-                '🔓 3 avatars unlocked • 🔒 ${GameAvatars.all.length - 3} locked',
+                'ðŸ”“ 3 avatars unlocked â€¢ ðŸ”’ ${GameAvatars.all.length - 3} locked',
                 style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 12),
               ),
             ],
@@ -3701,7 +3991,7 @@ class ProfileTabState extends State<ProfileTab> {
     );
   }
 
-  Widget _buildMiniStatCard(String emoji, String label, String value, Color accentColor) {
+  Widget _buildMiniStatCard(IconData icon, String label, String value, Color accentColor) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
@@ -3718,7 +4008,7 @@ class ProfileTabState extends State<ProfileTab> {
       ),
       child: Row(
         children: [
-          Text(emoji, style: const TextStyle(fontSize: 16)),
+          Icon(icon, color: accentColor, size: 18),
           const SizedBox(width: 8),
           Expanded(
             child: Column(
@@ -4138,12 +4428,11 @@ class DailySpinDialogState extends State<DailySpinDialog> with SingleTickerProvi
     final rotations = 5 + random.nextDouble() * 3;
     // Calculate angle so that segment prizeIndex lands at the TOP (where pointer is)
     // Wheel draws segment 0 at top (-pi/2), segments go clockwise
-    // Transform.rotate with positive angle rotates counter-clockwise
-    // To land on segment N, rotate so that segment N aligns with the pointer at top
+    // Transform.rotate with positive angle rotates clockwise visually
+    // To land on segment N, we subtract so segment N aligns with the pointer at top
     final segmentAngle = 2 * pi / _prizes.length;
-    // Rotate counter-clockwise: higher segments come to top
-    // For segment N to be at top, we need to rotate by (N * segmentAngle) + half segment for centering
-    final targetAngle = rotations * 2 * pi + (prizeIndex * segmentAngle) + (segmentAngle / 2);
+    // Subtract: rotate so segment N comes to top position
+    final targetAngle = rotations * 2 * pi - (prizeIndex * segmentAngle) - (segmentAngle / 2);
 
     _animation = Tween<double>(
       begin: 0,
@@ -4343,9 +4632,11 @@ class GemWheelDialogState extends State<GemWheelDialog> with SingleTickerProvide
     final prizeIndex = random.nextInt(_prizes.length);
     final rotations = 6 + random.nextDouble() * 4;
     // Calculate angle so that segment prizeIndex lands at the TOP (where pointer is)
-    // Same formula as Daily Spin for consistency
+    // Wheel draws segment 0 at top (-pi/2), segments go clockwise
+    // Transform.rotate with positive angle rotates clockwise visually
+    // Subtract so segment N comes to top position
     final segmentAngle = 2 * pi / _prizes.length;
-    final targetAngle = rotations * 2 * pi + (prizeIndex * segmentAngle) + (segmentAngle / 2);
+    final targetAngle = rotations * 2 * pi - (prizeIndex * segmentAngle) - (segmentAngle / 2);
 
     _animation = Tween<double>(
       begin: 0,
@@ -4692,305 +4983,483 @@ class GemWheelPainter extends CustomPainter {
 }
 
 // ============================================================================
-// ACHIEVEMENT CARD
+// ACHIEVEMENT CARD - TIERED SYSTEM
 // ============================================================================
 
+// Tier data for achievements
+class TierInfo {
+  final String name;
+  final Color color;
+  final List<Color> gradient;
+  final IconData icon;
+  final int requirement;
+
+  const TierInfo(this.name, this.color, this.gradient, this.icon, this.requirement);
+}
+
 class AchievementData {
-  final String emoji;
+  final String id;
   final String title;
   final String description;
-  final bool isUnlocked;
-  final double progress;
+  final String category;
+  final IconData icon;
+  final List<int> tierRequirements; // Requirements for each tier
+  final int currentProgress;
+  final int currentTier; // 0 = none, 1 = bronze, 2 = silver, etc.
 
-  const AchievementData(this.emoji, this.title, this.description, this.isUnlocked, this.progress);
+  const AchievementData({
+    required this.id,
+    required this.title,
+    required this.description,
+    required this.category,
+    required this.icon,
+    required this.tierRequirements,
+    this.currentProgress = 0,
+    this.currentTier = 0,
+  });
 }
 
 class AchievementCard extends StatelessWidget {
-  final String emoji;
-  final String title;
-  final String description;
-  final bool isUnlocked;
-  final double progress;
+  final AchievementData data;
 
-  const AchievementCard({
-    required this.emoji,
-    required this.title,
-    required this.description,
-    required this.isUnlocked,
-    required this.progress,
-  });
+  const AchievementCard({required this.data, super.key});
 
-  // 100 achievements - all locked for new account
+  // Tier definitions with colors matching the image
+  static const List<TierInfo> tiers = [
+    TierInfo('Bronze', Color(0xFFCD7F32), [Color(0xFFCD7F32), Color(0xFF8B4513)], Icons.military_tech_rounded, 0),
+    TierInfo('Silver', Color(0xFFC0C0C0), [Color(0xFFC0C0C0), Color(0xFF808080)], Icons.military_tech_rounded, 1),
+    TierInfo('Gold', Color(0xFFFFD700), [Color(0xFFFFD700), Color(0xFFDAA520)], Icons.military_tech_rounded, 2),
+    TierInfo('Platinum', Color(0xFFE5E4E2), [Color(0xFFE5E4E2), Color(0xFFB8B8B8)], Icons.military_tech_rounded, 3),
+    TierInfo('Diamond', Color(0xFFB9F2FF), [Color(0xFFB9F2FF), Color(0xFF00CED1)], Icons.diamond_rounded, 4),
+    TierInfo('Champion', Color(0xFFFF6B6B), [Color(0xFFFF6B6B), Color(0xFFEE5253)], Icons.emoji_events_rounded, 5),
+    TierInfo('Legend', Color(0xFFDA70D6), [Color(0xFFDA70D6), Color(0xFF9932CC)], Icons.auto_awesome_rounded, 6),
+  ];
+
+  TierInfo? get currentTierInfo => data.currentTier > 0 ? tiers[data.currentTier - 1] : null;
+  TierInfo? get nextTierInfo => data.currentTier < 7 ? tiers[data.currentTier] : null;
+
+  int get nextTierRequirement => data.currentTier < data.tierRequirements.length
+      ? data.tierRequirements[data.currentTier]
+      : data.tierRequirements.last;
+
+  double get progressToNextTier {
+    if (data.currentTier >= 7) return 1.0;
+    final prevReq = data.currentTier > 0 ? data.tierRequirements[data.currentTier - 1] : 0;
+    final nextReq = nextTierRequirement;
+    if (nextReq <= prevReq) return 1.0;
+    return ((data.currentProgress - prevReq) / (nextReq - prevReq)).clamp(0.0, 1.0);
+  }
+
+  // 20 Tiered Achievements
   static const List<AchievementData> _achievements = [
-    // Beginner (1-10)
-    AchievementData('🏆', 'First Win', 'Win your first poker hand', false, 0.0),
-    AchievementData('🎮', 'First Game', 'Complete your first game', false, 0.0),
-    AchievementData('💵', 'First Chips', 'Earn chips from a pot', false, 0.0),
-    AchievementData('🤝', 'First Friend', 'Add your first friend', false, 0.0),
-    AchievementData('📱', 'Daily Player', 'Play 7 days in a row', false, 0.0),
-    AchievementData('⭐', 'Rising Star', 'Reach level 5', false, 0.0),
-    AchievementData('🎯', 'Sharp Shooter', 'Win 3 hands in a row', false, 0.0),
-    AchievementData('🔥', 'Hot Start', 'Win first hand of a game', false, 0.0),
-    AchievementData('💪', 'Getting Strong', 'Reach level 10', false, 0.0),
-    AchievementData('📈', 'On The Rise', 'Win 5 games total', false, 0.0),
+    // Hands Category
+    AchievementData(
+      id: 'hands_won',
+      title: 'Hand Winner',
+      description: 'Win poker hands',
+      category: 'hands',
+      icon: Icons.style_rounded,
+      tierRequirements: [10, 50, 150, 500, 1500, 5000, 15000],
+    ),
+    AchievementData(
+      id: 'flush',
+      title: 'Flush Master',
+      description: 'Hit flushes',
+      category: 'hands',
+      icon: Icons.water_drop_rounded,
+      tierRequirements: [1, 5, 15, 50, 150, 500, 1500],
+    ),
+    AchievementData(
+      id: 'straight',
+      title: 'Straight Shooter',
+      description: 'Hit straights',
+      category: 'hands',
+      icon: Icons.linear_scale_rounded,
+      tierRequirements: [1, 5, 15, 50, 150, 500, 1500],
+    ),
+    AchievementData(
+      id: 'full_house',
+      title: 'Full House',
+      description: 'Hit full houses',
+      category: 'hands',
+      icon: Icons.home_rounded,
+      tierRequirements: [1, 3, 10, 30, 100, 300, 1000],
+    ),
 
-    // Hands (11-25)
-    AchievementData('🃏', 'Royal Flush', 'Hit a Royal Flush', false, 0.0),
-    AchievementData('🎰', 'Straight Flush', 'Hit a Straight Flush', false, 0.0),
-    AchievementData('4️⃣', 'Four of a Kind', 'Hit Four of a Kind', false, 0.0),
-    AchievementData('🏠', 'Full House', 'Hit a Full House', false, 0.0),
-    AchievementData('♠️', 'Flush Master', 'Hit a Flush', false, 0.0),
-    AchievementData('📊', 'Straight Draw', 'Hit a Straight', false, 0.0),
-    AchievementData('3️⃣', 'Three of a Kind', 'Hit Three of a Kind', false, 0.0),
-    AchievementData('✌️', 'Two Pair Pro', 'Hit Two Pair', false, 0.0),
-    AchievementData('👫', 'Pair Up', 'Win with a Pair', false, 0.0),
-    AchievementData('🎲', 'Lucky 7s', 'Win with pocket 7s', false, 0.0),
-    AchievementData('♦️', 'Diamond Hand', 'Win with diamond flush', false, 0.0),
-    AchievementData('♥️', 'Heart Breaker', 'Win with heart flush', false, 0.0),
-    AchievementData('♣️', 'Club Crusher', 'Win with club flush', false, 0.0),
-    AchievementData('🂡', 'Ace High', 'Win with Ace high', false, 0.0),
-    AchievementData('👑', 'Pocket Kings', 'Win with pocket Kings', false, 0.0),
+    // Wins Category
+    AchievementData(
+      id: 'games_won',
+      title: 'Winner',
+      description: 'Win games',
+      category: 'wins',
+      icon: Icons.emoji_events_rounded,
+      tierRequirements: [1, 10, 50, 150, 500, 1500, 5000],
+    ),
+    AchievementData(
+      id: 'win_streak',
+      title: 'Hot Streak',
+      description: 'Win hands in a row',
+      category: 'wins',
+      icon: Icons.local_fire_department_rounded,
+      tierRequirements: [3, 5, 7, 10, 15, 20, 30],
+    ),
+    AchievementData(
+      id: 'tournaments',
+      title: 'Tournament Pro',
+      description: 'Win Sit & Go tournaments',
+      category: 'wins',
+      icon: Icons.workspace_premium_rounded,
+      tierRequirements: [1, 5, 15, 50, 150, 500, 1500],
+    ),
+    AchievementData(
+      id: 'all_in',
+      title: 'All In Master',
+      description: 'Win all-in hands',
+      category: 'wins',
+      icon: Icons.casino_rounded,
+      tierRequirements: [5, 25, 75, 250, 750, 2500, 7500],
+    ),
 
-    // Wins (26-40)
-    AchievementData('🔥', 'Win Streak 3', 'Win 3 hands in a row', false, 0.0),
-    AchievementData('🔥', 'Win Streak 5', 'Win 5 hands in a row', false, 0.0),
-    AchievementData('🔥', 'Win Streak 10', 'Win 10 hands in a row', false, 0.0),
-    AchievementData('🔥', 'Win Streak 20', 'Win 20 hands in a row', false, 0.0),
-    AchievementData('🏅', '10 Wins', 'Win 10 games total', false, 0.0),
-    AchievementData('🏅', '50 Wins', 'Win 50 games total', false, 0.0),
-    AchievementData('🏅', '100 Wins', 'Win 100 games total', false, 0.0),
-    AchievementData('🏅', '500 Wins', 'Win 500 games total', false, 0.0),
-    AchievementData('🏅', '1000 Wins', 'Win 1000 games total', false, 0.0),
-    AchievementData('💯', 'Perfect Game', 'Win without losing a hand', false, 0.0),
-    AchievementData('🎯', 'Flawless Victory', 'Win with all chips doubled', false, 0.0),
-    AchievementData('⚡', 'Quick Win', 'Win a game under 5 minutes', false, 0.0),
-    AchievementData('🐢', 'Patient Win', 'Win a game over 30 minutes', false, 0.0),
-    AchievementData('🎪', 'Comeback King', 'Win after being down 90%', false, 0.0),
-    AchievementData('🦁', 'Dominant Win', 'Win with 10x starting chips', false, 0.0),
+    // Chips Category
+    AchievementData(
+      id: 'chip_earner',
+      title: 'Chip Collector',
+      description: 'Earn chips total',
+      category: 'chips',
+      icon: Icons.paid_rounded,
+      tierRequirements: [10000, 100000, 1000000, 10000000, 100000000, 500000000, 1000000000],
+    ),
+    AchievementData(
+      id: 'big_pot',
+      title: 'Big Winner',
+      description: 'Win chips in a single hand',
+      category: 'chips',
+      icon: Icons.monetization_on_rounded,
+      tierRequirements: [5000, 25000, 100000, 500000, 2000000, 10000000, 50000000],
+    ),
+    AchievementData(
+      id: 'daily_bonus',
+      title: 'Daily Devotee',
+      description: 'Claim daily bonuses',
+      category: 'chips',
+      icon: Icons.calendar_today_rounded,
+      tierRequirements: [7, 30, 90, 180, 365, 730, 1095],
+    ),
+    AchievementData(
+      id: 'wheel_spin',
+      title: 'Lucky Spinner',
+      description: 'Spin the wheel',
+      category: 'chips',
+      icon: Icons.refresh_rounded,
+      tierRequirements: [10, 50, 150, 500, 1500, 5000, 15000],
+    ),
 
-    // Chips (41-55)
-    AchievementData('💰', 'First 10K', 'Accumulate 10,000 chips', false, 0.0),
-    AchievementData('💰', 'First 100K', 'Accumulate 100,000 chips', false, 0.0),
-    AchievementData('💰', 'First Million', 'Accumulate 1,000,000 chips', false, 0.0),
-    AchievementData('💰', '10 Million', 'Accumulate 10,000,000 chips', false, 0.0),
-    AchievementData('💰', '100 Million', 'Accumulate 100,000,000 chips', false, 0.0),
-    AchievementData('🤑', 'Big Winner', 'Win 50,000 chips in one hand', false, 0.0),
-    AchievementData('💎', 'High Roller', 'Play at VIP stakes', false, 0.0),
-    AchievementData('🏦', 'Banker', 'Save 500,000 chips', false, 0.0),
-    AchievementData('💵', 'Cash Cow', 'Win 10 cash games', false, 0.0),
-    AchievementData('📦', 'Chip Collector', 'Collect daily bonus 30 times', false, 0.0),
-    AchievementData('🎁', 'Daily Bonus', 'Claim your first daily bonus', false, 0.0),
-    AchievementData('🎡', 'Spin Winner', 'Win 10,000 from the wheel', false, 0.0),
-    AchievementData('💫', 'Jackpot', 'Hit the jackpot on the wheel', false, 0.0),
-    AchievementData('🌟', 'Mega Jackpot', 'Win 100,000 from the wheel', false, 0.0),
-    AchievementData('✨', 'Ultra Jackpot', 'Win 1,000,000 from the wheel', false, 0.0),
+    // Social Category
+    AchievementData(
+      id: 'friends',
+      title: 'Social Butterfly',
+      description: 'Add friends',
+      category: 'social',
+      icon: Icons.people_rounded,
+      tierRequirements: [1, 5, 15, 30, 50, 100, 200],
+    ),
+    AchievementData(
+      id: 'multiplayer',
+      title: 'Table Regular',
+      description: 'Play multiplayer games',
+      category: 'social',
+      icon: Icons.groups_rounded,
+      tierRequirements: [10, 50, 150, 500, 1500, 5000, 15000],
+    ),
+    AchievementData(
+      id: 'team',
+      title: 'Team Player',
+      description: 'Earn team XP',
+      category: 'social',
+      icon: Icons.shield_rounded,
+      tierRequirements: [100, 500, 2000, 10000, 50000, 200000, 1000000],
+    ),
+    AchievementData(
+      id: 'gifter',
+      title: 'Generous',
+      description: 'Send gifts',
+      category: 'social',
+      icon: Icons.card_giftcard_rounded,
+      tierRequirements: [1, 5, 15, 50, 150, 500, 1500],
+    ),
 
-    // Multiplayer (56-70)
-    AchievementData('🤝', 'Team Player', 'Join your first team', false, 0.0),
-    AchievementData('🏅', 'Team Contributor', 'Earn 10,000 chips for your team', false, 0.0),
-    AchievementData('⭐', 'Team Star', 'Be MVP in a team match', false, 0.0),
-    AchievementData('👥', 'Table Regular', 'Play 50 multiplayer games', false, 0.0),
-    AchievementData('🎭', 'Social Player', 'Play with 20 different players', false, 0.0),
-    AchievementData('🗣️', 'Chatty', 'Send 100 chat messages', false, 0.0),
-    AchievementData('👋', 'Friendly', 'Add 10 friends', false, 0.0),
-    AchievementData('🤜', 'Rival', 'Beat the same player 5 times', false, 0.0),
-    AchievementData('🏰', 'Private Host', 'Host 10 private games', false, 0.0),
-    AchievementData('🎪', 'Party Starter', 'Fill a table with friends', false, 0.0),
-    AchievementData('👑', 'Table King', 'Win 5 games at same table', false, 0.0),
-    AchievementData('🌍', 'World Player', 'Play in 5 time zones', false, 0.0),
-    AchievementData('🌎', 'Globe Trotter', 'Play in 10 countries', false, 0.0),
-    AchievementData('🏆', 'Tournament Win', 'Win a Sit & Go tournament', false, 0.0),
-    AchievementData('🥇', 'Champion', 'Win 10 Sit & Go tournaments', false, 0.0),
+    // Skills Category
+    AchievementData(
+      id: 'bluffer',
+      title: 'Bluff Master',
+      description: 'Win with bluffs',
+      category: 'skills',
+      icon: Icons.theater_comedy_rounded,
+      tierRequirements: [5, 25, 75, 250, 750, 2500, 7500],
+    ),
+    AchievementData(
+      id: 'folder',
+      title: 'Discipline',
+      description: 'Fold hands',
+      category: 'skills',
+      icon: Icons.pan_tool_rounded,
+      tierRequirements: [50, 250, 750, 2500, 7500, 25000, 75000],
+    ),
 
-    // Bluffing (71-80)
-    AchievementData('🎭', 'Bluff Master', 'Win with a bluff 10 times', false, 0.0),
-    AchievementData('🤥', 'Big Bluff', 'Win an all-in bluff', false, 0.0),
-    AchievementData('😏', 'Stone Cold', 'Bluff successfully 5 times in one game', false, 0.0),
-    AchievementData('🎪', 'Show Stopper', 'Win with high card only', false, 0.0),
-    AchievementData('🃏', 'Wild Card', 'Win with 7-2 offsuit', false, 0.0),
-    AchievementData('🎲', 'Risk Taker', 'Go all-in preflop 10 times', false, 0.0),
-    AchievementData('😎', 'Cool Under Pressure', 'Win when down to 1 big blind', false, 0.0),
-    AchievementData('🧊', 'Ice Cold', 'Fold pocket Aces preflop', false, 0.0),
-    AchievementData('🔮', 'Mind Reader', 'Call a bluff correctly 10 times', false, 0.0),
-    AchievementData('🎯', 'Perfect Read', 'Predict opponent cards correctly', false, 0.0),
-
-    // All-In (81-90)
-    AchievementData('🌟', 'All In Win', 'Win your first all-in', false, 0.0),
-    AchievementData('🌟', '10 All In Wins', 'Win 10 all-in hands', false, 0.0),
-    AchievementData('🌟', '50 All In Wins', 'Win 50 all-in hands', false, 0.0),
-    AchievementData('🌟', '100 All In Wins', 'Win 100 all-in hands', false, 0.0),
-    AchievementData('💥', 'Double Up', 'Double your chips in one hand', false, 0.0),
-    AchievementData('💥', 'Triple Up', 'Triple your chips in one hand', false, 0.0),
-    AchievementData('🚀', 'Moon Shot', 'Win 10x your bet in one hand', false, 0.0),
-    AchievementData('☄️', 'Comet', 'Win 5 all-ins in a row', false, 0.0),
-    AchievementData('🌌', 'Galaxy Brain', 'Win 10 all-ins in a row', false, 0.0),
-    AchievementData('👑', 'All In King', 'Win 20 all-ins in a row', false, 0.0),
-
-    // Special (91-100)
-    AchievementData('🎄', 'Holiday Special', 'Play on Christmas Day', false, 0.0),
-    AchievementData('🎃', 'Spooky Win', 'Win on Halloween', false, 0.0),
-    AchievementData('❤️', 'Valentine Luck', 'Win on Valentine\'s Day', false, 0.0),
-    AchievementData('🍀', 'St Patrick', 'Win on St. Patrick\'s Day', false, 0.0),
-    AchievementData('🎆', 'New Year', 'Play on New Year\'s Day', false, 0.0),
-    AchievementData('🌙', 'Night Owl', 'Play between 12am and 4am', false, 0.0),
-    AchievementData('🌅', 'Early Bird', 'Play between 5am and 7am', false, 0.0),
-    AchievementData('📅', 'Weekly Streak', 'Play every day for a week', false, 0.0),
-    AchievementData('🗓️', 'Monthly Streak', 'Play every day for a month', false, 0.0),
-    AchievementData('👑', 'Legend', 'Unlock all other achievements', false, 0.0),
+    // Special Category
+    AchievementData(
+      id: 'level',
+      title: 'Leveler',
+      description: 'Reach levels',
+      category: 'special',
+      icon: Icons.arrow_upward_rounded,
+      tierRequirements: [5, 15, 30, 50, 75, 100, 150],
+    ),
+    AchievementData(
+      id: 'play_time',
+      title: 'Veteran',
+      description: 'Play hours',
+      category: 'special',
+      icon: Icons.access_time_rounded,
+      tierRequirements: [1, 10, 50, 150, 500, 1500, 5000],
+    ),
   ];
 
   factory AchievementCard.fromIndex(int index) {
-    final data = _achievements[index];
-    return AchievementCard(
-      emoji: data.emoji,
-      title: data.title,
-      description: data.description,
-      isUnlocked: data.isUnlocked,
-      progress: data.progress,
-    );
+    return AchievementCard(data: _achievements[index]);
   }
 
   void _showAchievementDialog(BuildContext context) {
     showDialog(
       context: context,
       builder: (context) => Dialog(
-        backgroundColor: const Color(0xFF121212),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-          side: BorderSide(
-            color: isUnlocked ? Colors.white.withValues(alpha: 0.15) : Colors.white.withValues(alpha: 0.08),
-            width: 1,
+        backgroundColor: Colors.transparent,
+        child: Container(
+          width: 320,
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color(0xFF1A1A2E), Color(0xFF0F0F1A)],
+            ),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: currentTierInfo?.color.withValues(alpha: 0.5) ?? Colors.white.withValues(alpha: 0.1),
+              width: 2,
+            ),
           ),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(20),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              // Header with category
               Container(
-                width: 56,
-                height: 56,
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 14),
                 decoration: BoxDecoration(
-                  color: isUnlocked ? Colors.white.withValues(alpha: 0.1) : Colors.white.withValues(alpha: 0.05),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: isUnlocked ? Colors.white.withValues(alpha: 0.15) : Colors.white.withValues(alpha: 0.08),
-                    width: 1,
-                  ),
-                ),
-                child: Center(
-                  child: Text(emoji, style: TextStyle(fontSize: 26, color: isUnlocked ? null : Colors.grey)),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                title,
-                style: TextStyle(
-                  color: isUnlocked ? Colors.white.withValues(alpha: 0.9) : Colors.white.withValues(alpha: 0.7),
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 10),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.04),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(
-                  description,
-                  style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 12),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-              const SizedBox(height: 12),
-              if (isUnlocked)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.check_circle, color: Colors.white.withValues(alpha: 0.6), size: 14),
-                      SizedBox(width: 4),
-                      Text(
-                        'UNLOCKED',
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.6),
-                          fontSize: 10,
-                          fontWeight: FontWeight.w500,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
+                  gradient: LinearGradient(
+                    colors: [
+                      (currentTierInfo?.color ?? Colors.white).withValues(alpha: 0.2),
+                      (currentTierInfo?.color ?? Colors.white).withValues(alpha: 0.05),
                     ],
                   ),
-                )
-              else if (progress > 0)
-                Column(
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(18),
+                    topRight: Radius.circular(18),
+                  ),
+                ),
+                child: Column(
                   children: [
+                    Icon(data.icon, color: Colors.white.withValues(alpha: 0.6), size: 16),
+                    const SizedBox(height: 4),
                     Text(
-                      '${(progress * 100).toInt()}% Complete',
-                      style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 10),
-                    ),
-                    const SizedBox(height: 6),
-                    SizedBox(
-                      width: 120,
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(2),
-                        child: LinearProgressIndicator(
-                          value: progress,
-                          backgroundColor: Colors.white.withValues(alpha: 0.08),
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white.withValues(alpha: 0.4)),
-                          minHeight: 4,
-                        ),
+                      data.category.toUpperCase(),
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.5),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 2,
                       ),
                     ),
                   ],
-                )
-              else
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.04),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.lock_outline, color: Colors.white.withValues(alpha: 0.3), size: 14),
-                      const SizedBox(width: 4),
-                      Text(
-                        'LOCKED',
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.3),
-                          fontSize: 10,
-                          fontWeight: FontWeight.w500,
-                          letterSpacing: 0.5,
+                ),
+              ),
+
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  children: [
+                    // Achievement icon
+                    Container(
+                      width: 70,
+                      height: 70,
+                      decoration: BoxDecoration(
+                        gradient: RadialGradient(
+                          colors: currentTierInfo != null
+                              ? [
+                                  currentTierInfo!.color.withValues(alpha: 0.3),
+                                  currentTierInfo!.color.withValues(alpha: 0.1)
+                                ]
+                              : [Colors.white.withValues(alpha: 0.1), Colors.white.withValues(alpha: 0.03)],
+                        ),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: currentTierInfo?.color ?? Colors.white.withValues(alpha: 0.15),
+                          width: 2,
                         ),
                       ),
-                    ],
+                      child: Center(
+                        child: Icon(
+                          data.icon,
+                          size: 32,
+                          color: currentTierInfo?.color ?? Colors.white.withValues(alpha: 0.3),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Title
+                    Text(
+                      data.title,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      data.description,
+                      style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Tier progress row
+                    SizedBox(
+                      height: 56,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: List.generate(7, (i) {
+                          final tier = tiers[i];
+                          final isUnlocked = data.currentTier > i;
+                          final isCurrent = data.currentTier == i + 1;
+                          return Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 32,
+                                height: 32,
+                                decoration: BoxDecoration(
+                                  color: isUnlocked || isCurrent
+                                      ? tier.color.withValues(alpha: 0.2)
+                                      : Colors.white.withValues(alpha: 0.03),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: isUnlocked || isCurrent
+                                        ? tier.color.withValues(alpha: 0.5)
+                                        : Colors.white.withValues(alpha: 0.08),
+                                    width: isCurrent ? 2 : 1,
+                                  ),
+                                  boxShadow: isCurrent
+                                      ? [
+                                          BoxShadow(color: tier.color.withValues(alpha: 0.4), blurRadius: 8),
+                                        ]
+                                      : null,
+                                ),
+                                child: Center(
+                                  child: _buildTierMedalIcon(tier, isUnlocked || isCurrent, 18),
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                tier.name.substring(0, 1),
+                                style: TextStyle(
+                                  color: isUnlocked || isCurrent ? tier.color : Colors.white.withValues(alpha: 0.3),
+                                  fontSize: 8,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          );
+                        }),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Progress info
+                    if (data.currentTier < 7) ...[
+                      Text(
+                        'Progress to ${nextTierInfo?.name ?? "Max"}',
+                        style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 11),
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(4),
+                              child: LinearProgressIndicator(
+                                value: progressToNextTier,
+                                backgroundColor: Colors.white.withValues(alpha: 0.1),
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  nextTierInfo?.color ?? Colors.white,
+                                ),
+                                minHeight: 8,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Text(
+                            '${data.currentProgress} / $nextTierRequirement',
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.6),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ] else
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(colors: tiers[6].gradient),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Text(
+                          'MAX TIER REACHED',
+                          style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+
+              // Close button
+              Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.06))),
+                ),
+                child: TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: const RoundedRectangleBorder(
+                      borderRadius: BorderRadius.only(
+                        bottomLeft: Radius.circular(18),
+                        bottomRight: Radius.circular(18),
+                      ),
+                    ),
                   ),
-                ),
-              const SizedBox(height: 16),
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                style: TextButton.styleFrom(
-                  backgroundColor: Colors.white.withValues(alpha: 0.08),
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-                child: Text(
-                  'Close',
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.7),
-                    fontWeight: FontWeight.w500,
-                    fontSize: 13,
+                  child: Text(
+                    'CLOSE',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.6),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ),
@@ -5001,78 +5470,149 @@ class AchievementCard extends StatelessWidget {
     );
   }
 
+  Widget _buildTierMedalIcon(TierInfo tier, bool isActive, double size) {
+    return ShaderMask(
+      shaderCallback: (bounds) => LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: isActive ? tier.gradient : [Colors.white.withValues(alpha: 0.2), Colors.white.withValues(alpha: 0.1)],
+      ).createShader(bounds),
+      child: Icon(tier.icon, size: size, color: Colors.white),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final displayTier = currentTierInfo;
+    final displayColor = displayTier?.color ?? Colors.white.withValues(alpha: 0.3);
+
     return GestureDetector(
       onTap: () => _showAchievementDialog(context),
       child: Container(
-        padding: const EdgeInsets.all(6),
+        padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: isUnlocked ? Colors.white.withValues(alpha: 0.06) : Colors.white.withValues(alpha: 0.03),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: isUnlocked ? Colors.white.withValues(alpha: 0.12) : Colors.white.withValues(alpha: 0.06),
-            width: 1,
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: displayTier != null
+                ? [displayColor.withValues(alpha: 0.2), displayColor.withValues(alpha: 0.05)]
+                : [Colors.white.withValues(alpha: 0.04), Colors.white.withValues(alpha: 0.02)],
           ),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: displayTier != null ? displayColor.withValues(alpha: 0.4) : Colors.white.withValues(alpha: 0.08),
+            width: displayTier != null ? 2 : 1,
+          ),
+          boxShadow:
+              displayTier != null ? [BoxShadow(color: displayColor.withValues(alpha: 0.25), blurRadius: 10)] : null,
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Stack(
-              alignment: Alignment.center,
-              children: [
-                Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    color: isUnlocked ? Colors.white.withValues(alpha: 0.08) : Colors.white.withValues(alpha: 0.04),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Center(
-                    child: Text(emoji, style: TextStyle(fontSize: 16, color: isUnlocked ? null : Colors.grey)),
+            // Current tier indicator
+            if (displayTier != null)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                margin: const EdgeInsets.only(bottom: 6),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(colors: displayTier.gradient),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  displayTier.name.toUpperCase(),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 7,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.5,
                   ),
                 ),
-                if (isUnlocked)
-                  Positioned(
-                    right: -2,
-                    bottom: -2,
-                    child: Container(
-                      width: 12,
-                      height: 12,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.3),
-                        shape: BoxShape.circle,
-                        border: Border.all(color: const Color(0xFF0A0A0A), width: 1.5),
-                      ),
-                      child: const Icon(Icons.check, color: Colors.white, size: 7),
-                    ),
-                  ),
-              ],
+              )
+            else
+              Container(
+                width: 30,
+                height: 3,
+                margin: const EdgeInsets.only(bottom: 6),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+
+            // Icon with tier-appropriate styling
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                gradient: RadialGradient(
+                  colors: displayTier != null
+                      ? [displayColor.withValues(alpha: 0.3), displayColor.withValues(alpha: 0.1)]
+                      : [Colors.white.withValues(alpha: 0.06), Colors.white.withValues(alpha: 0.02)],
+                ),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color:
+                      displayTier != null ? displayColor.withValues(alpha: 0.4) : Colors.white.withValues(alpha: 0.1),
+                  width: 2,
+                ),
+              ),
+              child: Center(
+                child: Icon(
+                  data.icon,
+                  size: 20,
+                  color: displayTier != null ? displayColor : Colors.white.withValues(alpha: 0.25),
+                ),
+              ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 6),
+
+            // Title
             Text(
-              title,
+              data.title,
               style: TextStyle(
-                color: isUnlocked ? Colors.white.withValues(alpha: 0.8) : Colors.white.withValues(alpha: 0.5),
-                fontSize: 8,
-                fontWeight: FontWeight.w500,
+                color: displayTier != null ? Colors.white : Colors.white.withValues(alpha: 0.5),
+                fontSize: 9,
+                fontWeight: FontWeight.w700,
               ),
               textAlign: TextAlign.center,
-              maxLines: 2,
+              maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
-            if (!isUnlocked && progress > 0 && progress < 1) ...[
-              const SizedBox(height: 4),
+            const SizedBox(height: 4),
+
+            // Progress bar to next tier
+            if (data.currentTier < 7) ...[
               ClipRRect(
                 borderRadius: BorderRadius.circular(2),
                 child: LinearProgressIndicator(
-                  value: progress,
+                  value: progressToNextTier,
                   backgroundColor: Colors.white.withValues(alpha: 0.1),
-                  valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFFD4AF37)),
-                  minHeight: 3,
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    nextTierInfo?.color ?? Colors.white.withValues(alpha: 0.3),
+                  ),
+                  minHeight: 4,
                 ),
               ),
-            ],
+              const SizedBox(height: 2),
+              Text(
+                '${data.currentProgress}/${nextTierRequirement}',
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.4),
+                  fontSize: 8,
+                ),
+              ),
+            ] else
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.check_circle, color: displayColor, size: 10),
+                  const SizedBox(width: 2),
+                  Text(
+                    'MAX',
+                    style: TextStyle(color: displayColor, fontSize: 8, fontWeight: FontWeight.w700),
+                  ),
+                ],
+              ),
           ],
         ),
       ),
@@ -5162,7 +5702,7 @@ class CustomizationCard extends StatelessWidget {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Text('💎', style: TextStyle(fontSize: 16)),
+                        const Text('ðŸ’Ž', style: TextStyle(fontSize: 16)),
                         const SizedBox(width: 6),
                         Text(
                           price,
@@ -5249,7 +5789,7 @@ class CustomizationCard extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Text('💎', style: TextStyle(fontSize: 10)),
+                  const Text('ðŸ’Ž', style: TextStyle(fontSize: 10)),
                   const SizedBox(width: 4),
                   Text(
                     price,
@@ -5347,7 +5887,7 @@ class ChestCard extends StatelessWidget {
               decoration: BoxDecoration(color: gradient[0], borderRadius: BorderRadius.circular(14)),
               child: Row(
                 children: [
-                  const Text('💎', style: TextStyle(fontSize: 14)),
+                  const Text('ðŸ’Ž', style: TextStyle(fontSize: 14)),
                   const SizedBox(width: 4),
                   Text(
                     price.toString(),
@@ -5451,7 +5991,7 @@ class ChestCard extends StatelessWidget {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Text('💎', style: TextStyle(fontSize: 14)),
+                          const Text('ðŸ’Ž', style: TextStyle(fontSize: 14)),
                           const SizedBox(width: 6),
                           Text(
                             'Open ($price)',
@@ -5489,7 +6029,7 @@ class ChestCard extends StatelessWidget {
               Text(emoji, style: const TextStyle(fontSize: 64)),
               const SizedBox(height: 20),
               const Text(
-                '🎉 You Got! 🎉',
+                'ðŸŽ‰ You Got! ðŸŽ‰',
                 style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 12),
@@ -5652,7 +6192,7 @@ class FriendAvatarExpanded extends StatelessWidget {
                   border: Border.all(color: const Color(0xFFD4AF37).withValues(alpha: 0.4)),
                 ),
                 child: const Text(
-                  '🏆 Gold III',
+                  'ðŸ† Gold III',
                   style: TextStyle(color: Color(0xFFD4AF37), fontSize: 12, fontWeight: FontWeight.w600),
                 ),
               ),
@@ -5704,11 +6244,11 @@ class FriendAvatarExpanded extends StatelessWidget {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: const [
-                    Text('🏆', style: TextStyle(fontSize: 24)),
-                    Text('⭐', style: TextStyle(fontSize: 24)),
-                    Text('🎯', style: TextStyle(fontSize: 24)),
-                    Text('💎', style: TextStyle(fontSize: 24)),
-                    Text('🔥', style: TextStyle(fontSize: 24)),
+                    Text('ðŸ†', style: TextStyle(fontSize: 24)),
+                    Text('â­', style: TextStyle(fontSize: 24)),
+                    Text('ðŸŽ¯', style: TextStyle(fontSize: 24)),
+                    Text('ðŸ’Ž', style: TextStyle(fontSize: 24)),
+                    Text('ðŸ”¥', style: TextStyle(fontSize: 24)),
                   ],
                 ),
               ),
@@ -5722,7 +6262,7 @@ class FriendAvatarExpanded extends StatelessWidget {
                         Navigator.pop(context);
                         onChallenge();
                       },
-                      icon: const Text('⚔️', style: TextStyle(fontSize: 16)),
+                      icon: const Text('âš”ï¸', style: TextStyle(fontSize: 16)),
                       label: const Text('Challenge'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFFE91E63),
@@ -5739,7 +6279,7 @@ class FriendAvatarExpanded extends StatelessWidget {
                         Navigator.pop(context);
                         onGift();
                       },
-                      icon: const Text('🎁', style: TextStyle(fontSize: 16)),
+                      icon: const Text('ðŸŽ', style: TextStyle(fontSize: 16)),
                       label: const Text('Gift'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF4CAF50),
@@ -5829,7 +6369,7 @@ class StakeOption extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text('🪙', style: TextStyle(fontSize: 14)),
+          const Text('ðŸª™', style: TextStyle(fontSize: 14)),
           const SizedBox(width: 6),
           Text(
             amount,
@@ -5850,12 +6390,12 @@ class StakeOption extends StatelessWidget {
 // ============================================================================
 
 class GiftOption extends StatelessWidget {
-  final String emoji;
+  final dynamic icon;
   final String label;
   final String amount;
   final bool isSelected;
 
-  const GiftOption({required this.emoji, required this.label, required this.amount, required this.isSelected});
+  const GiftOption({required this.icon, required this.label, required this.amount, required this.isSelected});
 
   @override
   Widget build(BuildContext context) {
@@ -5868,7 +6408,9 @@ class GiftOption extends StatelessWidget {
       ),
       child: Column(
         children: [
-          Text(emoji, style: const TextStyle(fontSize: 28)),
+          icon is IconData
+              ? Icon(icon, color: isSelected ? const Color(0xFF4CAF50) : Colors.white70, size: 30)
+              : Text(icon.toString(), style: const TextStyle(fontSize: 28)),
           const SizedBox(height: 8),
           Text(
             label,
@@ -5893,11 +6435,11 @@ class GiftOption extends StatelessWidget {
 // ============================================================================
 
 class TierReward extends StatelessWidget {
-  final String emoji;
+  final dynamic icon;
   final String label;
   final bool isFree;
 
-  const TierReward({required this.emoji, required this.label, required this.isFree});
+  const TierReward({required this.icon, required this.label, required this.isFree});
 
   @override
   Widget build(BuildContext context) {
@@ -5911,7 +6453,11 @@ class TierReward extends StatelessWidget {
             borderRadius: BorderRadius.circular(10),
             border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
           ),
-          child: Center(child: Text(emoji, style: const TextStyle(fontSize: 16))),
+          child: Center(
+            child: icon is IconData
+                ? Icon(icon, color: isFree ? Colors.white70 : const Color(0xFFFFD700), size: 18)
+                : Text(icon.toString(), style: const TextStyle(fontSize: 16)),
+          ),
         ),
         const SizedBox(height: 4),
         Text(label, style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 9)),
@@ -5919,7 +6465,7 @@ class TierReward extends StatelessWidget {
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('👑', style: TextStyle(fontSize: 7)),
+              const Icon(Icons.workspace_premium, color: Color(0xFFFFD700), size: 8),
               const SizedBox(width: 2),
               Text('Premium', style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 7)),
             ],
@@ -6360,7 +6906,7 @@ class LuckyHandDialog extends StatelessWidget {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Text('🪙', style: TextStyle(fontSize: 18)),
+                            const Text('ðŸª™', style: TextStyle(fontSize: 18)),
                             const SizedBox(width: 8),
                             Text(
                               '+${UserPreferences.formatChips(luckyHand.bonusReward)}',
@@ -6405,7 +6951,7 @@ class LuckyHandDialog extends StatelessWidget {
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Text('🪙', style: TextStyle(fontSize: 16)),
+                              const Text('ðŸª™', style: TextStyle(fontSize: 16)),
                               const SizedBox(width: 4),
                               Text(
                                 UserPreferences.formatChips(totalEarned),

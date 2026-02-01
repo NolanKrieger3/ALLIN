@@ -270,32 +270,324 @@ class ShopTabState extends State<ShopTab> with SingleTickerProviderStateMixin {
           ),
           const SizedBox(height: 12),
 
-          // Starter Pack - Simplified
-          HotDealCard(
-            title: 'Starter Pack',
-            subtitle: 'Perfect for new players',
-            icon: Icons.rocket_launch_rounded,
-            items: ['10,000 Chips', '50 Gems', 'Gold Card Back'],
-            price: '\$2.99',
-            originalPrice: '\$5.99',
-            gradient: [Colors.white.withValues(alpha: 0.05), Colors.white.withValues(alpha: 0.02)],
-          ),
-          const SizedBox(height: 10),
+          // Starter Pack - Compact horizontal card with rocket trail effect
+          _buildStarterPackCard(),
+          const SizedBox(height: 14),
 
-          // VIP Bundle
-          HotDealCard(
-            title: 'VIP Bundle',
-            subtitle: 'Best value pack',
-            icon: Icons.workspace_premium_rounded,
-            items: ['100,000 Chips', '500 Gems', 'Royal Set'],
-            price: '\$19.99',
-            originalPrice: '\$49.99',
-            gradient: [Colors.white.withValues(alpha: 0.05), Colors.white.withValues(alpha: 0.02)],
-            isBest: true,
-          ),
+          // VIP Bundle - Premium vertical card with animated shimmer border
+          _buildVIPBundleCard(),
           const SizedBox(height: 30),
         ],
       ),
+    );
+  }
+
+  Widget _buildStarterPackCard() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            const Color(0xFF0D3B4A),
+            const Color(0xFF0A2530),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF4DD0E1).withValues(alpha: 0.3), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF4DD0E1).withValues(alpha: 0.1),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          // Rocket icon with glow
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF4DD0E1), Color(0xFF26C6DA)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(14),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF4DD0E1).withValues(alpha: 0.4),
+                  blurRadius: 12,
+                ),
+              ],
+            ),
+            child: const Icon(Icons.rocket_launch_rounded, color: Colors.white, size: 28),
+          ),
+          const SizedBox(width: 14),
+          // Content
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Text(
+                      'Starter Pack',
+                      style: TextStyle(
+                        color: Color(0xFF4DD0E1),
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF4DD0E1).withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Text(
+                        '50% OFF',
+                        style: TextStyle(color: Color(0xFF4DD0E1), fontSize: 9, fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    _buildStarterItem(Icons.paid_rounded, '10K'),
+                    const SizedBox(width: 12),
+                    _buildStarterItem(Icons.diamond_rounded, '50'),
+                    const SizedBox(width: 12),
+                    _buildStarterItem(Icons.style_rounded, 'Card'),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          // Price column
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                '\$5.99',
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.35),
+                  fontSize: 11,
+                  decoration: TextDecoration.lineThrough,
+                  decorationColor: Colors.white.withValues(alpha: 0.35),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF4DD0E1), Color(0xFF00ACC1)],
+                  ),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Text(
+                  '\$2.99',
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStarterItem(IconData icon, String label) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, color: const Color(0xFF4DD0E1).withValues(alpha: 0.7), size: 14),
+        const SizedBox(width: 3),
+        Text(
+          label,
+          style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 11, fontWeight: FontWeight.w500),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildVIPBundleCard() {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF2D1F0D), Color(0xFF1A1208)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          width: 2,
+          color: const Color(0xFFD4AF37).withValues(alpha: 0.5),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFD4AF37).withValues(alpha: 0.15),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // Crown header
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  const Color(0xFFD4AF37).withValues(alpha: 0.2),
+                  const Color(0xFFD4AF37).withValues(alpha: 0.05),
+                ],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              ),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.auto_awesome, color: Color(0xFFD4AF37), size: 16),
+                const SizedBox(width: 6),
+                const Text(
+                  'BEST VALUE',
+                  style: TextStyle(
+                    color: Color(0xFFD4AF37),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.5,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                const Icon(Icons.auto_awesome, color: Color(0xFFD4AF37), size: 16),
+              ],
+            ),
+          ),
+          // Main content
+          Padding(
+            padding: const EdgeInsets.all(18),
+            child: Row(
+              children: [
+                // Premium emblem
+                Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFFFD700), Color(0xFFD4AF37), Color(0xFFB8860B)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFD4AF37).withValues(alpha: 0.5),
+                        blurRadius: 16,
+                      ),
+                    ],
+                  ),
+                  child: const Icon(Icons.workspace_premium_rounded, color: Colors.white, size: 32),
+                ),
+                const SizedBox(width: 16),
+                // VIP content
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'VIP Bundle',
+                        style: TextStyle(
+                          color: Color(0xFFFFD700),
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      _buildVIPItem(Icons.paid_rounded, '100,000 Chips'),
+                      const SizedBox(height: 4),
+                      _buildVIPItem(Icons.diamond_rounded, '500 Gems'),
+                      const SizedBox(height: 4),
+                      _buildVIPItem(Icons.collections_rounded, 'Royal Card Set'),
+                    ],
+                  ),
+                ),
+                // Price
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEF4444).withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Text(
+                        'SAVE 60%',
+                        style: TextStyle(color: Color(0xFFEF4444), fontSize: 9, fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      '\$49.99',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.35),
+                        fontSize: 12,
+                        decoration: TextDecoration.lineThrough,
+                        decorationColor: Colors.white.withValues(alpha: 0.35),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFFFFD700), Color(0xFFD4AF37)],
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFFD4AF37).withValues(alpha: 0.4),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: const Text(
+                        '\$19.99',
+                        style: TextStyle(color: Colors.black, fontWeight: FontWeight.w800, fontSize: 16),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVIPItem(IconData icon, String label) {
+    return Row(
+      children: [
+        Icon(icon, color: const Color(0xFFD4AF37).withValues(alpha: 0.8), size: 14),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 12),
+        ),
+      ],
     );
   }
 
@@ -1391,6 +1683,7 @@ class HotDealCard extends StatelessWidget {
   final String originalPrice;
   final List<Color> gradient;
   final bool isBest;
+  final Color? accentColor;
 
   const HotDealCard({
     required this.title,
@@ -1401,26 +1694,44 @@ class HotDealCard extends StatelessWidget {
     required this.originalPrice,
     required this.gradient,
     this.isBest = false,
+    this.accentColor,
   });
 
   @override
   Widget build(BuildContext context) {
+    final accent = accentColor ?? Colors.white;
+
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.03),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+        gradient: LinearGradient(
+          colors: [
+            accent.withValues(alpha: 0.12),
+            accent.withValues(alpha: 0.04),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: accent.withValues(alpha: 0.25), width: 1.5),
       ),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(10),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.06),
-              borderRadius: BorderRadius.circular(10),
+              gradient: LinearGradient(
+                colors: [
+                  accent.withValues(alpha: 0.25),
+                  accent.withValues(alpha: 0.10),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: accent.withValues(alpha: 0.3)),
             ),
-            child: Icon(icon, color: Colors.white.withValues(alpha: 0.7), size: 24),
+            child: Icon(icon, color: accent, size: 26),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -1431,66 +1742,96 @@ class HotDealCard extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500),
+                      style: TextStyle(color: accent, fontSize: 15, fontWeight: FontWeight.w600),
                     ),
                     if (isBest) ...[
                       const SizedBox(width: 8),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.1),
+                          gradient: LinearGradient(
+                            colors: [accent, accent.withValues(alpha: 0.7)],
+                          ),
                           borderRadius: BorderRadius.circular(4),
                         ),
-                        child: Text(
-                          'BEST',
+                        child: const Text(
+                          'BEST VALUE',
                           style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.7),
+                            color: Colors.black,
                             fontSize: 8,
-                            fontWeight: FontWeight.w600,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                       ),
                     ],
                   ],
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 11),
+                ),
+                const SizedBox(height: 6),
                 Wrap(
-                  spacing: 4,
-                  runSpacing: 2,
+                  spacing: 6,
+                  runSpacing: 4,
                   children: items
                       .map(
-                        (item) =>
-                            Text(item, style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 11)),
+                        (item) => Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: accent.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            item,
+                            style: TextStyle(
+                                color: accent.withValues(alpha: 0.8), fontSize: 10, fontWeight: FontWeight.w500),
+                          ),
+                        ),
                       )
                       .toList(),
                 ),
               ],
             ),
           ),
+          const SizedBox(width: 8),
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
                 originalPrice,
                 style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.3),
+                  color: Colors.white.withValues(alpha: 0.35),
                   fontSize: 11,
                   decoration: TextDecoration.lineThrough,
+                  decorationColor: Colors.white.withValues(alpha: 0.35),
                 ),
               ),
-              const SizedBox(height: 2),
+              const SizedBox(height: 4),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
+                  gradient: LinearGradient(
+                    colors: [accent, accent.withValues(alpha: 0.8)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(10),
+                  boxShadow: [
+                    BoxShadow(
+                      color: accent.withValues(alpha: 0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
                 child: Text(
                   price,
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.9),
-                    fontWeight: FontWeight.w500,
-                    fontSize: 13,
+                  style: const TextStyle(
+                    color: Colors.black,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
                   ),
                 ),
               ),
