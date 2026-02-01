@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import '../services/game_service.dart';
+import '../services/bot_service.dart';
 import '../widgets/mobile_wrapper.dart';
 import 'multiplayer_game_screen.dart';
 
@@ -14,6 +15,7 @@ class QuickPlayScreen extends StatefulWidget {
 class _QuickPlayScreenState extends State<QuickPlayScreen> {
   final AuthService _authService = AuthService();
   final GameService _gameService = GameService();
+  final BotService _botService = BotService();
 
   bool _isLoading = false;
   int _selectedBlindIndex = 2; // Default to medium blinds
@@ -89,17 +91,40 @@ class _QuickPlayScreenState extends State<QuickPlayScreen> {
         }
       }
 
-      // If no room found after retries, create a new one
+      // If no room found after retries, check if we should create a new one
       if (roomId == null) {
-        print('📦 No joinable rooms found, creating new room');
-        final room = await _gameService.createRoom(
-          bigBlind: bigBlind,
-          startingChips: buyIn,
-          gameType: 'quickplay',
-          maxPlayers: 6, // Allow up to 6 players in Quick Play lobbies
-        );
-        roomId = room.id;
-        print('✅ Created room ${room.id}');
+        // Only create a new room if all existing rooms for this blind are full
+        final allRoomsFull = await _gameService.areAllRoomsFull(bigBlind, 'quickplay');
+
+        if (allRoomsFull) {
+          print('📦 All rooms are full, creating new room');
+          final room = await _gameService.createRoom(
+            bigBlind: bigBlind,
+            startingChips: buyIn,
+            gameType: 'quickplay',
+            maxPlayers: 6, // Allow up to 6 players in Quick Play lobbies
+          );
+          roomId = room.id;
+          print('✅ Created room ${room.id}');
+        } else {
+          // Wait and retry - there should be a room available
+          print('⏳ Rooms exist but join failed, waiting before retry...');
+          await Future.delayed(const Duration(milliseconds: 1000));
+          // Do one final retry
+          final rooms = await _gameService.fetchJoinableRoomsByBlind(bigBlind, gameType: 'quickplay');
+          if (rooms.isNotEmpty) {
+            for (final room in rooms) {
+              try {
+                await _gameService.joinRoom(room.id, startingChips: buyIn);
+                roomId = room.id;
+                print('✅ Final retry succeeded, joined room ${room.id}');
+                break;
+              } catch (e) {
+                continue;
+              }
+            }
+          }
+        }
       }
 
       if (mounted) {
@@ -150,7 +175,7 @@ class _QuickPlayScreenState extends State<QuickPlayScreen> {
       );
 
       // Add 4 bots to the room
-      await _gameService.addBotsToRoom(room.id, 4);
+      await _botService.addBotsToRoom(room.id, 4);
       print('✅ Added 4 bots to room ${room.id}');
 
       if (mounted) {

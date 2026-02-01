@@ -19,36 +19,23 @@ class DefaultFirebaseOptions {
       return web;
     }
     switch (defaultTargetPlatform) {
-      case TargetPlatform.android:
-        return android;
       case TargetPlatform.iOS:
         return ios;
-      case TargetPlatform.macOS:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for macos - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
       case TargetPlatform.windows:
         return windows;
-      case TargetPlatform.linux:
+      case TargetPlatform.macOS:
         throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for linux - '
+          'DefaultFirebaseOptions have not been configured for macOS - '
           'you can reconfigure this by running the FlutterFire CLI again.',
         );
+      case TargetPlatform.android:
+      case TargetPlatform.linux:
       default:
         throw UnsupportedError(
-          'DefaultFirebaseOptions are not supported for this platform.',
+          'DefaultFirebaseOptions are only configured for iOS and Windows.',
         );
     }
   }
-
-  static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyBMztg8MN8E6Lbbi6gejb3A4whULkFMUgY',
-    appId: '1:635995796421:android:e98032f13cd97997e6d1ac',
-    messagingSenderId: '635995796421',
-    projectId: 'allin-d0e2d',
-    storageBucket: 'allin-d0e2d.firebasestorage.app',
-  );
 
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyDmgQY02h8CQjBHocLh6id9Ps76fwilmg0',

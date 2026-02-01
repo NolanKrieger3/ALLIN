@@ -4,6 +4,7 @@ import 'dart:async';
 import 'dart:math';
 import '../models/game_room.dart';
 import '../services/game_service.dart';
+import '../services/bot_service.dart';
 import '../services/hand_evaluator.dart';
 import '../services/user_preferences.dart';
 import '../services/friends_service.dart';
@@ -27,6 +28,7 @@ class MultiplayerGameScreen extends StatefulWidget {
 
 class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with TickerProviderStateMixin {
   final GameService _gameService = GameService();
+  final BotService _botService = BotService();
   final TextEditingController _chatController = TextEditingController();
   bool _isLoading = false;
   bool _hasAutoStarted = false;
@@ -109,7 +111,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
     final currentTurnId = room.currentTurnPlayerId;
     final isMyTurn = currentTurnId == _gameService.currentUserId;
     final isHost = room.hostId == _gameService.currentUserId;
-    final isBotTurn = currentTurnId != null && _gameService.isBot(currentTurnId);
+    final isBotTurn = currentTurnId != null && _botService.isBot(currentTurnId);
 
     // Handle bot turns - host controls bot actions
     if (isBotTurn && isHost && currentTurnId != _lastBotTurnId && !_isBotActing) {
@@ -190,7 +192,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
 
     try {
       final currentTurnId = room.currentTurnPlayerId;
-      if (currentTurnId == null || !_gameService.isBot(currentTurnId)) {
+      if (currentTurnId == null || !_botService.isBot(currentTurnId)) {
         _isBotActing = false;
         return;
       }
@@ -1302,7 +1304,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
     final isShowdown = room.phase == 'showdown';
     final isWinner = room.winnerId == player.uid;
     final isLoser = isShowdown && _showdownAnimationComplete && !isWinner && !hasFolded;
-    final isBot = _gameService.isBot(player.uid);
+    final isBot = _botService.isBot(player.uid);
 
     // Calculate this player's hand for card highlighting
     EvaluatedHand? playerHand;
@@ -2558,7 +2560,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
 
   void _showPlayerProfile(GamePlayer player) {
     final friendsService = FriendsService();
-    final isBot = _gameService.isBot(player.uid);
+    final isBot = _botService.isBot(player.uid);
 
     showDialog(
       context: context,

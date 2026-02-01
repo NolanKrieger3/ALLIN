@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import '../models/game_room.dart';
 import '../services/game_service.dart';
+import '../services/bot_service.dart';
 import '../widgets/mobile_wrapper.dart';
 import 'multiplayer_game_screen.dart';
 
@@ -23,6 +24,7 @@ class SitAndGoWaitingScreen extends StatefulWidget {
 
 class _SitAndGoWaitingScreenState extends State<SitAndGoWaitingScreen> {
   final GameService _gameService = GameService();
+  final BotService _botService = BotService();
   StreamSubscription? _roomSubscription;
   Timer? _heartbeatTimer;
   GameRoom? _room;
@@ -114,7 +116,7 @@ class _SitAndGoWaitingScreenState extends State<SitAndGoWaitingScreen> {
 
   Future<void> _fillWithBots() async {
     try {
-      await _gameService.fillRoomWithBots(widget.roomId);
+      await _botService.fillRoomWithBots(widget.roomId);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
