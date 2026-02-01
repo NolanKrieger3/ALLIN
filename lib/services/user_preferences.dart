@@ -94,8 +94,33 @@ class UserPreferences {
   static const String _luckyHandIndexKey = 'lucky_hand_index';
   static const String _luckyHandWinsKey = 'lucky_hand_wins_today';
   static const String _hasProPassKey = 'has_pro_pass';
+  static const String _proPassTierKey = 'pro_pass_tier';
+  static const String _proPassXpKey = 'pro_pass_xp';
   static const int _defaultChips = 1000;
   static const int _defaultGems = 100;
+
+  // Stats keys
+  static const String _gamesPlayedKey = 'games_played';
+  static const String _gamesWonKey = 'games_won';
+  static const String _handsPlayedKey = 'hands_played';
+  static const String _handsWonKey = 'hands_won';
+  static const String _highCardsKey = 'high_cards';
+  static const String _onePairsKey = 'one_pairs';
+  static const String _twoPairsKey = 'two_pairs';
+  static const String _threeOfKindsKey = 'three_of_kinds';
+  static const String _straightsKey = 'straights';
+  static const String _flushesKey = 'flushes';
+  static const String _fullHousesKey = 'full_houses';
+  static const String _fourOfKindsKey = 'four_of_kinds';
+  static const String _straightFlushesKey = 'straight_flushes';
+  static const String _royalFlushesKey = 'royal_flushes';
+  static const String _allInsWonKey = 'all_ins_won';
+  static const String _biggestPotKey = 'biggest_pot';
+  static const String _totalChipsWonKey = 'total_chips_won';
+  static const String _sitAndGoWinsKey = 'sit_and_go_wins';
+  static const String _currentWinStreakKey = 'current_win_streak';
+  static const String _bestWinStreakKey = 'best_win_streak';
+  static const String _dailyBonusClaimsKey = 'daily_bonus_claims';
 
   static SharedPreferences? _prefs;
 
@@ -398,5 +423,194 @@ class UserPreferences {
     if (lucky.contains('royal flush') && check.contains('royal')) return true;
 
     return lucky == check;
+  }
+
+  // ============================================================================
+  // PRO PASS TIER & XP SYSTEM
+  // ============================================================================
+
+  /// Get current Pro Pass tier (1-50)
+  static int get proPassTier {
+    return _prefs?.getInt(_proPassTierKey) ?? 1;
+  }
+
+  /// Set Pro Pass tier
+  static Future<void> setProPassTier(int tier) async {
+    await _prefs?.setInt(_proPassTierKey, tier.clamp(1, 50));
+  }
+
+  /// Get current Pro Pass XP
+  static int get proPassXp {
+    return _prefs?.getInt(_proPassXpKey) ?? 0;
+  }
+
+  /// Set Pro Pass XP
+  static Future<void> setProPassXp(int xp) async {
+    await _prefs?.setInt(_proPassXpKey, xp);
+  }
+
+  /// Get XP required for a specific tier
+  static int xpForTier(int tier) {
+    // Progressive XP requirements: base 500 + 100 per tier
+    return 500 + (tier * 100);
+  }
+
+  /// Add XP and handle tier ups
+  static Future<int> addProPassXp(int amount) async {
+    int currentXp = proPassXp + amount;
+    int currentTier = proPassTier;
+    int tiersGained = 0;
+
+    // Check for tier ups
+    while (currentTier < 50 && currentXp >= xpForTier(currentTier)) {
+      currentXp -= xpForTier(currentTier);
+      currentTier++;
+      tiersGained++;
+    }
+
+    await setProPassXp(currentXp);
+    await setProPassTier(currentTier);
+
+    return tiersGained;
+  }
+
+  // ============================================================================
+  // GAME STATISTICS
+  // ============================================================================
+
+  // Games
+  static int get gamesPlayed => _prefs?.getInt(_gamesPlayedKey) ?? 0;
+  static int get gamesWon => _prefs?.getInt(_gamesWonKey) ?? 0;
+  static double get winRate => gamesPlayed > 0 ? (gamesWon / gamesPlayed * 100) : 0.0;
+
+  // Hands
+  static int get handsPlayed => _prefs?.getInt(_handsPlayedKey) ?? 0;
+  static int get handsWon => _prefs?.getInt(_handsWonKey) ?? 0;
+
+  // Winning hands breakdown
+  static int get highCards => _prefs?.getInt(_highCardsKey) ?? 0;
+  static int get onePairs => _prefs?.getInt(_onePairsKey) ?? 0;
+  static int get twoPairs => _prefs?.getInt(_twoPairsKey) ?? 0;
+  static int get threeOfKinds => _prefs?.getInt(_threeOfKindsKey) ?? 0;
+  static int get straights => _prefs?.getInt(_straightsKey) ?? 0;
+  static int get flushes => _prefs?.getInt(_flushesKey) ?? 0;
+  static int get fullHouses => _prefs?.getInt(_fullHousesKey) ?? 0;
+  static int get fourOfKinds => _prefs?.getInt(_fourOfKindsKey) ?? 0;
+  static int get straightFlushes => _prefs?.getInt(_straightFlushesKey) ?? 0;
+  static int get royalFlushes => _prefs?.getInt(_royalFlushesKey) ?? 0;
+
+  // Straight+ total
+  static int get straightPlusTotal => straights + flushes + fullHouses + fourOfKinds + straightFlushes + royalFlushes;
+
+  // Other stats
+  static int get allInsWon => _prefs?.getInt(_allInsWonKey) ?? 0;
+  static int get biggestPot => _prefs?.getInt(_biggestPotKey) ?? 0;
+  static int get totalChipsWon => _prefs?.getInt(_totalChipsWonKey) ?? 0;
+  static int get sitAndGoWins => _prefs?.getInt(_sitAndGoWinsKey) ?? 0;
+  static int get currentWinStreak => _prefs?.getInt(_currentWinStreakKey) ?? 0;
+  static int get bestWinStreak => _prefs?.getInt(_bestWinStreakKey) ?? 0;
+  static int get dailyBonusClaims => _prefs?.getInt(_dailyBonusClaimsKey) ?? 0;
+
+  /// Record a game played
+  static Future<void> recordGamePlayed({required bool won}) async {
+    await _prefs?.setInt(_gamesPlayedKey, gamesPlayed + 1);
+    if (won) {
+      await _prefs?.setInt(_gamesWonKey, gamesWon + 1);
+      final newStreak = currentWinStreak + 1;
+      await _prefs?.setInt(_currentWinStreakKey, newStreak);
+      if (newStreak > bestWinStreak) {
+        await _prefs?.setInt(_bestWinStreakKey, newStreak);
+      }
+    } else {
+      await _prefs?.setInt(_currentWinStreakKey, 0);
+    }
+    // Award XP for playing
+    await addProPassXp(won ? 50 : 10);
+  }
+
+  /// Record a hand won with specific hand type
+  static Future<void> recordHandWon(String handType, int potSize) async {
+    await _prefs?.setInt(_handsPlayedKey, handsPlayed + 1);
+    await _prefs?.setInt(_handsWonKey, handsWon + 1);
+    await _prefs?.setInt(_totalChipsWonKey, totalChipsWon + potSize);
+
+    if (potSize > biggestPot) {
+      await _prefs?.setInt(_biggestPotKey, potSize);
+    }
+
+    // Record by hand type
+    final type = handType.toLowerCase();
+    if (type.contains('royal')) {
+      await _prefs?.setInt(_royalFlushesKey, royalFlushes + 1);
+    } else if (type.contains('straight flush')) {
+      await _prefs?.setInt(_straightFlushesKey, straightFlushes + 1);
+    } else if (type.contains('four') || type.contains('quads')) {
+      await _prefs?.setInt(_fourOfKindsKey, fourOfKinds + 1);
+    } else if (type.contains('full house')) {
+      await _prefs?.setInt(_fullHousesKey, fullHouses + 1);
+    } else if (type.contains('flush')) {
+      await _prefs?.setInt(_flushesKey, flushes + 1);
+    } else if (type.contains('straight')) {
+      await _prefs?.setInt(_straightsKey, straights + 1);
+    } else if (type.contains('three') || type.contains('trips')) {
+      await _prefs?.setInt(_threeOfKindsKey, threeOfKinds + 1);
+    } else if (type.contains('two pair')) {
+      await _prefs?.setInt(_twoPairsKey, twoPairs + 1);
+    } else if (type.contains('pair')) {
+      await _prefs?.setInt(_onePairsKey, onePairs + 1);
+    } else {
+      await _prefs?.setInt(_highCardsKey, highCards + 1);
+    }
+
+    // Award XP for winning hand
+    await addProPassXp(5);
+  }
+
+  /// Record an all-in win
+  static Future<void> recordAllInWon() async {
+    await _prefs?.setInt(_allInsWonKey, allInsWon + 1);
+    await addProPassXp(25);
+  }
+
+  /// Record a Sit & Go tournament win
+  static Future<void> recordSitAndGoWin() async {
+    await _prefs?.setInt(_sitAndGoWinsKey, sitAndGoWins + 1);
+    await addProPassXp(100);
+  }
+
+  /// Record daily bonus claim
+  static Future<void> recordDailyBonusClaim() async {
+    await _prefs?.setInt(_dailyBonusClaimsKey, dailyBonusClaims + 1);
+    await addProPassXp(20);
+  }
+
+  /// Get achievement progress for a specific achievement ID
+  static int getAchievementProgress(String achievementId) {
+    switch (achievementId) {
+      case 'hands_won':
+        return handsWon;
+      case 'flush':
+        return flushes;
+      case 'straight':
+        return straights;
+      case 'full_house':
+        return fullHouses;
+      case 'games_won':
+        return gamesWon;
+      case 'win_streak':
+        return bestWinStreak;
+      case 'tournaments':
+        return sitAndGoWins;
+      case 'all_in':
+        return allInsWon;
+      case 'chip_earner':
+        return totalChipsWon;
+      case 'big_pot':
+        return biggestPot;
+      case 'daily_bonus':
+        return dailyBonusClaims;
+      default:
+        return 0;
+    }
   }
 }
