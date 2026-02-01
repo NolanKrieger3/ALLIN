@@ -435,35 +435,53 @@ class GameActionService {
     final communityCards = List<PlayingCard>.from(room.communityCards);
     final currentPhase = GamePhase.fromString(room.phase);
 
-    switch (currentPhase) {
-      case GamePhase.preflop:
-        deck.removeLast();
-        for (var i = 0; i < 3; i++) {
-          final card = deck.removeLast().split('|');
-          communityCards.add(PlayingCard(rank: card[0], suit: card[1]));
-        }
-        deck.removeLast();
-        final turnCard = deck.removeLast().split('|');
-        communityCards.add(PlayingCard(rank: turnCard[0], suit: turnCard[1]));
-        deck.removeLast();
-        final riverCard = deck.removeLast().split('|');
-        communityCards.add(PlayingCard(rank: riverCard[0], suit: riverCard[1]));
-        break;
-      case GamePhase.flop:
-        deck.removeLast();
-        final turnCard2 = deck.removeLast().split('|');
-        communityCards.add(PlayingCard(rank: turnCard2[0], suit: turnCard2[1]));
-        deck.removeLast();
-        final riverCard2 = deck.removeLast().split('|');
-        communityCards.add(PlayingCard(rank: riverCard2[0], suit: riverCard2[1]));
-        break;
-      case GamePhase.turn:
-        deck.removeLast();
-        final riverCard3 = deck.removeLast().split('|');
-        communityCards.add(PlayingCard(rank: riverCard3[0], suit: riverCard3[1]));
-        break;
-      default:
-        break;
+    // Safety check: ensure deck has enough cards
+    // Worst case: preflop needs 3 burns + 5 community cards = 8 cards
+    if (deck.length < 8 && currentPhase == GamePhase.preflop) {
+      print('⚠️ Deck too small (${deck.length} cards), cannot deal to showdown');
+      return;
+    }
+
+    try {
+      switch (currentPhase) {
+        case GamePhase.preflop:
+          if (deck.length >= 8) {
+            deck.removeLast(); // burn
+            for (var i = 0; i < 3; i++) {
+              final card = deck.removeLast().split('|');
+              communityCards.add(PlayingCard(rank: card[0], suit: card[1]));
+            }
+            deck.removeLast(); // burn
+            final turnCard = deck.removeLast().split('|');
+            communityCards.add(PlayingCard(rank: turnCard[0], suit: turnCard[1]));
+            deck.removeLast(); // burn
+            final riverCard = deck.removeLast().split('|');
+            communityCards.add(PlayingCard(rank: riverCard[0], suit: riverCard[1]));
+          }
+          break;
+        case GamePhase.flop:
+          if (deck.length >= 4) {
+            deck.removeLast(); // burn
+            final turnCard2 = deck.removeLast().split('|');
+            communityCards.add(PlayingCard(rank: turnCard2[0], suit: turnCard2[1]));
+            deck.removeLast(); // burn
+            final riverCard2 = deck.removeLast().split('|');
+            communityCards.add(PlayingCard(rank: riverCard2[0], suit: riverCard2[1]));
+          }
+          break;
+        case GamePhase.turn:
+          if (deck.length >= 2) {
+            deck.removeLast(); // burn
+            final riverCard3 = deck.removeLast().split('|');
+            communityCards.add(PlayingCard(rank: riverCard3[0], suit: riverCard3[1]));
+          }
+          break;
+        default:
+          break;
+      }
+    } catch (e) {
+      print('❌ Error dealing cards to showdown: $e');
+      return;
     }
 
     final activePlayers = players.where((p) => !p.hasFolded).toList();
@@ -508,57 +526,77 @@ class GameActionService {
 
     var updatedPlayers = players.map((p) => p.copyWith(currentBet: 0, hasActed: false, lastAction: null)).toList();
 
-    switch (currentPhase) {
-      case GamePhase.preflop:
-        deck.removeLast();
-        for (var i = 0; i < 3; i++) {
+    try {
+      switch (currentPhase) {
+        case GamePhase.preflop:
+          // Need 1 burn + 3 flop cards = 4 cards minimum
+          if (deck.length < 4) {
+            print('⚠️ Not enough cards in deck for flop (${deck.length} remaining)');
+            return;
+          }
+          deck.removeLast(); // burn
+          for (var i = 0; i < 3; i++) {
+            final card = deck.removeLast().split('|');
+            communityCards.add(PlayingCard(rank: card[0], suit: card[1]));
+          }
+          nextPhase = GamePhase.flop;
+          break;
+        case GamePhase.flop:
+          // Need 1 burn + 1 turn card = 2 cards minimum
+          if (deck.length < 2) {
+            print('⚠️ Not enough cards in deck for turn (${deck.length} remaining)');
+            return;
+          }
+          deck.removeLast(); // burn
           final card = deck.removeLast().split('|');
           communityCards.add(PlayingCard(rank: card[0], suit: card[1]));
-        }
-        nextPhase = GamePhase.flop;
-        break;
-      case GamePhase.flop:
-        deck.removeLast();
-        final card = deck.removeLast().split('|');
-        communityCards.add(PlayingCard(rank: card[0], suit: card[1]));
-        nextPhase = GamePhase.turn;
-        break;
-      case GamePhase.turn:
-        deck.removeLast();
-        final cardStr = deck.removeLast().split('|');
-        communityCards.add(PlayingCard(rank: cardStr[0], suit: cardStr[1]));
-        nextPhase = GamePhase.river;
-        break;
-      case GamePhase.river:
-        nextPhase = GamePhase.showdown;
-        final activePlayers = updatedPlayers.where((p) => !p.hasFolded).toList();
-        final finalPlayers = PotService.distributePots(updatedPlayers, communityCards, pot);
+          nextPhase = GamePhase.turn;
+          break;
+        case GamePhase.turn:
+          // Need 1 burn + 1 river card = 2 cards minimum
+          if (deck.length < 2) {
+            print('⚠️ Not enough cards in deck for river (${deck.length} remaining)');
+            return;
+          }
+          deck.removeLast(); // burn
+          final cardStr = deck.removeLast().split('|');
+          communityCards.add(PlayingCard(rank: cardStr[0], suit: cardStr[1]));
+          nextPhase = GamePhase.river;
+          break;
+        case GamePhase.river:
+          nextPhase = GamePhase.showdown;
+          final activePlayers = updatedPlayers.where((p) => !p.hasFolded).toList();
+          final finalPlayers = PotService.distributePots(updatedPlayers, communityCards, pot);
 
-        final winnerIndices = HandEvaluator.determineWinners(activePlayers, communityCards);
-        if (winnerIndices.isEmpty) winnerIndices.add(0);
-        final firstWinner = activePlayers[winnerIndices.first];
-        final winningHand = HandEvaluator.evaluateBestHand(firstWinner.cards, communityCards);
-        final winnerUids = winnerIndices.map((i) => activePlayers[i].uid).toList();
+          final winnerIndices = HandEvaluator.determineWinners(activePlayers, communityCards);
+          if (winnerIndices.isEmpty) winnerIndices.add(0);
+          final firstWinner = activePlayers[winnerIndices.first];
+          final winningHand = HandEvaluator.evaluateBestHand(firstWinner.cards, communityCards);
+          final winnerUids = winnerIndices.map((i) => activePlayers[i].uid).toList();
 
-        await http.patch(
-          Uri.parse('${RoomService.databaseUrl}/game_rooms/$roomId.json?auth=$token'),
-          body: jsonEncode({
-            'players': finalPlayers.map((p) => p.toJson()).toList(),
-            'communityCards': communityCards.map((c) => c.toJson()).toList(),
-            'deck': deck,
-            'phase': nextPhase.toDbString(),
-            'pot': 0,
-            'currentBet': 0,
-            'lastRaiseAmount': 0,
-            'status': 'finished',
-            'winnerId': winnerUids.first,
-            'winnerIds': winnerUids,
-            'winningHandName': winningHand.description,
-          }),
-        );
-        return;
-      default:
-        nextPhase = currentPhase;
+          await http.patch(
+            Uri.parse('${RoomService.databaseUrl}/game_rooms/$roomId.json?auth=$token'),
+            body: jsonEncode({
+              'players': finalPlayers.map((p) => p.toJson()).toList(),
+              'communityCards': communityCards.map((c) => c.toJson()).toList(),
+              'deck': deck,
+              'phase': nextPhase.toDbString(),
+              'pot': 0,
+              'currentBet': 0,
+              'lastRaiseAmount': 0,
+              'status': 'finished',
+              'winnerId': winnerUids.first,
+              'winnerIds': winnerUids,
+              'winningHandName': winningHand.description,
+            }),
+          );
+          return;
+        default:
+          nextPhase = currentPhase;
+      }
+    } catch (e) {
+      print('❌ Error advancing phase: $e');
+      return;
     }
 
     final firstToActIdx = _getFirstToActIndex(room.copyWith(phase: nextPhase.toDbString()), updatedPlayers);

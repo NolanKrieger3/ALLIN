@@ -29,6 +29,7 @@ class GameFlowService {
     }
 
     deck.shuffle(Random());
+    print('🃏 Created fresh deck with ${deck.length} cards');
     return deck;
   }
 
@@ -48,9 +49,9 @@ class GameFlowService {
     final deck = _createShuffledDeck();
     final numPlayers = room.players.length;
 
-    final updatedPlayers = room.players.asMap().entries.map((entry) {
-      final player = entry.value;
-
+    // Deal cards sequentially to avoid issues with map ordering
+    final updatedPlayers = <GamePlayer>[];
+    for (final player in room.players) {
       final card1Str = deck.removeLast().split('|');
       final card2Str = deck.removeLast().split('|');
       final cards = [
@@ -58,15 +59,17 @@ class GameFlowService {
         PlayingCard(rank: card2Str[0], suit: card2Str[1]),
       ];
 
-      return player.copyWith(
+      updatedPlayers.add(player.copyWith(
         cards: cards,
         hasFolded: false,
         hasActed: false,
         currentBet: 0,
         totalContributed: 0,
         lastAction: null,
-      );
-    }).toList();
+      ));
+    }
+
+    print('🃏 Dealt cards to ${updatedPlayers.length} players, ${deck.length} cards remaining in deck');
 
     final dealerIndex = Random().nextInt(numPlayers);
 
@@ -173,10 +176,10 @@ class GameFlowService {
 
     var pot = smallBlindAmount + bigBlindAmount;
 
-    // Reset players and deal new cards
-    final updatedPlayers = players.asMap().entries.map((entry) {
-      final i = entry.key;
-      final player = entry.value;
+    // Reset players and deal new cards - use for loop for consistent ordering
+    final updatedPlayers = <GamePlayer>[];
+    for (var i = 0; i < players.length; i++) {
+      final player = players[i];
 
       final card1Str = deck.removeLast().split('|');
       final card2Str = deck.removeLast().split('|');
@@ -188,7 +191,7 @@ class GameFlowService {
       var resetPlayer = player.copyWith(
         hasFolded: false,
         hasActed: false,
-        cards: [], // Clear cards first to prevent flash of old cards
+        cards: newCards,
         lastAction: null,
       );
 
@@ -199,8 +202,10 @@ class GameFlowService {
         );
       }
 
-      return resetPlayer.copyWith(cards: newCards);
-    }).toList();
+      updatedPlayers.add(resetPlayer);
+    }
+
+    print('🃏 New hand dealt to ${updatedPlayers.length} players, ${deck.length} cards remaining in deck');
 
     int firstToAct;
     if (isHeadsUp) {

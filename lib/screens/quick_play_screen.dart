@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import '../services/game_service.dart';
 import '../services/bot_service.dart';
+import '../services/user_preferences.dart';
 import '../widgets/mobile_wrapper.dart';
 import 'multiplayer_game_screen.dart';
 
@@ -19,6 +20,7 @@ class _QuickPlayScreenState extends State<QuickPlayScreen> {
 
   bool _isLoading = false;
   int _selectedBlindIndex = 2; // Default to medium blinds
+  int _chipBalance = 0;
 
   // Blind levels (small blind / big blind / buy-in)
   static const List<Map<String, dynamic>> _blindLevels = [
@@ -35,6 +37,30 @@ class _QuickPlayScreenState extends State<QuickPlayScreen> {
   void initState() {
     super.initState();
     _ensureAuthenticated();
+    _loadChipBalance();
+  }
+
+  void _loadChipBalance() {
+    setState(() {
+      _chipBalance = UserPreferences.chips;
+      // Auto-select the highest affordable blind level
+      _selectedBlindIndex = _getHighestAffordableIndex();
+    });
+  }
+
+  /// Get the highest blind level index the user can afford
+  int _getHighestAffordableIndex() {
+    for (int i = _blindLevels.length - 1; i >= 0; i--) {
+      if (_chipBalance >= (_blindLevels[i]['buyIn'] as int)) {
+        return i;
+      }
+    }
+    return 0; // Default to lowest if can't afford any
+  }
+
+  /// Check if user can afford a specific blind level
+  bool _canAfford(int index) {
+    return _chipBalance >= (_blindLevels[index]['buyIn'] as int);
   }
 
   Future<void> _ensureAuthenticated() async {
@@ -48,12 +74,27 @@ class _QuickPlayScreenState extends State<QuickPlayScreen> {
       await _authService.signInAnonymously();
     }
 
+    final blindLevel = _blindLevels[_selectedBlindIndex];
+    final buyIn = blindLevel['buyIn'] as int;
+
+    // Check if user can afford the buy-in
+    if (_chipBalance < buyIn) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+                'Not enough chips! You need ${UserPreferences.formatChips(buyIn)} but only have ${UserPreferences.formatChips(_chipBalance)}'),
+            backgroundColor: const Color(0xFFFF4444),
+          ),
+        );
+      }
+      return;
+    }
+
     setState(() => _isLoading = true);
 
     try {
-      final blindLevel = _blindLevels[_selectedBlindIndex];
       final bigBlind = blindLevel['big'] as int;
-      final buyIn = blindLevel['buyIn'] as int;
 
       String? roomId;
 
@@ -157,12 +198,27 @@ class _QuickPlayScreenState extends State<QuickPlayScreen> {
       await _authService.signInAnonymously();
     }
 
+    final blindLevel = _blindLevels[_selectedBlindIndex];
+    final buyIn = blindLevel['buyIn'] as int;
+
+    // Check if user can afford the buy-in
+    if (_chipBalance < buyIn) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+                'Not enough chips! You need ${UserPreferences.formatChips(buyIn)} but only have ${UserPreferences.formatChips(_chipBalance)}'),
+            backgroundColor: const Color(0xFFFF4444),
+          ),
+        );
+      }
+      return;
+    }
+
     setState(() => _isLoading = true);
 
     try {
-      final blindLevel = _blindLevels[_selectedBlindIndex];
       final bigBlind = blindLevel['big'] as int;
-      final buyIn = blindLevel['buyIn'] as int;
 
       // Create a new private room for testing
       print('🤖 Creating test room with bots');
@@ -206,6 +262,8 @@ class _QuickPlayScreenState extends State<QuickPlayScreen> {
   @override
   Widget build(BuildContext context) {
     final blindLevel = _blindLevels[_selectedBlindIndex];
+    final canAffordSelected = _canAfford(_selectedBlindIndex);
+    final maxAffordableIndex = _getHighestAffordableIndex();
 
     return MobileWrapper(
       child: Scaffold(
@@ -216,21 +274,46 @@ class _QuickPlayScreenState extends State<QuickPlayScreen> {
             child: Column(
               children: [
                 const SizedBox(height: 24),
-                // Back button
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: GestureDetector(
-                    onTap: () => Navigator.pop(context),
-                    child: Container(
-                      width: 44,
-                      height: 44,
+                // Back button and chip balance
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    GestureDetector(
+                      onTap: () => Navigator.pop(context),
+                      child: Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.06),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(Icons.arrow_back, color: Colors.white, size: 20),
+                      ),
+                    ),
+                    // Chip balance display
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       decoration: BoxDecoration(
                         color: Colors.white.withValues(alpha: 0.06),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: const Icon(Icons.arrow_back, color: Colors.white, size: 20),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.monetization_on, color: Colors.amber.withValues(alpha: 0.8), size: 18),
+                          const SizedBox(width: 8),
+                          Text(
+                            UserPreferences.formatChips(_chipBalance),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
+                  ],
                 ),
 
                 const Spacer(flex: 2),
