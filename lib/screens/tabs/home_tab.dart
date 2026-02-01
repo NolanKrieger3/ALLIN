@@ -2760,329 +2760,334 @@ class HomeTabState extends State<HomeTab> {
       isScrollControlled: true,
       builder: (context) => StatefulBuilder(
         builder: (context, setModalState) => Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.85,
+          ),
           padding: EdgeInsets.fromLTRB(24, 24, 24, MediaQuery.of(context).viewInsets.bottom + 24),
           decoration: const BoxDecoration(
             color: Color(0xFF141414),
             borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Handle bar
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              // Title
-              const Row(
-                children: [
-                  Text('🎮', style: TextStyle(fontSize: 28)),
-                  SizedBox(width: 12),
-                  Text(
-                    'Private Games',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 24,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Create a room or join with a PIN',
-                style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 14),
-              ),
-              const SizedBox(height: 32),
-
-              // Create Room Button
-              AnimatedTapButton(
-                onTap: isCreating
-                    ? null
-                    : () async {
-                        setModalState(() => isCreating = true);
-                        try {
-                          final result = await RoomService().createPrivateRoom();
-                          if (mounted) {
-                            Navigator.pop(context);
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => PrivateGameWaitingScreen(
-                                  roomId: result['roomId']!,
-                                  roomPin: result['roomPin']!,
-                                  isHost: true,
-                                ),
-                              ),
-                            );
-                          }
-                        } catch (e) {
-                          setModalState(() => isCreating = false);
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-                            );
-                          }
-                        }
-                      },
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 18),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Handle bar
+                Container(
+                  width: 40,
+                  height: 4,
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF8B5CF6), Color(0xFF7C3AED)],
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF8B5CF6).withValues(alpha: 0.3),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Center(
-                    child: isCreating
-                        ? const SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                          )
-                        : const Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.add_circle_outline, color: Colors.white, size: 22),
-                              SizedBox(width: 10),
-                              Text(
-                                'Create Room',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ],
-                          ),
+                    color: Colors.white.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(2),
                   ),
                 ),
-              ),
+                const SizedBox(height: 24),
 
-              const SizedBox(height: 24),
-
-              // Divider
-              Row(
-                children: [
-                  Expanded(child: Divider(color: Colors.white.withValues(alpha: 0.1))),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Text('or', style: TextStyle(color: Colors.white.withValues(alpha: 0.4))),
-                  ),
-                  Expanded(child: Divider(color: Colors.white.withValues(alpha: 0.1))),
-                ],
-              ),
-
-              const SizedBox(height: 24),
-
-              // Join Room Section
-              Text(
-                'Join with PIN',
-                style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 14),
-              ),
-              const SizedBox(height: 12),
-
-              // PIN Input - 4 separate boxes
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(4, (index) {
-                  return Container(
-                    width: 56,
-                    height: 64,
-                    margin: const EdgeInsets.symmetric(horizontal: 6),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1E1E1E),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: pinController.text.length > index
-                            ? const Color(0xFF8B5CF6)
-                            : Colors.white.withValues(alpha: 0.15),
-                        width: 2,
-                      ),
-                    ),
-                    child: Center(
-                      child: Text(
-                        pinController.text.length > index ? pinController.text[index] : '',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 28,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  );
-                }),
-              ),
-              const SizedBox(height: 16),
-
-              // Hidden TextField for input
-              SizedBox(
-                height: 0,
-                child: TextField(
-                  controller: pinController,
-                  keyboardType: TextInputType.number,
-                  maxLength: 4,
-                  autofocus: false,
-                  onChanged: (_) => setModalState(() {}),
-                  decoration: const InputDecoration(counterText: ''),
-                ),
-              ),
-
-              // Number pad
-              Container(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Column(
+                // Title
+                const Row(
                   children: [
-                    for (var row in [
-                      ['1', '2', '3'],
-                      ['4', '5', '6'],
-                      ['7', '8', '9'],
-                      ['', '0', '⌫']
-                    ])
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: row.map((digit) {
-                          if (digit.isEmpty) {
-                            return const SizedBox(width: 72, height: 52);
-                          }
-                          return GestureDetector(
-                            onTap: () {
-                              if (digit == '⌫') {
-                                if (pinController.text.isNotEmpty) {
-                                  pinController.text = pinController.text.substring(0, pinController.text.length - 1);
-                                  setModalState(() {});
-                                }
-                              } else if (pinController.text.length < 4) {
-                                pinController.text += digit;
-                                setModalState(() {});
-                              }
-                            },
-                            child: Container(
-                              width: 72,
-                              height: 52,
-                              margin: const EdgeInsets.all(4),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF252525),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Center(
-                                child: digit == '⌫'
-                                    ? const Icon(Icons.backspace_outlined, color: Colors.white70, size: 22)
-                                    : Text(
-                                        digit,
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 24,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                              ),
-                            ),
-                          );
-                        }).toList(),
+                    Text('🎮', style: TextStyle(fontSize: 28)),
+                    SizedBox(width: 12),
+                    Text(
+                      'Private Games',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.w700,
                       ),
+                    ),
                   ],
                 ),
-              ),
+                const SizedBox(height: 8),
+                Text(
+                  'Create a room or join with a PIN',
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 14),
+                ),
+                const SizedBox(height: 32),
 
-              const SizedBox(height: 16),
-
-              // Join Button
-              AnimatedTapButton(
-                onTap: isJoining
-                    ? null
-                    : () async {
-                        final pin = pinController.text.trim();
-                        if (pin.length != 4) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Please enter a 4-digit PIN'),
-                              backgroundColor: Colors.orange,
-                            ),
-                          );
-                          return;
-                        }
-                        setModalState(() => isJoining = true);
-                        try {
-                          final roomId = await RoomService().joinPrivateRoom(pin);
-                          if (mounted) {
-                            Navigator.pop(context);
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => PrivateGameWaitingScreen(
-                                  roomId: roomId,
-                                  roomPin: pin,
-                                  isHost: false,
+                // Create Room Button
+                AnimatedTapButton(
+                  onTap: isCreating
+                      ? null
+                      : () async {
+                          setModalState(() => isCreating = true);
+                          try {
+                            final result = await RoomService().createPrivateRoom();
+                            if (mounted) {
+                              Navigator.pop(context);
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => PrivateGameWaitingScreen(
+                                    roomId: result['roomId']!,
+                                    roomPin: result['roomPin']!,
+                                    isHost: true,
+                                  ),
                                 ),
-                              ),
-                            );
+                              );
+                            }
+                          } catch (e) {
+                            setModalState(() => isCreating = false);
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+                              );
+                            }
                           }
-                        } catch (e) {
-                          setModalState(() => isJoining = false);
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('$e'), backgroundColor: Colors.red),
-                            );
-                          }
-                        }
-                      },
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  decoration: BoxDecoration(
-                    gradient: pinController.text.length == 4
-                        ? const LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFF7C3AED)])
-                        : null,
-                    color: pinController.text.length == 4 ? null : const Color(0xFF252525),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Center(
-                    child: isJoining
-                        ? const SizedBox(
-                            width: 22,
-                            height: 22,
-                            child: CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 2,
-                            ),
-                          )
-                        : Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.login_rounded,
-                                  color: pinController.text.length == 4 ? Colors.white : Colors.white54, size: 20),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Join Room',
-                                style: TextStyle(
-                                  color: pinController.text.length == 4 ? Colors.white : Colors.white54,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
+                        },
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 18),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF8B5CF6), Color(0xFF7C3AED)],
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF8B5CF6).withValues(alpha: 0.3),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Center(
+                      child: isCreating
+                          ? const SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                            )
+                          : const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.add_circle_outline, color: Colors.white, size: 22),
+                                SizedBox(width: 10),
+                                Text(
+                                  'Create Room',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w700,
+                                  ),
                                 ),
-                              ),
-                            ],
-                          ),
+                              ],
+                            ),
+                    ),
                   ),
                 ),
-              ),
 
-              const SizedBox(height: 16),
-            ],
+                const SizedBox(height: 24),
+
+                // Divider
+                Row(
+                  children: [
+                    Expanded(child: Divider(color: Colors.white.withValues(alpha: 0.1))),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Text('or', style: TextStyle(color: Colors.white.withValues(alpha: 0.4))),
+                    ),
+                    Expanded(child: Divider(color: Colors.white.withValues(alpha: 0.1))),
+                  ],
+                ),
+
+                const SizedBox(height: 24),
+
+                // Join Room Section
+                Text(
+                  'Join with PIN',
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 14),
+                ),
+                const SizedBox(height: 12),
+
+                // PIN Input - 4 separate boxes
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(4, (index) {
+                    return Container(
+                      width: 56,
+                      height: 64,
+                      margin: const EdgeInsets.symmetric(horizontal: 6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1E1E1E),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: pinController.text.length > index
+                              ? const Color(0xFF8B5CF6)
+                              : Colors.white.withValues(alpha: 0.15),
+                          width: 2,
+                        ),
+                      ),
+                      child: Center(
+                        child: Text(
+                          pinController.text.length > index ? pinController.text[index] : '',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 28,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+                ),
+                const SizedBox(height: 16),
+
+                // Hidden TextField for input
+                SizedBox(
+                  height: 0,
+                  child: TextField(
+                    controller: pinController,
+                    keyboardType: TextInputType.number,
+                    maxLength: 4,
+                    autofocus: false,
+                    onChanged: (_) => setModalState(() {}),
+                    decoration: const InputDecoration(counterText: ''),
+                  ),
+                ),
+
+                // Number pad
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Column(
+                    children: [
+                      for (var row in [
+                        ['1', '2', '3'],
+                        ['4', '5', '6'],
+                        ['7', '8', '9'],
+                        ['', '0', '⌫']
+                      ])
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: row.map((digit) {
+                            if (digit.isEmpty) {
+                              return const SizedBox(width: 72, height: 52);
+                            }
+                            return GestureDetector(
+                              onTap: () {
+                                if (digit == '⌫') {
+                                  if (pinController.text.isNotEmpty) {
+                                    pinController.text = pinController.text.substring(0, pinController.text.length - 1);
+                                    setModalState(() {});
+                                  }
+                                } else if (pinController.text.length < 4) {
+                                  pinController.text += digit;
+                                  setModalState(() {});
+                                }
+                              },
+                              child: Container(
+                                width: 72,
+                                height: 52,
+                                margin: const EdgeInsets.all(4),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF252525),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Center(
+                                  child: digit == '⌫'
+                                      ? const Icon(Icons.backspace_outlined, color: Colors.white70, size: 22)
+                                      : Text(
+                                          digit,
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 24,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
+                // Join Button
+                AnimatedTapButton(
+                  onTap: isJoining
+                      ? null
+                      : () async {
+                          final pin = pinController.text.trim();
+                          if (pin.length != 4) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Please enter a 4-digit PIN'),
+                                backgroundColor: Colors.orange,
+                              ),
+                            );
+                            return;
+                          }
+                          setModalState(() => isJoining = true);
+                          try {
+                            final roomId = await RoomService().joinPrivateRoom(pin);
+                            if (mounted) {
+                              Navigator.pop(context);
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => PrivateGameWaitingScreen(
+                                    roomId: roomId,
+                                    roomPin: pin,
+                                    isHost: false,
+                                  ),
+                                ),
+                              );
+                            }
+                          } catch (e) {
+                            setModalState(() => isJoining = false);
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('$e'), backgroundColor: Colors.red),
+                              );
+                            }
+                          }
+                        },
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    decoration: BoxDecoration(
+                      gradient: pinController.text.length == 4
+                          ? const LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFF7C3AED)])
+                          : null,
+                      color: pinController.text.length == 4 ? null : const Color(0xFF252525),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Center(
+                      child: isJoining
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.login_rounded,
+                                    color: pinController.text.length == 4 ? Colors.white : Colors.white54, size: 20),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Join Room',
+                                  style: TextStyle(
+                                    color: pinController.text.length == 4 ? Colors.white : Colors.white54,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+              ],
+            ),
           ),
         ),
       ),
