@@ -112,7 +112,7 @@ class HomeTabState extends State<HomeTab> {
         // User doesn't have a username set in Firestore, redirect to setup
         Navigator.of(context).pushReplacementNamed('/username-setup');
       } else if (mounted) {
-        // Trigger rebuild to show updated data
+        // Trigger rebuild to show updated data (Pro Pass state will be checked in build)
         _loadChipBalance();
         setState(() {});
       }
@@ -2305,15 +2305,17 @@ class HomeTabState extends State<HomeTab> {
                     height: 140,
                     child: LayoutBuilder(
                       builder: (context, constraints) {
-                        // Recreate controller when Pro Pass status changes
-                        if (_lastProPassState != UserPreferences.hasProPass) {
-                          _lastProPassState = UserPreferences.hasProPass;
+                        // Check if Pro Pass changed and recreate controller to preserve position
+                        final currentProPass = UserPreferences.hasProPass;
+                        if (_lastProPassState != currentProPass) {
+                          _lastProPassState = currentProPass;
+                          // Recreate controller to work with new PageView key
+                          _playCardController.dispose();
                           _playCardController = PageController(initialPage: _currentPlayMode);
                         }
-                        final cardWidth = constraints.maxWidth;
                         return PageView.builder(
-                          // Key changes when Pro Pass status changes to force rebuild
-                          key: ValueKey('playCards_${UserPreferences.hasProPass}'),
+                          // Key changes when Pro Pass status changes to force complete rebuild
+                          key: ValueKey('playCards_$currentProPass'),
                           controller: _playCardController,
                           onPageChanged: (index) => setState(() => _currentPlayMode = index),
                           itemCount: 5,
