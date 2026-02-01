@@ -40,7 +40,7 @@ class GameFlowService {
 
     // CRITICAL: Guard against starting a game that's already in progress
     // This prevents race conditions where startGame is called multiple times
-    if (room.status == 'in_progress' && room.phase != 'waiting_for_players') {
+    if (room.status == 'playing' && room.phase != 'waiting_for_players') {
       print('⚠️ Game already in progress, skipping startGame');
       return;
     }
@@ -104,7 +104,7 @@ class GameFlowService {
     await http.patch(
       Uri.parse('${RoomService.databaseUrl}/game_rooms/$roomId.json?auth=$token'),
       body: jsonEncode({
-        'status': 'in_progress',
+        'status': 'playing',
         'phase': 'preflop',
         'players': updatedPlayers.map((p) => p.toJson()).toList(),
         'deck': deck,
@@ -212,7 +212,7 @@ class GameFlowService {
     await http.patch(
       Uri.parse('${RoomService.databaseUrl}/game_rooms/$roomId.json?auth=$token'),
       body: jsonEncode({
-        'status': 'in_progress',
+        'status': 'playing',
         'phase': 'preflop',
         'players': updatedPlayers.map((p) => p.toJson()).toList(),
         'deck': deck,
@@ -237,7 +237,7 @@ class GameFlowService {
   Future<void> handleTurnTimeout(String roomId) async {
     final token = await _getAuthToken();
     final room = await _roomService.fetchRoom(roomId);
-    if (room == null || room.status != 'in_progress') return;
+    if (room == null || room.status != 'playing') return;
 
     final currentPlayerId = room.currentTurnPlayerId;
     if (currentPlayerId == null) return;

@@ -280,8 +280,34 @@ class RoomService {
       isJoinable = room.status == 'waiting' || (room.status == 'playing' && room.phase == 'waiting_for_players');
     }
     if (!isJoinable) throw Exception('Game already in progress');
-    if (room.players.any((p) => p.uid == userId)) {
+
+    // Check if player is already in the room
+    final existingPlayerIndex = room.players.indexWhere((p) => p.uid == userId);
+    if (existingPlayerIndex != -1) {
       print('ALREADY IN ROOM: User $userId is already a player');
+
+      // If room is in 'waiting' status, reset player's stale state (hasFolded, hasActed, etc.)
+      if (room.status == 'waiting') {
+        final existingPlayer = room.players[existingPlayerIndex];
+        final resetPlayer = existingPlayer.copyWith(
+          hasFolded: false,
+          hasActed: false,
+          currentBet: 0,
+          totalContributed: 0,
+          cards: [],
+          lastAction: null,
+          lastActiveAt: DateTime.now(),
+        );
+
+        final updatedPlayers = List<GamePlayer>.from(room.players);
+        updatedPlayers[existingPlayerIndex] = resetPlayer;
+
+        await http.patch(
+          Uri.parse('$databaseUrl/game_rooms/$roomId.json?auth=$token'),
+          body: jsonEncode({'players': updatedPlayers.map((p) => p.toJson()).toList()}),
+        );
+        print('✅ Reset stale player state for user $userId in waiting room');
+      }
       return;
     }
 
@@ -449,6 +475,8 @@ class RoomService {
     final allRooms =
         data.entries.map((e) => GameRoom.fromJson(Map<String, dynamic>.from(e.value as Map), e.key)).toList();
 
+    print('🔍 Total rooms in database: ${allRooms.length}');
+
     final joinableRooms = allRooms.where((room) {
       final isCorrectBlind = room.bigBlind == bigBlind;
       final isCorrectGameType = room.gameType == gameType;
@@ -470,6 +498,11 @@ class RoomService {
         hasSpace = room.players.length < 6;
       }
 
+      // Debug log for each room
+      if (!isCorrectBlind && room.gameType == gameType) {
+        print('❌ Room ${room.id}: wrong blind (${room.bigBlind} != $bigBlind)');
+      }
+
       return isCorrectBlind &&
           isCorrectGameType &&
           isNotFull &&
@@ -478,6 +511,8 @@ class RoomService {
           isJoinable &&
           hasSpace;
     }).toList();
+
+    print('✅ Found ${joinableRooms.length} joinable rooms for blind=$bigBlind, gameType=$gameType');
 
     // Sort by fullest first, then oldest
     joinableRooms.sort((a, b) {
@@ -619,12 +654,12 @@ class RoomService {
             reason = 'stale lobby (${waitTime}min)';
           }
         }
-        // Delete in_progress rooms older than 30 minutes (stale games)
-        else if (room.status == 'in_progress') {
+        // Delete playing/in_progress rooms older than 30 minutes (stale games)
+        else if (room.status == 'in_progress' || room.status == 'playing') {
           final gameTime = now.difference(room.createdAt).inMinutes;
           if (gameTime > 30) {
             shouldDelete = true;
-            reason = 'stale in_progress game (${gameTime}min)';
+            reason = 'stale game (${gameTime}min)';
           }
         }
 
