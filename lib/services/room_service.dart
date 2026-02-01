@@ -418,7 +418,7 @@ class RoomService {
         final winner = updatedPlayers.first;
         final winnerWithPot = GamePlayer(
           uid: winner.uid,
-          username: winner.username,
+          displayName: winner.displayName,
           chips: winner.chips + room.pot,
           cards: winner.cards,
           hasFolded: winner.hasFolded,
@@ -428,10 +428,9 @@ class RoomService {
           isReady: winner.isReady,
           lastActiveAt: winner.lastActiveAt,
           lastAction: winner.lastAction,
-          avatarEmoji: winner.avatarEmoji,
         );
 
-        print('🏆 Player left mid-game! Awarding pot (${room.pot}) to ${winner.username}');
+        print('🏆 Player left mid-game! Awarding pot (${room.pot}) to ${winner.displayName}');
 
         final patchResponse = await http.patch(
           Uri.parse('$databaseUrl/game_rooms/$roomId.json?auth=$token'),
@@ -744,7 +743,7 @@ class RoomService {
           final winner = activePlayers.first;
           final winnerWithPot = GamePlayer(
             uid: winner.uid,
-            username: winner.username,
+            displayName: winner.displayName,
             chips: winner.chips + room.pot,
             cards: winner.cards,
             hasFolded: winner.hasFolded,
@@ -754,10 +753,9 @@ class RoomService {
             isReady: winner.isReady,
             lastActiveAt: winner.lastActiveAt,
             lastAction: winner.lastAction,
-            avatarEmoji: winner.avatarEmoji,
           );
 
-          print('🏆 Opponent disconnected! Awarding pot (${room.pot}) to ${winner.username}');
+          print('🏆 Opponent disconnected! Awarding pot (${room.pot}) to ${winner.displayName}');
 
           final patchResponse = await http.patch(
             Uri.parse('$databaseUrl/game_rooms/$roomId.json?auth=$token'),
