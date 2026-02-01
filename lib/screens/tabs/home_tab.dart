@@ -2029,13 +2029,14 @@ class HomeTabState extends State<HomeTab> {
                         title: UserPreferences.hasProPass ? 'Pro Pass: ON' : 'Pro Pass: OFF',
                         onTap: () async {
                           Navigator.pop(dialogContext);
-                          await UserPreferences.setProPass(!UserPreferences.hasProPass);
+                          final newValue = !UserPreferences.hasProPass;
+                          await _userService.setProPass(newValue);
                           if (mounted) {
                             setState(() {});
                             parentScaffoldMessenger.showSnackBar(
                               SnackBar(
                                 content: Text(
-                                  UserPreferences.hasProPass ? 'Pro Pass enabled!' : 'Pro Pass disabled!',
+                                  newValue ? 'Pro Pass enabled!' : 'Pro Pass disabled!',
                                 ),
                               ),
                             );
@@ -2710,7 +2711,7 @@ class HomeTabState extends State<HomeTab> {
         return _buildPlayModeCard(
           title: 'Private Games',
           subtitle: 'Play with friends',
-          icon: UserPreferences.hasProPass ? Icons.vpn_key_rounded : Icons.lock_rounded,
+          icon: UserPreferences.hasProPass ? Icons.lock_open_rounded : Icons.lock_rounded,
           gradient: UserPreferences.hasProPass
               ? const [Color(0xFF8B5CF6), Color(0xFF7C3AED)]
               : const [Color(0xFF6B7280), Color(0xFF4B5563)],
