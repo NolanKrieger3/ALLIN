@@ -308,6 +308,10 @@ class UserService {
       final gems = data['gems'] as int? ?? defaultGems;
       await UserPreferences.setGems(gems);
 
+      // Sync Pro Pass status
+      final hasProPass = data['hasProPass'] as bool? ?? false;
+      await UserPreferences.setProPass(hasProPass);
+
       return data;
     } catch (e) {
       return null;
@@ -318,5 +322,44 @@ class UserService {
   Future<bool> needsUsernameSetup() async {
     final username = await getUsername();
     return username == null || username.isEmpty;
+  }
+
+  /// Set Pro Pass status in Firestore and sync to local
+  Future<void> setProPass(bool value) async {
+    final doc = _userDoc;
+    if (doc == null) {
+      // Not logged in, just save locally
+      await UserPreferences.setProPass(value);
+      return;
+    }
+
+    try {
+      await doc.set({
+        'hasProPass': value,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      // Also update local preferences
+      await UserPreferences.setProPass(value);
+    } catch (e) {
+      // If Firestore fails, still save locally
+      await UserPreferences.setProPass(value);
+    }
+  }
+
+  /// Get Pro Pass status from Firestore
+  Future<bool> getProPass() async {
+    final doc = _userDoc;
+    if (doc == null) return UserPreferences.hasProPass;
+
+    try {
+      final snapshot = await doc.get();
+      if (!snapshot.exists) return false;
+
+      final data = snapshot.data() as Map<String, dynamic>?;
+      return data?['hasProPass'] as bool? ?? false;
+    } catch (e) {
+      return UserPreferences.hasProPass;
+    }
   }
 }
