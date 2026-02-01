@@ -588,14 +588,17 @@ class RoomService {
     final room = GameRoom.fromJson(roomData, roomId);
 
     if (room.hostId != userId) return;
-    if (room.status != 'waiting') return;
+    // Allow removal from both waiting and playing rooms
+    if (room.status == 'finished') return;
 
     final now = DateTime.now();
+    // Reduced timeout from 45s to 15s for quicker disconnect detection
+    const inactiveTimeoutSeconds = 15;
     final activePlayers = room.players.where((p) {
       if (p.lastActiveAt == null) {
-        return now.difference(room.createdAt).inSeconds < 45;
+        return now.difference(room.createdAt).inSeconds < inactiveTimeoutSeconds;
       }
-      return now.difference(p.lastActiveAt!).inSeconds < 45;
+      return now.difference(p.lastActiveAt!).inSeconds < inactiveTimeoutSeconds;
     }).toList();
 
     if (activePlayers.length < room.players.length) {

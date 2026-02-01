@@ -26,13 +26,17 @@ class MultiplayerGameScreen extends StatefulWidget {
   State<MultiplayerGameScreen> createState() => _MultiplayerGameScreenState();
 }
 
-class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with TickerProviderStateMixin {
+class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   final GameService _gameService = GameService();
   final BotService _botService = BotService();
   final TextEditingController _chatController = TextEditingController();
   bool _isLoading = false;
   bool _hasAutoStarted = false;
   bool _hasTriggeredNewHand = false;
+
+  // Heartbeat timer for presence detection
+  Timer? _heartbeatTimer;
 
   // Fold animation
   late AnimationController _foldAnimationController;
@@ -73,6 +77,9 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
   @override
   void initState() {
     super.initState();
+    // Register for app lifecycle events
+    WidgetsBinding.instance.addObserver(this);
+
     // Cache the stream once - prevents recreation on every build which causes flickering
     _roomStream = _gameService.watchRoom(widget.roomId);
     _foldAnimationController = AnimationController(
@@ -93,14 +100,48 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
       parent: _foldAnimationController,
       curve: Curves.easeOut,
     ));
+
+    // Start heartbeat to show we're active (every 5 seconds)
+    _startHeartbeat();
   }
 
   @override
   void dispose() {
+    // Stop observing app lifecycle
+    WidgetsBinding.instance.removeObserver(this);
+    _heartbeatTimer?.cancel();
     _turnTimer?.cancel();
     _foldAnimationController.dispose();
     _chatController.dispose();
+    // Leave room when disposed
+    _gameService.leaveRoom(widget.roomId);
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.detached || state == AppLifecycleState.hidden) {
+      // App is going to background or closing - leave the room immediately
+      _gameService.leaveRoom(widget.roomId);
+    } else if (state == AppLifecycleState.resumed) {
+      // App is back - restart heartbeat
+      _startHeartbeat();
+    }
+  }
+
+  void _startHeartbeat() {
+    _heartbeatTimer?.cancel();
+    // Send heartbeat immediately
+    _gameService.sendHeartbeat(widget.roomId);
+    // Then every 5 seconds
+    _heartbeatTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (mounted) {
+        _gameService.sendHeartbeat(widget.roomId);
+        // Also check for inactive players if we're the host
+        _gameService.removeInactivePlayers(widget.roomId);
+      }
+    });
   }
 
   /// Start or update the turn timer based on room state
