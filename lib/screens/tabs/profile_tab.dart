@@ -1244,166 +1244,478 @@ class ProfileTabState extends State<ProfileTab> {
               ),
             ),
 
-          // Season Pass - Minimalist
+          // Season Pass - Premium Battle Pass Design
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Season Pass',
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.5),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
+                  // Battle Pass Header - Clickable to open full view
+                  GestureDetector(
+                    onTap: () => _showBattlePassDialog(context),
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            const Color(0xFF6366F1).withValues(alpha: 0.2),
+                            const Color(0xFF8B5CF6).withValues(alpha: 0.1),
+                            const Color(0xFFD4AF37).withValues(alpha: 0.05),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: const Color(0xFF6366F1).withValues(alpha: 0.3),
                         ),
                       ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.05),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          'FREE',
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.5),
-                            fontSize: 9,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.03),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
-                    ),
-                    child: Column(
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Row(
-                              children: [
-                                const Text('🏆', style: TextStyle(fontSize: 18)),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'Tier 1',
-                                  style: TextStyle(
-                                    color: Colors.white.withValues(alpha: 0.9),
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
+                      child: Column(
+                        children: [
+                          // Season Header Row
+                          Row(
+                            children: [
+                              // Season Icon
+                              Container(
+                                width: 48,
+                                height: 48,
+                                decoration: BoxDecoration(
+                                  gradient: const LinearGradient(
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                    colors: [Color(0xFFD4AF37), Color(0xFFB8860B)],
                                   ),
-                                ),
-                              ],
-                            ),
-                            Text(
-                              '0 / 1000 XP',
-                              style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 11),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(3),
-                          child: LinearProgressIndicator(
-                            value: 0.0,
-                            backgroundColor: Colors.white.withValues(alpha: 0.08),
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white.withValues(alpha: 0.3)),
-                            minHeight: 4,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        // Tier rewards preview
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceAround,
-                          children: [
-                            TierReward(emoji: '🪙', label: 'Tier 1', isFree: true),
-                            TierReward(emoji: '💎', label: 'Tier 2', isFree: true),
-                            TierReward(emoji: '🎴', label: 'Tier 3', isFree: false),
-                            TierReward(emoji: '✨', label: 'Tier 4', isFree: false),
-                            TierReward(emoji: '👑', label: 'Tier 5', isFree: false),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        // Premium Pass Button
-                        GestureDetector(
-                          onTap: () => _showPremiumPassDialog(context),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.08),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Row(
-                                  children: [
-                                    Container(
-                                      width: 28,
-                                      height: 28,
-                                      decoration: BoxDecoration(
-                                        color: Colors.white.withValues(alpha: 0.08),
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: const Center(child: Text('👑', style: TextStyle(fontSize: 14))),
+                                  borderRadius: BorderRadius.circular(14),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: const Color(0xFFD4AF37).withValues(alpha: 0.3),
+                                      blurRadius: 12,
+                                      offset: const Offset(0, 4),
                                     ),
-                                    const SizedBox(width: 10),
-                                    Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                  ],
+                                ),
+                                child: const Center(child: Text('🎰', style: TextStyle(fontSize: 24))),
+                              ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
                                       children: [
-                                        Text(
-                                          'Premium Pass',
+                                        const Text(
+                                          'SEASON 1',
                                           style: TextStyle(
-                                            color: Colors.white.withValues(alpha: 0.9),
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w600,
+                                            color: Colors.white,
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w700,
+                                            letterSpacing: 1,
                                           ),
                                         ),
+                                        const SizedBox(width: 8),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFF10B981).withValues(alpha: 0.2),
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: const Text(
+                                            'ACTIVE',
+                                            style: TextStyle(
+                                              color: Color(0xFF10B981),
+                                              fontSize: 8,
+                                              fontWeight: FontWeight.w700,
+                                              letterSpacing: 0.5,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Row(
+                                      children: [
                                         Text(
-                                          'Unlock exclusive rewards & 2x XP',
-                                          style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 10),
+                                          'High Roller\'s Fortune',
+                                          style: TextStyle(
+                                            color: Colors.white.withValues(alpha: 0.6),
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          '• Tap to view all',
+                                          style: TextStyle(
+                                            color: const Color(0xFF6366F1).withValues(alpha: 0.8),
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w500,
+                                          ),
                                         ),
                                       ],
                                     ),
                                   ],
                                 ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.1),
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      const Text('💎', style: TextStyle(fontSize: 11)),
-                                      const SizedBox(width: 3),
-                                      Text(
-                                        '500',
+                              ),
+                              // Chevron indicator
+                              Container(
+                                width: 32,
+                                height: 32,
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.08),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Icon(
+                                  Icons.chevron_right,
+                                  color: Colors.white54,
+                                  size: 20,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+
+                          // XP Progress Section (compact)
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.3),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Column(
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Container(
+                                          width: 32,
+                                          height: 32,
+                                          decoration: BoxDecoration(
+                                            gradient: const LinearGradient(
+                                              colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+                                            ),
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: const Center(
+                                            child: Text(
+                                              '7',
+                                              style: TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 10),
+                                        Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            const Text(
+                                              'Tier 7',
+                                              style: TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                            Text(
+                                              '2,450 / 3,000 XP',
+                                              style: TextStyle(
+                                                color: Colors.white.withValues(alpha: 0.5),
+                                                fontSize: 11,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withValues(alpha: 0.08),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Text(
+                                        '28 days left',
                                         style: TextStyle(
-                                          color: Colors.white.withValues(alpha: 0.8),
-                                          fontSize: 11,
+                                          color: Colors.white.withValues(alpha: 0.6),
+                                          fontSize: 10,
                                           fontWeight: FontWeight.w500,
                                         ),
                                       ),
-                                    ],
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 10),
+                                // Animated XP Bar
+                                Stack(
+                                  children: [
+                                    Container(
+                                      height: 8,
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withValues(alpha: 0.1),
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                    ),
+                                    FractionallySizedBox(
+                                      widthFactor: 0.82,
+                                      child: Container(
+                                        height: 8,
+                                        decoration: BoxDecoration(
+                                          gradient: const LinearGradient(
+                                            colors: [Color(0xFF6366F1), Color(0xFF8B5CF6), Color(0xFFD4AF37)],
+                                          ),
+                                          borderRadius: BorderRadius.circular(4),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: const Color(0xFF6366F1).withValues(alpha: 0.5),
+                                              blurRadius: 8,
+                                              offset: const Offset(0, 2),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Tier Track - Horizontal Scroll (also clickable)
+                  GestureDetector(
+                    onTap: () => _showBattlePassDialog(context),
+                    child: SizedBox(
+                      height: 140,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: 50,
+                        itemBuilder: (context, index) {
+                          final tier = index + 1;
+                          final isUnlocked = tier <= 7;
+                          final isCurrent = tier == 7;
+                          final isPremiumReward = tier % 5 == 0;
+
+                          return Padding(
+                            padding: EdgeInsets.only(right: 8, left: index == 0 ? 0 : 0),
+                            child: _buildBattlePassTier(
+                              tier: tier,
+                              isUnlocked: isUnlocked,
+                              isCurrent: isCurrent,
+                              isPremiumReward: isPremiumReward,
+                              freeReward: _getTierFreeReward(tier),
+                              premiumReward: _getTierPremiumReward(tier),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Daily & Weekly Challenges
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.03),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Challenges',
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.8),
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFFBB00).withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Text('⚡', style: TextStyle(fontSize: 10)),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '3/5 Complete',
+                                    style: const TextStyle(
+                                      color: Color(0xFFFFBB00),
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        _buildChallengeItem(
+                          icon: '🃏',
+                          title: 'Win 3 Hands',
+                          progress: 3,
+                          total: 3,
+                          xp: 100,
+                          isComplete: true,
+                        ),
+                        const SizedBox(height: 8),
+                        _buildChallengeItem(
+                          icon: '💰',
+                          title: 'Win 10,000 Chips',
+                          progress: 7500,
+                          total: 10000,
+                          xp: 150,
+                          isComplete: false,
+                        ),
+                        const SizedBox(height: 8),
+                        _buildChallengeItem(
+                          icon: '🔥',
+                          title: 'Win 3 Games in a Row',
+                          progress: 1,
+                          total: 3,
+                          xp: 250,
+                          isComplete: false,
+                          isWeekly: true,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Premium Pass Button - Enhanced
+                  GestureDetector(
+                    onTap: () => _showPremiumPassDialog(context),
+                    child: Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            const Color(0xFFD4AF37).withValues(alpha: 0.2),
+                            const Color(0xFFB8860B).withValues(alpha: 0.1),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: const Color(0xFFD4AF37).withValues(alpha: 0.4),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFFD4AF37), Color(0xFFB8860B)],
+                              ),
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFFD4AF37).withValues(alpha: 0.4),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: const Center(child: Text('👑', style: TextStyle(fontSize: 22))),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    const Text(
+                                      'Premium Pass',
+                                      style: TextStyle(
+                                        color: Color(0xFFD4AF37),
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFEF4444),
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: const Text(
+                                        '-20%',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Unlock all premium rewards + 2x XP boost',
+                                  style: TextStyle(
+                                    color: Colors.white.withValues(alpha: 0.5),
+                                    fontSize: 11,
                                   ),
                                 ),
                               ],
                             ),
                           ),
-                        ),
-                      ],
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Row(
+                                children: [
+                                  const Text('💎', style: TextStyle(fontSize: 14)),
+                                  const SizedBox(width: 4),
+                                  const Text(
+                                    '400',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              Text(
+                                '500',
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.4),
+                                  fontSize: 11,
+                                  decoration: TextDecoration.lineThrough,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(width: 8),
+                          Icon(
+                            Icons.chevron_right,
+                            color: const Color(0xFFD4AF37),
+                            size: 20,
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],
@@ -1787,87 +2099,1303 @@ class ProfileTabState extends State<ProfileTab> {
     );
   }
 
-  void _showPremiumPassDialog(BuildContext context) {
-    showDialog(
+  void _showBattlePassDialog(BuildContext context) {
+    showModalBottomSheet(
       context: context,
-      builder: (context) => Dialog(
-        backgroundColor: const Color(0xFF1A1A1A),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.8, maxWidth: 360),
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 80,
-                    height: 80,
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(colors: [Color(0xFFD4AF37), Color(0xFFB8860B)]),
-                      borderRadius: BorderRadius.circular(24),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.9,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        builder: (context, scrollController) => Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color(0xFF1E1E2E), Color(0xFF0D0D0D)],
+            ),
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(24),
+              topRight: Radius.circular(24),
+            ),
+          ),
+          child: Column(
+            children: [
+              // Handle bar
+              Container(
+                margin: const EdgeInsets.only(top: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+
+              // Header
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 50,
+                      height: 50,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFFD4AF37), Color(0xFFB8860B)],
+                        ),
+                        borderRadius: BorderRadius.circular(14),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFFD4AF37).withValues(alpha: 0.4),
+                            blurRadius: 12,
+                          ),
+                        ],
+                      ),
+                      child: const Center(child: Text('🎰', style: TextStyle(fontSize: 26))),
                     ),
-                    child: const Center(child: Text('👑', style: TextStyle(fontSize: 40))),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Text(
+                                'SEASON 1',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 1,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF10B981).withValues(alpha: 0.2),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: const Text(
+                                  'ACTIVE',
+                                  style: TextStyle(
+                                    color: Color(0xFF10B981),
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'High Roller\'s Fortune',
+                            style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Column(
+                        children: [
+                          const Text(
+                            '28',
+                            style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700),
+                          ),
+                          Text(
+                            'DAYS LEFT',
+                            style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 8),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // XP Progress
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
                   ),
-                  const SizedBox(height: 20),
-                  const Text(
-                    'Premium Pass',
-                    style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w700),
+                  child: Column(
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                width: 40,
+                                height: 40,
+                                decoration: BoxDecoration(
+                                  gradient: const LinearGradient(
+                                    colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+                                  ),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: const Center(
+                                  child: Text('7',
+                                      style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700)),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text('Current Tier',
+                                      style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
+                                  Text('2,450 / 3,000 XP',
+                                      style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 11)),
+                                ],
+                              ),
+                            ],
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF10B981).withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Text('+550 XP to next',
+                                style: TextStyle(color: Color(0xFF10B981), fontSize: 11, fontWeight: FontWeight.w600)),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Stack(
+                        children: [
+                          Container(
+                            height: 10,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(5),
+                            ),
+                          ),
+                          FractionallySizedBox(
+                            widthFactor: 0.82,
+                            child: Container(
+                              height: 10,
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(
+                                  colors: [Color(0xFF6366F1), Color(0xFF8B5CF6), Color(0xFFD4AF37)],
+                                ),
+                                borderRadius: BorderRadius.circular(5),
+                                boxShadow: [
+                                  BoxShadow(color: const Color(0xFF6366F1).withValues(alpha: 0.5), blurRadius: 8),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Unlock exclusive rewards!',
-                    style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 14),
+                ),
+              ),
+
+              // Tier Grid
+              Expanded(
+                child: ListView.builder(
+                  controller: scrollController,
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                  itemCount: 50,
+                  itemBuilder: (context, index) {
+                    final tier = index + 1;
+                    final isUnlocked = tier <= 7;
+                    final isCurrent = tier == 7;
+                    final isPremiumReward = tier % 5 == 0;
+                    final canClaim = isUnlocked && tier <= 6;
+
+                    return _buildInteractiveTierRow(
+                      context: context,
+                      tier: tier,
+                      isUnlocked: isUnlocked,
+                      isCurrent: isCurrent,
+                      isPremiumReward: isPremiumReward,
+                      canClaim: canClaim,
+                      freeReward: _getTierFreeReward(tier),
+                      premiumReward: _getTierPremiumReward(tier),
+                    );
+                  },
+                ),
+              ),
+
+              // Bottom Premium Button
+              Container(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.transparent,
+                      const Color(0xFF0D0D0D).withValues(alpha: 0.9),
+                      const Color(0xFF0D0D0D),
+                    ],
                   ),
-                  const SizedBox(height: 24),
-                  PremiumBenefit(icon: '⚡', text: '2x XP on all games'),
-                  const SizedBox(height: 10),
-                  PremiumBenefit(icon: '🎴', text: 'Exclusive card backs'),
-                  const SizedBox(height: 10),
-                  PremiumBenefit(icon: '🪙', text: 'Bonus chips every tier'),
-                  const SizedBox(height: 10),
-                  PremiumBenefit(icon: '👤', text: 'Premium avatar frame'),
-                  const SizedBox(height: 10),
-                  PremiumBenefit(icon: '💬', text: 'Exclusive emotes'),
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Premium Pass purchased!'), backgroundColor: Color(0xFFD4AF37)),
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFD4AF37),
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+                child: SafeArea(
+                  child: GestureDetector(
+                    onTap: () {
+                      Navigator.pop(context);
+                      _showPremiumPassDialog(context);
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFFD4AF37), Color(0xFFB8860B)],
+                        ),
+                        borderRadius: BorderRadius.circular(14),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFFD4AF37).withValues(alpha: 0.4),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Text('💎', style: TextStyle(fontSize: 18)),
-                          const SizedBox(width: 8),
+                          const Text('👑', style: TextStyle(fontSize: 20)),
+                          const SizedBox(width: 10),
                           const Text(
-                            'Buy for 500 Gems',
+                            'Upgrade to Premium',
                             style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700),
+                          ),
+                          const SizedBox(width: 10),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Row(
+                              children: [
+                                const Text('💎', style: TextStyle(fontSize: 12)),
+                                const SizedBox(width: 4),
+                                const Text('400',
+                                    style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
+                              ],
+                            ),
                           ),
                         ],
                       ),
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: Text('Maybe Later', style: TextStyle(color: Colors.white.withValues(alpha: 0.5))),
-                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInteractiveTierRow({
+    required BuildContext context,
+    required int tier,
+    required bool isUnlocked,
+    required bool isCurrent,
+    required bool isPremiumReward,
+    required bool canClaim,
+    required Map<String, dynamic> freeReward,
+    required Map<String, dynamic> premiumReward,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        gradient: isCurrent
+            ? LinearGradient(
+                colors: [
+                  const Color(0xFF6366F1).withValues(alpha: 0.2),
+                  const Color(0xFF8B5CF6).withValues(alpha: 0.1),
                 ],
+              )
+            : null,
+        color: isCurrent ? null : Colors.white.withValues(alpha: 0.03),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isCurrent
+              ? const Color(0xFF6366F1).withValues(alpha: 0.5)
+              : isPremiumReward
+                  ? const Color(0xFFD4AF37).withValues(alpha: 0.3)
+                  : Colors.white.withValues(alpha: 0.08),
+          width: isCurrent ? 2 : 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          // Tier Badge
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              gradient: isUnlocked
+                  ? const LinearGradient(colors: [Color(0xFF10B981), Color(0xFF059669)])
+                  : isCurrent
+                      ? const LinearGradient(colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)])
+                      : null,
+              color: isUnlocked || isCurrent ? null : Colors.white.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Center(
+              child: isUnlocked && !isCurrent
+                  ? const Icon(Icons.check, color: Colors.white, size: 20)
+                  : Text(
+                      '$tier',
+                      style: TextStyle(
+                        color: isCurrent ? Colors.white : Colors.white.withValues(alpha: 0.5),
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+            ),
+          ),
+          const SizedBox(width: 12),
+
+          // Free Reward
+          Expanded(
+            child: GestureDetector(
+              onTap: () => _showRewardDetails(context, freeReward, 'Free Reward', tier, isUnlocked),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                decoration: BoxDecoration(
+                  color: isUnlocked
+                      ? const Color(0xFF10B981).withValues(alpha: 0.1)
+                      : Colors.white.withValues(alpha: 0.05),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: isUnlocked
+                        ? const Color(0xFF10B981).withValues(alpha: 0.3)
+                        : Colors.white.withValues(alpha: 0.08),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Text(freeReward['emoji'] as String, style: const TextStyle(fontSize: 22)),
+                    const SizedBox(width: 8),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _getRewardTitle(freeReward),
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: isUnlocked ? 0.9 : 0.5),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        Text(
+                          'FREE',
+                          style: TextStyle(
+                            color: const Color(0xFF10B981).withValues(alpha: isUnlocked ? 0.8 : 0.4),
+                            fontSize: 9,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
+          const SizedBox(width: 8),
+
+          // Premium Reward
+          Expanded(
+            child: GestureDetector(
+              onTap: () => _showRewardDetails(context, premiumReward, 'Premium Reward', tier, isUnlocked),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                decoration: BoxDecoration(
+                  gradient: isPremiumReward
+                      ? LinearGradient(
+                          colors: [
+                            const Color(0xFFD4AF37).withValues(alpha: 0.2),
+                            const Color(0xFFD4AF37).withValues(alpha: 0.1),
+                          ],
+                        )
+                      : null,
+                  color: isPremiumReward ? null : Colors.white.withValues(alpha: 0.05),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: isPremiumReward
+                        ? const Color(0xFFD4AF37).withValues(alpha: 0.4)
+                        : Colors.white.withValues(alpha: 0.08),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Text(premiumReward['emoji'] as String, style: const TextStyle(fontSize: 22)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _getRewardTitle(premiumReward),
+                            style: TextStyle(
+                              color: isPremiumReward
+                                  ? const Color(0xFFD4AF37).withValues(alpha: isUnlocked ? 1.0 : 0.6)
+                                  : Colors.white.withValues(alpha: isUnlocked ? 0.9 : 0.5),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Row(
+                            children: [
+                              const Text('👑', style: TextStyle(fontSize: 8)),
+                              const SizedBox(width: 2),
+                              Text(
+                                'PREMIUM',
+                                style: TextStyle(
+                                  color: const Color(0xFFD4AF37).withValues(alpha: isUnlocked ? 0.8 : 0.4),
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _getRewardTitle(Map<String, dynamic> reward) {
+    final label = reward['label'] as String;
+    if (label.contains('K')) return '$label Chips';
+    if (label == 'XP') return 'Bonus XP';
+    if (label == 'Card' || label == 'Skin') return 'Card Back';
+    if (label == 'Dice' || label == 'Chip') return 'Table Theme';
+    if (label == 'Emote') return 'Emote Pack';
+    if (label == 'Frame') return 'Avatar Frame';
+    if (label == 'Trail') return 'Card Trail';
+    if (label == 'Epic' || label == 'Legend') return 'Legendary Item';
+    if (label == 'Rare') return 'Rare Emote';
+    if (label == 'VIP') return 'VIP Badge';
+    if (int.tryParse(label) != null) return '$label Gems';
+    return label;
+  }
+
+  void _showRewardDetails(BuildContext context, Map<String, dynamic> reward, String type, int tier, bool isUnlocked) {
+    final title = _getRewardTitle(reward);
+    final isPremium = type == 'Premium Reward';
+
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          width: 300,
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: isPremium
+                  ? [const Color(0xFF2A1A0A), const Color(0xFF1A1A1A)]
+                  : [const Color(0xFF1A2A1A), const Color(0xFF1A1A1A)],
+            ),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: isPremium
+                  ? const Color(0xFFD4AF37).withValues(alpha: 0.4)
+                  : const Color(0xFF10B981).withValues(alpha: 0.4),
+            ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Reward Icon
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  gradient: isPremium
+                      ? const LinearGradient(colors: [Color(0xFFD4AF37), Color(0xFFB8860B)])
+                      : const LinearGradient(colors: [Color(0xFF10B981), Color(0xFF059669)]),
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: (isPremium ? const Color(0xFFD4AF37) : const Color(0xFF10B981)).withValues(alpha: 0.4),
+                      blurRadius: 16,
+                    ),
+                  ],
+                ),
+                child: Center(child: Text(reward['emoji'] as String, style: const TextStyle(fontSize: 40))),
+              ),
+              const SizedBox(height: 16),
+
+              // Type Badge
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: (isPremium ? const Color(0xFFD4AF37) : const Color(0xFF10B981)).withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  type.toUpperCase(),
+                  style: TextStyle(
+                    color: isPremium ? const Color(0xFFD4AF37) : const Color(0xFF10B981),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // Title
+              Text(
+                title,
+                style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Tier $tier Reward',
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13),
+              ),
+              const SizedBox(height: 20),
+
+              // Status
+              if (isUnlocked)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF10B981).withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.check_circle, color: Color(0xFF10B981), size: 18),
+                      const SizedBox(width: 8),
+                      Text(
+                        isPremium ? 'Requires Premium' : 'Claimed!',
+                        style: const TextStyle(color: Color(0xFF10B981), fontSize: 14, fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
+                )
+              else
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.lock_outline, color: Colors.white54, size: 18),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Reach Tier $tier to unlock',
+                        style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 14),
+                      ),
+                    ],
+                  ),
+                ),
+              const SizedBox(height: 16),
+
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text('Close', style: TextStyle(color: Colors.white.withValues(alpha: 0.5))),
+              ),
+            ],
+          ),
         ),
+      ),
+    );
+  }
+
+  void _showPremiumPassDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.85, maxWidth: 380),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                const Color(0xFF2A1A0A),
+                const Color(0xFF1A1A1A),
+                const Color(0xFF1A1A1A),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: const Color(0xFFD4AF37).withValues(alpha: 0.4)),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFFD4AF37).withValues(alpha: 0.2),
+                blurRadius: 30,
+                spreadRadius: 2,
+              ),
+            ],
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Header with crown
+                Container(
+                  padding: const EdgeInsets.fromLTRB(24, 28, 24, 20),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        const Color(0xFFD4AF37).withValues(alpha: 0.15),
+                        Colors.transparent,
+                      ],
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      // Crown with glow
+                      Container(
+                        width: 90,
+                        height: 90,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [Color(0xFFD4AF37), Color(0xFFB8860B), Color(0xFFD4AF37)],
+                          ),
+                          borderRadius: BorderRadius.circular(28),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFFD4AF37).withValues(alpha: 0.5),
+                              blurRadius: 20,
+                              spreadRadius: 2,
+                            ),
+                          ],
+                        ),
+                        child: const Center(child: Text('👑', style: TextStyle(fontSize: 44))),
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'PREMIUM PASS',
+                        style: TextStyle(
+                          color: Color(0xFFD4AF37),
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 2,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Season 1: High Roller\'s Fortune',
+                        style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Benefits Section
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                  child: Column(
+                    children: [
+                      _buildPremiumBenefitCard(
+                        icon: '⚡',
+                        title: '2X XP BOOST',
+                        description: 'Level up twice as fast on all games',
+                        color: const Color(0xFF6366F1),
+                      ),
+                      const SizedBox(height: 10),
+                      _buildPremiumBenefitCard(
+                        icon: '🎴',
+                        title: 'EXCLUSIVE CARD BACKS',
+                        description: '5 premium animated card designs',
+                        color: const Color(0xFF8B5CF6),
+                      ),
+                      const SizedBox(height: 10),
+                      _buildPremiumBenefitCard(
+                        icon: '💰',
+                        title: 'BONUS CHIPS',
+                        description: 'Extra chips with every tier unlock',
+                        color: const Color(0xFF10B981),
+                      ),
+                      const SizedBox(height: 10),
+                      _buildPremiumBenefitCard(
+                        icon: '🖼️',
+                        title: 'PREMIUM AVATAR FRAME',
+                        description: 'Animated golden frame for your profile',
+                        color: const Color(0xFFD4AF37),
+                      ),
+                      const SizedBox(height: 10),
+                      _buildPremiumBenefitCard(
+                        icon: '💬',
+                        title: 'EXCLUSIVE EMOTES',
+                        description: '10 premium animated emotes',
+                        color: const Color(0xFFEC4899),
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Reward Preview
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.05),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                        ),
+                        child: Column(
+                          children: [
+                            Text(
+                              'Premium Rewards Preview',
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.7),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                              children: [
+                                _buildMiniReward('💎', '5K'),
+                                _buildMiniReward('🃏', 'Epic'),
+                                _buildMiniReward('🎭', 'Rare'),
+                                _buildMiniReward('✨', 'VIP'),
+                                _buildMiniReward('🏆', 'Legend'),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Purchase Button
+                      Container(
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFFD4AF37), Color(0xFFB8860B)],
+                          ),
+                          borderRadius: BorderRadius.circular(14),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFFD4AF37).withValues(alpha: 0.4),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: ElevatedButton(
+                          onPressed: () {
+                            Navigator.pop(context);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Row(
+                                  children: [
+                                    const Text('👑', style: TextStyle(fontSize: 20)),
+                                    const SizedBox(width: 10),
+                                    const Text('Premium Pass Activated!',
+                                        style: TextStyle(fontWeight: FontWeight.w600)),
+                                  ],
+                                ),
+                                backgroundColor: const Color(0xFFD4AF37),
+                              ),
+                            );
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.transparent,
+                            shadowColor: Colors.transparent,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Text('💎', style: TextStyle(fontSize: 18)),
+                              const SizedBox(width: 8),
+                              const Text(
+                                '400',
+                                style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                '500',
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.6),
+                                  fontSize: 14,
+                                  decoration: TextDecoration.lineThrough,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Limited time 20% discount!',
+                        style: TextStyle(color: const Color(0xFFEF4444), fontSize: 11, fontWeight: FontWeight.w500),
+                      ),
+                      const SizedBox(height: 10),
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: Text('Maybe Later',
+                            style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 13)),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPremiumBenefitCard({
+    required String icon,
+    required String title,
+    required String description,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Center(child: Text(icon, style: const TextStyle(fontSize: 20))),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  description,
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 11),
+                ),
+              ],
+            ),
+          ),
+          Icon(Icons.check_circle, color: color, size: 18),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMiniReward(String emoji, String label) {
+    return Column(
+      children: [
+        Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                const Color(0xFFD4AF37).withValues(alpha: 0.3),
+                const Color(0xFFD4AF37).withValues(alpha: 0.1),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0xFFD4AF37).withValues(alpha: 0.3)),
+          ),
+          child: Center(child: Text(emoji, style: const TextStyle(fontSize: 16))),
+        ),
+        const SizedBox(height: 4),
+        Text(label, style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 9)),
+      ],
+    );
+  }
+
+  Widget _buildBattlePassTier({
+    required int tier,
+    required bool isUnlocked,
+    required bool isCurrent,
+    required bool isPremiumReward,
+    required Map<String, dynamic> freeReward,
+    required Map<String, dynamic> premiumReward,
+  }) {
+    return Container(
+      width: 72,
+      decoration: BoxDecoration(
+        gradient: isCurrent
+            ? LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  const Color(0xFF6366F1).withValues(alpha: 0.3),
+                  const Color(0xFF6366F1).withValues(alpha: 0.1),
+                ],
+              )
+            : null,
+        color: isCurrent ? null : Colors.white.withValues(alpha: 0.03),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isCurrent
+              ? const Color(0xFF6366F1).withValues(alpha: 0.5)
+              : isPremiumReward
+                  ? const Color(0xFFD4AF37).withValues(alpha: 0.3)
+                  : Colors.white.withValues(alpha: 0.08),
+          width: isCurrent ? 2 : 1,
+        ),
+      ),
+      child: Column(
+        children: [
+          // Tier number header
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            decoration: BoxDecoration(
+              color: isUnlocked
+                  ? const Color(0xFF10B981).withValues(alpha: 0.2)
+                  : isCurrent
+                      ? const Color(0xFF6366F1).withValues(alpha: 0.2)
+                      : Colors.white.withValues(alpha: 0.05),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(11),
+                topRight: Radius.circular(11),
+              ),
+            ),
+            child: Center(
+              child: Text(
+                '$tier',
+                style: TextStyle(
+                  color: isUnlocked
+                      ? const Color(0xFF10B981)
+                      : isCurrent
+                          ? Colors.white
+                          : Colors.white.withValues(alpha: 0.4),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
+
+          // Free reward
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.all(4),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: isUnlocked ? Colors.white.withValues(alpha: 0.08) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        freeReward['emoji'] as String,
+                        style: TextStyle(
+                          fontSize: 18,
+                          color: isUnlocked ? null : Colors.white.withValues(alpha: 0.3),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        freeReward['label'] as String,
+                        style: TextStyle(
+                          color: isUnlocked ? Colors.white.withValues(alpha: 0.7) : Colors.white.withValues(alpha: 0.3),
+                          fontSize: 8,
+                        ),
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          // Divider
+          Container(
+            height: 1,
+            color: Colors.white.withValues(alpha: 0.08),
+          ),
+
+          // Premium reward
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.all(4),
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: isPremiumReward
+                      ? LinearGradient(
+                          colors: [
+                            const Color(0xFFD4AF37).withValues(alpha: 0.15),
+                            const Color(0xFFD4AF37).withValues(alpha: 0.05),
+                          ],
+                        )
+                      : null,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Stack(
+                  children: [
+                    Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            premiumReward['emoji'] as String,
+                            style: TextStyle(
+                              fontSize: 18,
+                              color: isUnlocked ? null : Colors.white.withValues(alpha: 0.3),
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            premiumReward['label'] as String,
+                            style: TextStyle(
+                              color: isPremiumReward
+                                  ? const Color(0xFFD4AF37).withValues(alpha: isUnlocked ? 0.9 : 0.5)
+                                  : Colors.white.withValues(alpha: isUnlocked ? 0.7 : 0.3),
+                              fontSize: 8,
+                            ),
+                            textAlign: TextAlign.center,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (!isUnlocked)
+                      Positioned(
+                        top: 0,
+                        right: 0,
+                        child: Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFD4AF37).withValues(alpha: 0.3),
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                          child: const Text('👑', style: TextStyle(fontSize: 8)),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Map<String, dynamic> _getTierFreeReward(int tier) {
+    final rewards = [
+      {'emoji': '🪙', 'label': '500'},
+      {'emoji': '💫', 'label': 'XP'},
+      {'emoji': '🪙', 'label': '1K'},
+      {'emoji': '🎲', 'label': 'Dice'},
+      {'emoji': '🪙', 'label': '2K'},
+      {'emoji': '💫', 'label': 'XP'},
+      {'emoji': '🃏', 'label': 'Card'},
+      {'emoji': '🪙', 'label': '3K'},
+      {'emoji': '🎯', 'label': 'Chip'},
+      {'emoji': '🪙', 'label': '5K'},
+    ];
+    return rewards[(tier - 1) % rewards.length];
+  }
+
+  Map<String, dynamic> _getTierPremiumReward(int tier) {
+    final rewards = [
+      {'emoji': '💎', 'label': '50'},
+      {'emoji': '🎴', 'label': 'Skin'},
+      {'emoji': '💎', 'label': '100'},
+      {'emoji': '🎭', 'label': 'Emote'},
+      {'emoji': '👑', 'label': 'Epic'},
+      {'emoji': '💎', 'label': '150'},
+      {'emoji': '✨', 'label': 'Frame'},
+      {'emoji': '💎', 'label': '200'},
+      {'emoji': '🌟', 'label': 'Trail'},
+      {'emoji': '🏆', 'label': 'Legend'},
+    ];
+    return rewards[(tier - 1) % rewards.length];
+  }
+
+  Widget _buildChallengeItem({
+    required String icon,
+    required String title,
+    required int progress,
+    required int total,
+    required int xp,
+    required bool isComplete,
+    bool isWeekly = false,
+  }) {
+    final progressPercent = (progress / total).clamp(0.0, 1.0);
+
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: isComplete ? const Color(0xFF10B981).withValues(alpha: 0.1) : Colors.white.withValues(alpha: 0.03),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: isComplete ? const Color(0xFF10B981).withValues(alpha: 0.3) : Colors.white.withValues(alpha: 0.06),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: isComplete ? const Color(0xFF10B981).withValues(alpha: 0.2) : Colors.white.withValues(alpha: 0.05),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Center(child: Text(icon, style: const TextStyle(fontSize: 16))),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.9),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                    if (isWeekly)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF8B5CF6).withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          'WEEKLY',
+                          style: const TextStyle(
+                            color: Color(0xFF8B5CF6),
+                            fontSize: 8,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Stack(
+                        children: [
+                          Container(
+                            height: 4,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                          FractionallySizedBox(
+                            widthFactor: progressPercent,
+                            child: Container(
+                              height: 4,
+                              decoration: BoxDecoration(
+                                color: isComplete ? const Color(0xFF10B981) : const Color(0xFF6366F1),
+                                borderRadius: BorderRadius.circular(2),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '$progress/$total',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.5),
+                        fontSize: 10,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: isComplete
+                  ? const Color(0xFF10B981).withValues(alpha: 0.2)
+                  : const Color(0xFFFFBB00).withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Row(
+              children: [
+                Text(isComplete ? '✓' : '⚡', style: const TextStyle(fontSize: 10)),
+                const SizedBox(width: 3),
+                Text(
+                  isComplete ? 'Done' : '+$xp',
+                  style: TextStyle(
+                    color: isComplete ? const Color(0xFF10B981) : const Color(0xFFFFBB00),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
