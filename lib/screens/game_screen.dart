@@ -1987,43 +1987,53 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
               children: [
                 // Player's cards - always show face up during showdown (dimmed if folded or lost)
                 if (isShowdown && _playerCards.isNotEmpty)
-                  Row(
-                    children: [
-                      _buildLargeCard(
-                        _playerCards[0],
-                        isHighlighted: _showdownAnimationComplete &&
-                            isPlayerWinner &&
-                            !_playerHasFolded &&
-                            playerHand != null &&
-                            playerHand.isCardInWinningHand(_playerCards[0]),
-                        isDimmed: isPlayerLoser || _playerHasFolded,
-                      ),
-                      Transform.translate(
-                        offset: const Offset(-15, 0),
-                        child: _buildLargeCard(
-                          _playerCards.length > 1 ? _playerCards[1] : _playerCards[0],
+                  SizedBox(
+                    width: 165, // 90 * 2 - 15 overlap
+                    height: 126,
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        _buildLargeCard(
+                          _playerCards[0],
                           isHighlighted: _showdownAnimationComplete &&
                               isPlayerWinner &&
                               !_playerHasFolded &&
                               playerHand != null &&
-                              _playerCards.length > 1 &&
-                              playerHand.isCardInWinningHand(_playerCards[1]),
+                              playerHand.isCardInWinningHand(_playerCards[0]),
                           isDimmed: isPlayerLoser || _playerHasFolded,
                         ),
-                      ),
-                    ],
+                        Positioned(
+                          left: 75, // 90 - 15 overlap
+                          child: _buildLargeCard(
+                            _playerCards.length > 1 ? _playerCards[1] : _playerCards[0],
+                            isHighlighted: _showdownAnimationComplete &&
+                                isPlayerWinner &&
+                                !_playerHasFolded &&
+                                playerHand != null &&
+                                _playerCards.length > 1 &&
+                                playerHand.isCardInWinningHand(_playerCards[1]),
+                            isDimmed: isPlayerLoser || _playerHasFolded,
+                          ),
+                        ),
+                      ],
+                    ),
                   )
                 else if (_playerHasFolded && _foldedCards.isNotEmpty)
                   // Show ghost outline of folded cards
-                  Row(
-                    children: [
-                      _buildLargeCard(_foldedCards[0], isGhost: true),
-                      if (_foldedCards.length > 1)
-                        Transform.translate(
-                          offset: const Offset(-15, 0),
-                          child: _buildLargeCard(_foldedCards[1], isGhost: true),
-                        ),
-                    ],
+                  SizedBox(
+                    width: _foldedCards.length > 1 ? 165 : 90, // 90 * 2 - 15 overlap
+                    height: 126,
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        _buildLargeCard(_foldedCards[0], isGhost: true),
+                        if (_foldedCards.length > 1)
+                          Positioned(
+                            left: 75, // 90 - 15 overlap
+                            child: _buildLargeCard(_foldedCards[1], isGhost: true),
+                          ),
+                      ],
+                    ),
                   )
                 else
                   _buildPlayerCardsLarge(),

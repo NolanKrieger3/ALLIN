@@ -67,15 +67,25 @@ class GameUIWidgets {
 
   /// Build two large overlapping cards
   static Widget buildPlayerCardsLarge(List<PlayingCard> cards) {
-    return Row(
-      children: [
-        if (cards.isNotEmpty) buildLargeCard(cards[0]),
-        if (cards.length > 1)
-          Transform.translate(
-            offset: const Offset(-15, 0),
-            child: buildLargeCard(cards[1]),
-          ),
-      ],
+    const cardWidth = 90.0;
+    const cardHeight = 126.0;
+    const overlap = 15.0;
+    final totalWidth = cards.length > 1 ? (cardWidth * 2 - overlap) : cardWidth;
+
+    return SizedBox(
+      width: totalWidth,
+      height: cardHeight,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          if (cards.isNotEmpty) buildLargeCard(cards[0]),
+          if (cards.length > 1)
+            Positioned(
+              left: cardWidth - overlap,
+              child: buildLargeCard(cards[1]),
+            ),
+        ],
+      ),
     );
   }
 
