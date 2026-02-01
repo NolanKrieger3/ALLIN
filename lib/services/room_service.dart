@@ -6,10 +6,22 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../models/game_room.dart';
 import 'user_preferences.dart';
 
+/// Room status constants for consistency
+class RoomStatus {
+  static const String waiting = 'waiting';
+  static const String playing = 'playing';
+  static const String finished = 'finished';
+}
+
 /// Service for managing game rooms - creation, joining, leaving, fetching
 class RoomService {
   static const String databaseUrl = 'https://allin-d0e2d-default-rtdb.firebaseio.com';
   final FirebaseAuth _auth = FirebaseAuth.instance;
+
+  /// Standard headers for JSON requests
+  static const Map<String, String> _jsonHeaders = {
+    'Content-Type': 'application/json',
+  };
 
   /// Get current user ID
   String? get currentUserId => _auth.currentUser?.uid;
@@ -49,9 +61,13 @@ class RoomService {
       }
     }
 
-    // Final fallback - use UserPreferences which now caches the random name
-    print('⚠️ Using UserPreferences fallback: $savedUsername');
-    return savedUsername;
+    // Final fallback - ensure we never return empty string
+    if (savedUsername.isNotEmpty) {
+      return savedUsername;
+    }
+
+    // Generate a guaranteed non-empty fallback
+    return 'Player${currentUserId?.substring(0, 4) ?? Random().nextInt(9999).toString().padLeft(4, '0')}';
   }
 
   /// Get auth token for authenticated requests
@@ -110,7 +126,12 @@ class RoomService {
 
     final response = await http.put(
       Uri.parse('$databaseUrl/game_rooms/$roomId.json?auth=$token'),
-      body: jsonEncode(room.toJson()),
+      headers: _jsonHeaders,
+      body: jsonEncode({
+        ...room.toJson(),
+        'lastActivityAt': DateTime.now().millisecondsSinceEpoch,
+        'defaultChips': startingChips,
+      }),
     );
 
     if (response.statusCode != 200) {
@@ -148,7 +169,7 @@ class RoomService {
     }
 
     // Check if game already started
-    if (room.status != 'waiting') {
+    if (room.status != RoomStatus.waiting) {
       throw Exception('Game has already started');
     }
 
@@ -167,10 +188,18 @@ class RoomService {
 
     final updatedPlayers = [...room.players, newPlayer];
 
-    await http.patch(
+    final patchResponse = await http.patch(
       Uri.parse('$databaseUrl/game_rooms/$roomId.json?auth=$token'),
-      body: jsonEncode({'players': updatedPlayers.map((p) => p.toJson()).toList()}),
+      headers: _jsonHeaders,
+      body: jsonEncode({
+        'players': updatedPlayers.map((p) => p.toJson()).toList(),
+        'lastActivityAt': DateTime.now().millisecondsSinceEpoch,
+      }),
     );
+
+    if (patchResponse.statusCode != 200) {
+      throw Exception('Failed to join room');
+    }
 
     return roomId;
   }
@@ -210,7 +239,12 @@ class RoomService {
 
     final response = await http.put(
       Uri.parse('$databaseUrl/game_rooms/$roomId.json?auth=$token'),
-      body: jsonEncode(room.toJson()),
+      headers: _jsonHeaders,
+      body: jsonEncode({
+        ...room.toJson(),
+        'lastActivityAt': DateTime.now().millisecondsSinceEpoch,
+        'defaultChips': startingChips,
+      }),
     );
 
     if (response.statusCode != 200) {
@@ -241,7 +275,12 @@ class RoomService {
 
     final response = await http.put(
       Uri.parse('$databaseUrl/game_rooms/$roomId.json?auth=$token'),
-      body: jsonEncode(room.toJson()),
+      headers: _jsonHeaders,
+      body: jsonEncode({
+        ...room.toJson(),
+        'lastActivityAt': DateTime.now().millisecondsSinceEpoch,
+        'defaultChips': startingChips,
+      }),
     );
 
     if (response.statusCode != 200) {
@@ -275,9 +314,10 @@ class RoomService {
 
     bool isJoinable;
     if (room.gameType == 'quickplay') {
-      isJoinable = room.status == 'waiting' || room.status == 'playing';
+      isJoinable = room.status == RoomStatus.waiting || room.status == RoomStatus.playing;
     } else {
-      isJoinable = room.status == 'waiting' || (room.status == 'playing' && room.phase == 'waiting_for_players');
+      isJoinable = room.status == RoomStatus.waiting ||
+          (room.status == RoomStatus.playing && room.phase == 'waiting_for_players');
     }
     if (!isJoinable) throw Exception('Game already in progress');
 
@@ -287,7 +327,7 @@ class RoomService {
       print('ALREADY IN ROOM: User $userId is already a player');
 
       // If room is in 'waiting' status, reset player's stale state (hasFolded, hasActed, etc.)
-      if (room.status == 'waiting') {
+      if (room.status == RoomStatus.waiting) {
         final existingPlayer = room.players[existingPlayerIndex];
         final resetPlayer = existingPlayer.copyWith(
           hasFolded: false,
@@ -302,17 +342,26 @@ class RoomService {
         final updatedPlayers = List<GamePlayer>.from(room.players);
         updatedPlayers[existingPlayerIndex] = resetPlayer;
 
-        await http.patch(
+        final patchResponse = await http.patch(
           Uri.parse('$databaseUrl/game_rooms/$roomId.json?auth=$token'),
-          body: jsonEncode({'players': updatedPlayers.map((p) => p.toJson()).toList()}),
+          headers: _jsonHeaders,
+          body: jsonEncode({
+            'players': updatedPlayers.map((p) => p.toJson()).toList(),
+            'lastActivityAt': DateTime.now().millisecondsSinceEpoch,
+          }),
         );
+        if (patchResponse.statusCode != 200) {
+          print('⚠️ Failed to reset player state: ${patchResponse.statusCode}');
+        }
         print('✅ Reset stale player state for user $userId in waiting room');
       }
       return;
     }
 
-    final chips = startingChips ?? room.players.first.chips;
-    final isJoiningMidGame = room.status == 'playing' && room.phase != 'waiting_for_players';
+    // Use room's default chips or first player's chips as fallback
+    final defaultChips = (roomData['defaultChips'] as int?) ?? room.players.first.chips;
+    final chips = startingChips ?? defaultChips;
+    final isJoiningMidGame = room.status == RoomStatus.playing && room.phase != 'waiting_for_players';
 
     final newPlayer = GamePlayer(
       uid: userId,
@@ -325,10 +374,18 @@ class RoomService {
 
     final updatedPlayers = [...room.players, newPlayer];
 
-    await http.patch(
+    final patchResponse = await http.patch(
       Uri.parse('$databaseUrl/game_rooms/$roomId.json?auth=$token'),
-      body: jsonEncode({'players': updatedPlayers.map((p) => p.toJson()).toList()}),
+      headers: _jsonHeaders,
+      body: jsonEncode({
+        'players': updatedPlayers.map((p) => p.toJson()).toList(),
+        'lastActivityAt': DateTime.now().millisecondsSinceEpoch,
+      }),
     );
+
+    if (patchResponse.statusCode != 200) {
+      throw Exception('Failed to join room');
+    }
 
     print('✅ Successfully joined room $roomId with ${updatedPlayers.length} players');
   }
@@ -349,14 +406,25 @@ class RoomService {
     final updatedPlayers = room.players.where((p) => p.uid != userId).toList();
 
     if (updatedPlayers.isEmpty) {
-      await http.delete(Uri.parse('$databaseUrl/game_rooms/$roomId.json?auth=$token'));
+      final deleteResponse = await http.delete(Uri.parse('$databaseUrl/game_rooms/$roomId.json?auth=$token'));
+      if (deleteResponse.statusCode != 200) {
+        print('⚠️ Failed to delete empty room $roomId');
+      }
     } else {
       final newHostId = room.hostId == userId ? updatedPlayers.first.uid : room.hostId;
 
-      await http.patch(
+      final patchResponse = await http.patch(
         Uri.parse('$databaseUrl/game_rooms/$roomId.json?auth=$token'),
-        body: jsonEncode({'players': updatedPlayers.map((p) => p.toJson()).toList(), 'hostId': newHostId}),
+        headers: _jsonHeaders,
+        body: jsonEncode({
+          'players': updatedPlayers.map((p) => p.toJson()).toList(),
+          'hostId': newHostId,
+          'lastActivityAt': DateTime.now().millisecondsSinceEpoch,
+        }),
       );
+      if (patchResponse.statusCode != 200) {
+        print('⚠️ Failed to update room after leaving');
+      }
     }
   }
 
@@ -374,17 +442,21 @@ class RoomService {
     final roomData = jsonDecode(response.body) as Map<String, dynamic>;
     final room = GameRoom.fromJson(roomData, roomId);
 
-    final updatedPlayers = room.players.map((p) {
-      if (p.uid == userId) {
-        return p.copyWith(isReady: !p.isReady);
-      }
-      return p;
-    }).toList();
+    final myIndex = room.players.indexWhere((p) => p.uid == userId);
+    if (myIndex == -1) return;
 
-    await http.patch(
-      Uri.parse('$databaseUrl/game_rooms/$roomId.json?auth=$token'),
-      body: jsonEncode({'players': updatedPlayers.map((p) => p.toJson()).toList()}),
+    final currentReady = room.players[myIndex].isReady;
+
+    // Patch only our own ready status
+    final patchResponse = await http.patch(
+      Uri.parse('$databaseUrl/game_rooms/$roomId/players/$myIndex.json?auth=$token'),
+      headers: _jsonHeaders,
+      body: jsonEncode({'isReady': !currentReady}),
     );
+
+    if (patchResponse.statusCode != 200) {
+      print('⚠️ Failed to toggle ready status');
+    }
   }
 
   // ============================================================================
@@ -486,9 +558,9 @@ class RoomService {
 
       bool isJoinable;
       if (gameType.startsWith('sitandgo')) {
-        isJoinable = room.status == 'waiting';
+        isJoinable = room.status == RoomStatus.waiting;
       } else {
-        isJoinable = room.status == 'waiting' || room.status == 'playing';
+        isJoinable = room.status == RoomStatus.waiting || room.status == RoomStatus.playing;
       }
 
       bool hasSpace;
@@ -543,7 +615,7 @@ class RoomService {
       return room.bigBlind == bigBlind &&
           room.gameType == gameType &&
           !room.isPrivate &&
-          (room.status == 'waiting' || room.status == 'playing');
+          (room.status == RoomStatus.waiting || room.status == RoomStatus.playing);
     }).toList();
 
     if (matchingRooms.isEmpty) return true;
@@ -554,7 +626,7 @@ class RoomService {
   // HEARTBEAT & CLEANUP
   // ============================================================================
 
-  /// Send heartbeat to keep player active in room
+  /// Send heartbeat to keep player active in room - verifies uid before patching
   Future<void> sendHeartbeat(String roomId) async {
     final userId = currentUserId;
     if (userId == null) return;
@@ -570,9 +642,23 @@ class RoomService {
     final myIndex = room.players.indexWhere((p) => p.uid == userId);
     if (myIndex == -1) return;
 
+    // Verify the player at this index is actually us before patching
+    if (room.players[myIndex].uid != userId) {
+      // Index mismatch - array likely changed, skip this heartbeat
+      return;
+    }
+
     await http.patch(
       Uri.parse('$databaseUrl/game_rooms/$roomId/players/$myIndex.json?auth=$token'),
+      headers: _jsonHeaders,
       body: jsonEncode({'lastActiveAt': DateTime.now().toIso8601String()}),
+    );
+
+    // Also update room-level activity timestamp
+    await http.patch(
+      Uri.parse('$databaseUrl/game_rooms/$roomId.json?auth=$token'),
+      headers: _jsonHeaders,
+      body: jsonEncode({'lastActivityAt': DateTime.now().millisecondsSinceEpoch}),
     );
   }
 
@@ -589,7 +675,7 @@ class RoomService {
 
     if (room.hostId != userId) return;
     // Allow removal from both waiting and playing rooms
-    if (room.status == 'finished') return;
+    if (room.status == RoomStatus.finished) return;
 
     final now = DateTime.now();
     // Reduced timeout from 45s to 15s for quicker disconnect detection
@@ -602,23 +688,34 @@ class RoomService {
     }).toList();
 
     if (activePlayers.length < room.players.length) {
+      final removedCount = room.players.length - activePlayers.length;
+      print('🧹 Removing $removedCount inactive players from room $roomId');
+
       if (activePlayers.isEmpty) {
-        await http.delete(Uri.parse('$databaseUrl/game_rooms/$roomId.json?auth=$token'));
+        final deleteResponse = await http.delete(Uri.parse('$databaseUrl/game_rooms/$roomId.json?auth=$token'));
+        if (deleteResponse.statusCode != 200) {
+          print('⚠️ Failed to delete room with no active players');
+        }
       } else {
         final newHostId = activePlayers.any((p) => p.uid == room.hostId) ? room.hostId : activePlayers.first.uid;
 
-        await http.patch(
+        final patchResponse = await http.patch(
           Uri.parse('$databaseUrl/game_rooms/$roomId.json?auth=$token'),
+          headers: _jsonHeaders,
           body: jsonEncode({
             'players': activePlayers.map((p) => p.toJson()).toList(),
             'hostId': newHostId,
+            'lastActivityAt': DateTime.now().millisecondsSinceEpoch,
           }),
         );
+        if (patchResponse.statusCode != 200) {
+          print('⚠️ Failed to remove inactive players');
+        }
       }
     }
   }
 
-  /// Clean up stale rooms
+  /// Clean up stale rooms - uses lastActivityAt for accurate staleness detection
   Future<void> cleanupStaleRooms() async {
     final token = await getAuthToken();
     if (token == null) return;
@@ -636,6 +733,11 @@ class RoomService {
         final roomData = Map<String, dynamic>.from(entry.value as Map);
         final room = GameRoom.fromJson(roomData, roomId);
 
+        // Use lastActivityAt if available, otherwise fall back to createdAt
+        final lastActivityMs = roomData['lastActivityAt'] as int?;
+        final lastActivity =
+            lastActivityMs != null ? DateTime.fromMillisecondsSinceEpoch(lastActivityMs) : room.createdAt;
+
         bool shouldDelete = false;
         String reason = '';
 
@@ -644,31 +746,37 @@ class RoomService {
           shouldDelete = true;
           reason = 'empty';
         }
-        // Delete finished rooms
-        else if (room.status == 'finished') {
-          shouldDelete = true;
-          reason = 'finished';
-        }
-        // Delete waiting rooms older than 5 minutes (stale lobbies)
-        else if (room.status == 'waiting') {
-          final waitTime = now.difference(room.createdAt).inMinutes;
-          if (waitTime >= 5) {
+        // Delete finished rooms older than 1 minute
+        else if (room.status == RoomStatus.finished) {
+          final timeSinceFinish = now.difference(lastActivity).inMinutes;
+          if (timeSinceFinish >= 1) {
             shouldDelete = true;
-            reason = 'stale lobby (${waitTime}min)';
+            reason = 'finished';
           }
         }
-        // Delete playing/in_progress rooms older than 30 minutes (stale games)
-        else if (room.status == 'in_progress' || room.status == 'playing') {
-          final gameTime = now.difference(room.createdAt).inMinutes;
-          if (gameTime > 30) {
+        // Delete waiting rooms with no activity for 5 minutes
+        else if (room.status == RoomStatus.waiting) {
+          final inactiveTime = now.difference(lastActivity).inMinutes;
+          if (inactiveTime >= 5) {
             shouldDelete = true;
-            reason = 'stale game (${gameTime}min)';
+            reason = 'stale lobby (${inactiveTime}min inactive)';
+          }
+        }
+        // Delete playing rooms with no activity for 30 minutes
+        else if (room.status == RoomStatus.playing) {
+          final inactiveTime = now.difference(lastActivity).inMinutes;
+          if (inactiveTime > 30) {
+            shouldDelete = true;
+            reason = 'stale game (${inactiveTime}min inactive)';
           }
         }
 
         if (shouldDelete) {
           print('🗑️ Deleting room $roomId: $reason');
-          await http.delete(Uri.parse('$databaseUrl/game_rooms/$roomId.json?auth=$token'));
+          final deleteResponse = await http.delete(Uri.parse('$databaseUrl/game_rooms/$roomId.json?auth=$token'));
+          if (deleteResponse.statusCode != 200) {
+            print('⚠️ Failed to delete room $roomId');
+          }
         }
       }
     } catch (e) {
@@ -682,8 +790,12 @@ class RoomService {
     if (token == null) return;
 
     try {
-      await http.delete(Uri.parse('$databaseUrl/game_rooms.json?auth=$token'));
-      print('🗑️ Deleted ALL game rooms');
+      final deleteResponse = await http.delete(Uri.parse('$databaseUrl/game_rooms.json?auth=$token'));
+      if (deleteResponse.statusCode == 200) {
+        print('🗑️ Deleted ALL game rooms');
+      } else {
+        print('⚠️ Failed to delete all rooms: ${deleteResponse.statusCode}');
+      }
     } catch (e) {
       print('⚠️ Delete all rooms error: $e');
     }

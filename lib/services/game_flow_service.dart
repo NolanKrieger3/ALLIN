@@ -3,7 +3,7 @@ import 'dart:math';
 import 'package:http/http.dart' as http;
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/game_room.dart';
-import 'room_service.dart';
+import 'room_service.dart'; // Also imports RoomStatus
 
 /// Service for handling game flow - starting games, dealing cards, new hands
 class GameFlowService {
@@ -40,7 +40,7 @@ class GameFlowService {
 
     // CRITICAL: Guard against starting a game that's already in progress
     // This prevents race conditions where startGame is called multiple times
-    if (room.status == 'playing' && room.phase != 'waiting_for_players') {
+    if (room.status == RoomStatus.playing && room.phase != 'waiting_for_players') {
       print('⚠️ Game already in progress, skipping startGame');
       return;
     }
@@ -130,7 +130,7 @@ class GameFlowService {
 
     // CRITICAL: Only start new hand from showdown phase
     // This prevents race conditions where newHand is called multiple times
-    if (room.phase != 'showdown' && room.status != 'finished') {
+    if (room.phase != 'showdown' && room.status != RoomStatus.finished) {
       print('⚠️ Game not in showdown, skipping newHand (current phase: ${room.phase})');
       return;
     }
@@ -237,7 +237,7 @@ class GameFlowService {
   Future<void> handleTurnTimeout(String roomId) async {
     final token = await _getAuthToken();
     final room = await _roomService.fetchRoom(roomId);
-    if (room == null || room.status != 'playing') return;
+    if (room == null || room.status != RoomStatus.playing) return;
 
     final currentPlayerId = room.currentTurnPlayerId;
     if (currentPlayerId == null) return;

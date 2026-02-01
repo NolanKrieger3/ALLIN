@@ -123,7 +123,7 @@ class GameService {
   Future<void> startGameFromWaiting(String roomId) async {
     final room = await _roomService.fetchRoom(roomId);
     if (room == null) throw Exception('Room not found');
-    if (room.status != 'waiting' && room.phase != 'waiting_for_players') {
+    if (room.status != RoomStatus.waiting && room.phase != 'waiting_for_players') {
       throw Exception('Game not in waiting state');
     }
     await _flowService.startGame(roomId);
