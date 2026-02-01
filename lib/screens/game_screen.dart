@@ -1427,8 +1427,9 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
             )));
 
     final totalParticipants = allParticipants.length;
-    // Enable centering and sliding with 4+ participants
-    final shouldCenterOnActive = totalParticipants >= 4;
+    // Enable centering and sliding only when there are more participants than visible slots
+    // This prevents duplicate keys and only shows the carousel when needed (6+ bots)
+    final shouldCenterOnActive = totalParticipants > maxVisible;
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),

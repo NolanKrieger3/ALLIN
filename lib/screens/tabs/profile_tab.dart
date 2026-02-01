@@ -2340,7 +2340,10 @@ class GemWheelDialogState extends State<GemWheelDialog> with SingleTickerProvide
     final random = Random();
     final prizeIndex = random.nextInt(_prizes.length);
     final rotations = 6 + random.nextDouble() * 4;
-    final targetAngle = rotations * 2 * pi + (prizeIndex / _prizes.length) * 2 * pi;
+    // Calculate angle so that segment prizeIndex lands at the TOP (where pointer is)
+    // Same formula as Daily Spin for consistency
+    final segmentAngle = 2 * pi / _prizes.length;
+    final targetAngle = rotations * 2 * pi + (prizeIndex * segmentAngle) + (segmentAngle / 2);
 
     _animation = Tween<double>(
       begin: 0,

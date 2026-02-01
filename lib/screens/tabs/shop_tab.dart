@@ -826,7 +826,7 @@ class CurrencyCard extends StatelessWidget {
             )
           else
             const SizedBox(height: 16),
-          Text(emoji, style: const TextStyle(fontSize: 22)),
+          _buildStackedEmoji(emoji, amount),
           const SizedBox(height: 4),
           Text(
             amount,
@@ -845,6 +845,72 @@ class CurrencyCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// Build stacked emoji visual based on amount tier
+  Widget _buildStackedEmoji(String emoji, String amount) {
+    // Determine stack count based on amount
+    int stackCount = 1;
+    final amountLower = amount.toLowerCase();
+    if (amountLower.contains('m')) {
+      // Millions
+      final num = double.tryParse(amountLower.replaceAll('m', '').replaceAll(',', '')) ?? 1;
+      if (num >= 100) {
+        stackCount = 5;
+      } else if (num >= 10) {
+        stackCount = 4;
+      } else if (num >= 1) {
+        stackCount = 3;
+      }
+    } else if (amountLower.contains('k')) {
+      // Thousands
+      final num = double.tryParse(amountLower.replaceAll('k', '').replaceAll(',', '')) ?? 1;
+      if (num >= 10) {
+        stackCount = 3;
+      } else if (num >= 1) {
+        stackCount = 2;
+      }
+    } else {
+      // Plain numbers
+      final num = int.tryParse(amount.replaceAll(',', '')) ?? 0;
+      if (num >= 1000) {
+        stackCount = 3;
+      } else if (num >= 500) {
+        stackCount = 2;
+      }
+    }
+
+    if (stackCount == 1) {
+      return Text(emoji, style: const TextStyle(fontSize: 22));
+    }
+
+    // Build stacked emojis with slight offset
+    return SizedBox(
+      height: 28 + (stackCount - 1) * 3.0,
+      width: 30 + (stackCount - 1) * 6.0,
+      child: Stack(
+        alignment: Alignment.center,
+        children: List.generate(stackCount, (i) {
+          return Positioned(
+            left: i * 4.0,
+            bottom: i * 2.0,
+            child: Text(
+              emoji,
+              style: TextStyle(
+                fontSize: 18,
+                shadows: [
+                  Shadow(
+                    color: Colors.black.withValues(alpha: 0.3),
+                    offset: const Offset(1, 1),
+                    blurRadius: 2,
+                  ),
+                ],
+              ),
+            ),
+          );
+        }),
       ),
     );
   }
