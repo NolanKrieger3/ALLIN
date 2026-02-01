@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'dart:async';
 import 'dart:math';
 import '../../widgets/shared_widgets.dart';
@@ -30,7 +30,7 @@ class ProfileTabState extends State<ProfileTab> {
   StreamSubscription? _friendsSub;
   StreamSubscription? _authSub;
   String _displayUsername = '';
-  String _selectedAvatar = 'ðŸ‘¤';
+  String _selectedAvatar = '👤';
 
   @override
   void initState() {
@@ -1881,7 +1881,7 @@ class ProfileTabState extends State<ProfileTab> {
                               color: Colors.white.withValues(alpha: 0.05),
                               borderRadius: BorderRadius.circular(10),
                             ),
-                            child: const Center(child: Text('ðŸŽ', style: TextStyle(fontSize: 18))),
+                            child: const Center(child: Text('🎁', style: TextStyle(fontSize: 18))),
                           ),
                           const SizedBox(width: 12),
                           Expanded(
@@ -2077,7 +2077,7 @@ class ProfileTabState extends State<ProfileTab> {
                   gradient: const LinearGradient(colors: [Color(0xFFE91E63), Color(0xFFC2185B)]),
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: const Center(child: Text('âš”ï¸', style: TextStyle(fontSize: 36))),
+                child: const Center(child: Text('⚔️', style: TextStyle(fontSize: 36))),
               ),
               const SizedBox(height: 20),
               Text(
@@ -2166,7 +2166,7 @@ class ProfileTabState extends State<ProfileTab> {
                   gradient: const LinearGradient(colors: [Color(0xFF4CAF50), Color(0xFF388E3C)]),
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: const Center(child: Text('ðŸŽ', style: TextStyle(fontSize: 36))),
+                child: const Center(child: Text('🎁', style: TextStyle(fontSize: 36))),
               ),
               const SizedBox(height: 20),
               Text(
@@ -3040,14 +3040,14 @@ class ProfileTabState extends State<ProfileTab> {
                   child: Column(
                     children: [
                       _buildPremiumBenefitCard(
-                        icon: 'âš¡',
+                        icon: '⚡',
                         title: '2X XP BOOST',
                         description: 'Level up twice as fast on all games',
                         color: const Color(0xFF6366F1),
                       ),
                       const SizedBox(height: 10),
                       _buildPremiumBenefitCard(
-                        icon: 'ðŸŽ´',
+                        icon: '🎴',
                         title: 'EXCLUSIVE CARD BACKS',
                         description: '5 premium animated card designs',
                         color: const Color(0xFF8B5CF6),
@@ -3123,7 +3123,7 @@ class ProfileTabState extends State<ProfileTab> {
                           child: const Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Text('âœ“', style: TextStyle(fontSize: 20, color: Colors.white)),
+                              Text('✓', style: TextStyle(fontSize: 20, color: Colors.white)),
                               SizedBox(width: 8),
                               Text(
                                 'Already Activated!',
@@ -3666,7 +3666,7 @@ class ProfileTabState extends State<ProfileTab> {
             ),
             child: Row(
               children: [
-                Text(isComplete ? 'âœ“' : 'âš¡', style: const TextStyle(fontSize: 10)),
+                Text(isComplete ? '✓' : '⚡', style: const TextStyle(fontSize: 10)),
                 const SizedBox(width: 3),
                 Text(
                   isComplete ? 'Done' : '+$xp',
@@ -3743,7 +3743,7 @@ class ProfileTabState extends State<ProfileTab> {
                             // Show unlock requirement
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
-                                content: Text('ðŸ”’ ${GameAvatars.getUnlockRequirement(index)}'),
+                                content: Text('🔒 ${GameAvatars.getUnlockRequirement(index)}'),
                                 backgroundColor: const Color(0xFF333333),
                               ),
                             );
@@ -3808,7 +3808,7 @@ class ProfileTabState extends State<ProfileTab> {
               ),
               const SizedBox(height: 16),
               Text(
-                'ðŸ”“ 3 avatars unlocked â€¢ ðŸ”’ ${GameAvatars.all.length - 3} locked',
+                '🔓 3 avatars unlocked • 🔒 ${GameAvatars.all.length - 3} locked',
                 style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 12),
               ),
             ],
@@ -5797,7 +5797,7 @@ class CustomizationCard extends StatelessWidget {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Text('ðŸ’Ž', style: TextStyle(fontSize: 16)),
+                        const Text('💎', style: TextStyle(fontSize: 16)),
                         const SizedBox(width: 6),
                         Text(
                           price,
@@ -5884,7 +5884,7 @@ class CustomizationCard extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Text('ðŸ’Ž', style: TextStyle(fontSize: 10)),
+                  const Text('💎', style: TextStyle(fontSize: 10)),
                   const SizedBox(width: 4),
                   Text(
                     price,
@@ -5982,7 +5982,7 @@ class ChestCard extends StatelessWidget {
               decoration: BoxDecoration(color: gradient[0], borderRadius: BorderRadius.circular(14)),
               child: Row(
                 children: [
-                  const Text('ðŸ’Ž', style: TextStyle(fontSize: 14)),
+                  const Text('💎', style: TextStyle(fontSize: 14)),
                   const SizedBox(width: 4),
                   Text(
                     price.toString(),
@@ -6086,7 +6086,7 @@ class ChestCard extends StatelessWidget {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Text('ðŸ’Ž', style: TextStyle(fontSize: 14)),
+                          const Text('💎', style: TextStyle(fontSize: 14)),
                           const SizedBox(width: 6),
                           Text(
                             'Open ($price)',
@@ -6124,7 +6124,7 @@ class ChestCard extends StatelessWidget {
               Text(emoji, style: const TextStyle(fontSize: 64)),
               const SizedBox(height: 20),
               const Text(
-                'ðŸŽ‰ You Got! ðŸŽ‰',
+                '🎉 You Got! 🎉',
                 style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 12),
@@ -6287,7 +6287,7 @@ class FriendAvatarExpanded extends StatelessWidget {
                   border: Border.all(color: const Color(0xFFD4AF37).withValues(alpha: 0.4)),
                 ),
                 child: const Text(
-                  'ðŸ† Gold III',
+                  '🏆 Gold III',
                   style: TextStyle(color: Color(0xFFD4AF37), fontSize: 12, fontWeight: FontWeight.w600),
                 ),
               ),
@@ -6339,11 +6339,11 @@ class FriendAvatarExpanded extends StatelessWidget {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: const [
-                    Text('ðŸ†', style: TextStyle(fontSize: 24)),
-                    Text('â­', style: TextStyle(fontSize: 24)),
-                    Text('ðŸŽ¯', style: TextStyle(fontSize: 24)),
-                    Text('ðŸ’Ž', style: TextStyle(fontSize: 24)),
-                    Text('ðŸ”¥', style: TextStyle(fontSize: 24)),
+                    Text('🏆', style: TextStyle(fontSize: 24)),
+                    Text('⭐', style: TextStyle(fontSize: 24)),
+                    Text('🎯', style: TextStyle(fontSize: 24)),
+                    Text('💎', style: TextStyle(fontSize: 24)),
+                    Text('🔥', style: TextStyle(fontSize: 24)),
                   ],
                 ),
               ),
@@ -6357,7 +6357,7 @@ class FriendAvatarExpanded extends StatelessWidget {
                         Navigator.pop(context);
                         onChallenge();
                       },
-                      icon: const Text('âš”ï¸', style: TextStyle(fontSize: 16)),
+                      icon: const Text('⚔️', style: TextStyle(fontSize: 16)),
                       label: const Text('Challenge'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFFE91E63),
@@ -6374,7 +6374,7 @@ class FriendAvatarExpanded extends StatelessWidget {
                         Navigator.pop(context);
                         onGift();
                       },
-                      icon: const Text('ðŸŽ', style: TextStyle(fontSize: 16)),
+                      icon: const Text('🎁', style: TextStyle(fontSize: 16)),
                       label: const Text('Gift'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF4CAF50),
@@ -6464,7 +6464,7 @@ class StakeOption extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text('ðŸª™', style: TextStyle(fontSize: 14)),
+          const Text('🪙', style: TextStyle(fontSize: 14)),
           const SizedBox(width: 6),
           Text(
             amount,
@@ -7132,7 +7132,7 @@ class LuckyHandDialog extends StatelessWidget {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Text('ðŸª™', style: TextStyle(fontSize: 18)),
+                            const Text('🪙', style: TextStyle(fontSize: 18)),
                             const SizedBox(width: 8),
                             Text(
                               '+${UserPreferences.formatChips(luckyHand.bonusReward)}',
@@ -7177,7 +7177,7 @@ class LuckyHandDialog extends StatelessWidget {
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Text('ðŸª™', style: TextStyle(fontSize: 16)),
+                              const Text('🪙', style: TextStyle(fontSize: 16)),
                               const SizedBox(width: 4),
                               Text(
                                 UserPreferences.formatChips(totalEarned),
