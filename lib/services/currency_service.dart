@@ -136,10 +136,16 @@ class BlindLevels {
   /// All available blind levels
   /// Format: small blind, big blind, buy-in amount
   static const List<BlindLevel> all = [
-    BlindLevel(small: 25, big: 50, buyIn: 2500),
-    BlindLevel(small: 100, big: 200, buyIn: 10000),
-    BlindLevel(small: 500, big: 1000, buyIn: 50000),
-    BlindLevel(small: 2500, big: 5000, buyIn: 250000),
+    BlindLevel(small: 5, big: 10, buyIn: 500), // 5/10 - $500 buy-in
+    BlindLevel(small: 10, big: 20, buyIn: 1000), // 10/20 - $1K buy-in
+    BlindLevel(small: 25, big: 50, buyIn: 2500), // 25/50 - $2.5K buy-in
+    BlindLevel(small: 50, big: 100, buyIn: 5000), // 50/100 - $5K buy-in
+    BlindLevel(small: 100, big: 200, buyIn: 10000), // 100/200 - $10K buy-in
+    BlindLevel(small: 250, big: 500, buyIn: 25000), // 250/500 - $25K buy-in
+    BlindLevel(small: 500, big: 1000, buyIn: 50000), // 500/1K - $50K buy-in
+    BlindLevel(small: 1000, big: 2000, buyIn: 100000), // 1K/2K - $100K buy-in
+    BlindLevel(small: 2500, big: 5000, buyIn: 250000), // 2.5K/5K - $250K buy-in
+    BlindLevel(small: 5000, big: 10000, buyIn: 500000), // 5K/10K - $500K buy-in
   ];
 
   /// Get the highest blind level a player can afford

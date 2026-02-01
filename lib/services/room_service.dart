@@ -545,11 +545,15 @@ class RoomService {
     final token = await getAuthToken();
     final userId = currentUserId;
 
+    // Fetch all rooms and filter client-side (more reliable than server-side filtering)
     final response = await http.get(
-      Uri.parse('$databaseUrl/game_rooms.json?auth=$token&orderBy="status"&equalTo="waiting"'),
+      Uri.parse('$databaseUrl/game_rooms.json?auth=$token'),
     );
 
+    print('🔍 FETCHING AVAILABLE ROOMS for gameType=$gameType');
+
     if (response.statusCode != 200 || response.body == 'null') {
+      print('❌ No rooms found or error: ${response.statusCode}');
       return [];
     }
 
@@ -557,12 +561,25 @@ class RoomService {
     final allRooms =
         data.entries.map((e) => GameRoom.fromJson(Map<String, dynamic>.from(e.value as Map), e.key)).toList();
 
-    return allRooms
+    print('📋 Total rooms in database: ${allRooms.length}');
+    for (final room in allRooms) {
+      print(
+          '   Room ${room.id}: gameType=${room.gameType}, status=${room.status}, players=${room.players.length}/${room.maxPlayers}, isFull=${room.isFull}');
+    }
+
+    final filteredRooms = allRooms
         .where(
           (room) =>
-              !room.isFull && room.gameType == gameType && !room.isPrivate && !room.players.any((p) => p.uid == userId),
+              room.status == 'waiting' &&
+              !room.isFull &&
+              room.gameType == gameType &&
+              !room.isPrivate &&
+              !room.players.any((p) => p.uid == userId),
         )
         .toList();
+
+    print('✅ Found ${filteredRooms.length} joinable $gameType rooms');
+    return filteredRooms;
   }
 
   /// Fetch joinable rooms by blind level

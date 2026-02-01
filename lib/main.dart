@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -12,6 +13,17 @@ import 'services/user_preferences.dart';
 import 'services/currency_service.dart';
 import 'services/user_service.dart';
 import 'screens/home_screen.dart';
+
+/// Custom scroll behavior that enables mouse drag on web
+class AppScrollBehavior extends MaterialScrollBehavior {
+  @override
+  Set<PointerDeviceKind> get dragDevices => {
+        PointerDeviceKind.touch,
+        PointerDeviceKind.mouse,
+        PointerDeviceKind.trackpad,
+        PointerDeviceKind.stylus,
+      };
+}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -44,6 +56,9 @@ class MyApp extends StatelessWidget {
           return MaterialApp(
             title: 'ALLIN_HOTRELOAD_5555',
             debugShowCheckedModeBanner: false,
+
+            // Enable mouse drag gestures on web
+            scrollBehavior: AppScrollBehavior(),
 
             // Theming
             theme: AppTheme.lightTheme,

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/gestures.dart';
 import 'dart:async';
 import 'dart:math';
 import '../models/game_room.dart';
@@ -1682,53 +1683,64 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               // Swipeable cards with fold animation - fixed width
+              // Using Listener for universal mouse + touch support
               SizedBox(
                 width: 165, // Fixed width for 2 overlapping large cards
-                child: GestureDetector(
-                  onVerticalDragUpdate: (details) {
-                    // Don't allow drag if processing action
-                    if (_isProcessingAction) return;
-                    setState(() {
-                      _dragOffset += details.delta.dy;
-                      // Clamp to only allow upward drag
-                      if (_dragOffset > 0) _dragOffset = 0;
-                    });
-                  },
-                  onVerticalDragEnd: (details) async {
-                    // Prevent multiple fold actions
-                    if (_isProcessingAction) {
-                      setState(() => _dragOffset = 0);
-                      return;
-                    }
-
-                    // If swiped up enough (past threshold) or fast enough, trigger fold
-                    if (_dragOffset < -80 || (details.primaryVelocity != null && details.primaryVelocity! < -300)) {
-                      setState(() => _isProcessingAction = true);
-                      await Future.delayed(const Duration(milliseconds: 100));
-                      _animateFold(player.cards);
-                      await Future.delayed(const Duration(milliseconds: 300));
-                      if (mounted) {
-                        setState(() => _isProcessingAction = false);
+                child: MouseRegion(
+                  cursor: SystemMouseCursors.grab,
+                  child: GestureDetector(
+                    // Enable all pointer kinds for drag (including mouse)
+                    supportedDevices: const {
+                      PointerDeviceKind.touch,
+                      PointerDeviceKind.mouse,
+                      PointerDeviceKind.trackpad,
+                      PointerDeviceKind.stylus,
+                    },
+                    onVerticalDragUpdate: (details) {
+                      // Don't allow drag if processing action
+                      if (_isProcessingAction) return;
+                      setState(() {
+                        _dragOffset += details.delta.dy;
+                        // Clamp to only allow upward drag
+                        if (_dragOffset > 0) _dragOffset = 0;
+                      });
+                    },
+                    onVerticalDragEnd: (details) async {
+                      // Prevent multiple fold actions
+                      if (_isProcessingAction) {
+                        setState(() => _dragOffset = 0);
+                        return;
                       }
-                    }
-                    // Reset drag offset
-                    setState(() => _dragOffset = 0);
-                  },
-                  child: _isFolding
-                      ? SlideTransition(
-                          position: _foldSlideAnimation,
-                          child: FadeTransition(
-                            opacity: _foldOpacityAnimation,
-                            child: _buildPlayerCardsLarge(player),
+
+                      // If swiped up enough (past threshold) or fast enough, trigger fold
+                      if (_dragOffset < -80 || (details.primaryVelocity != null && details.primaryVelocity! < -300)) {
+                        setState(() => _isProcessingAction = true);
+                        await Future.delayed(const Duration(milliseconds: 100));
+                        _animateFold(player.cards);
+                        await Future.delayed(const Duration(milliseconds: 300));
+                        if (mounted) {
+                          setState(() => _isProcessingAction = false);
+                        }
+                      }
+                      // Reset drag offset
+                      setState(() => _dragOffset = 0);
+                    },
+                    child: _isFolding
+                        ? SlideTransition(
+                            position: _foldSlideAnimation,
+                            child: FadeTransition(
+                              opacity: _foldOpacityAnimation,
+                              child: _buildPlayerCardsLarge(player),
+                            ),
+                          )
+                        : Transform.translate(
+                            offset: Offset(0, _dragOffset * 0.5),
+                            child: Opacity(
+                              opacity: (1.0 + _dragOffset / 200).clamp(0.3, 1.0),
+                              child: _buildPlayerCardsLarge(player),
+                            ),
                           ),
-                        )
-                      : Transform.translate(
-                          offset: Offset(0, _dragOffset * 0.5),
-                          child: Opacity(
-                            opacity: (1.0 + _dragOffset / 200).clamp(0.3, 1.0),
-                            child: _buildPlayerCardsLarge(player),
-                          ),
-                        ),
+                  ),
                 ),
               ),
               const Spacer(),

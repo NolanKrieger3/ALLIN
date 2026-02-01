@@ -3,6 +3,7 @@ import '../services/auth_service.dart';
 import '../services/game_service.dart';
 import '../widgets/mobile_wrapper.dart';
 import 'multiplayer_game_screen.dart';
+import 'sit_and_go_waiting_screen.dart';
 
 // Stake level definition
 class StakeLevel {
@@ -225,22 +226,29 @@ class _LobbyScreenState extends State<LobbyScreen> {
       final roomToJoin =
           nonEmptyRooms.isNotEmpty ? nonEmptyRooms.first : (matchingRooms.isNotEmpty ? matchingRooms.first : null);
 
+      String roomId;
       if (roomToJoin != null) {
         await _gameService.joinRoom(roomToJoin.id, startingChips: buyIn.prizePool ~/ 2);
-        if (mounted) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => MultiplayerGameScreen(roomId: roomToJoin.id)),
-          );
-        }
+        roomId = roomToJoin.id;
       } else {
         final room = await _gameService.createSitAndGoRoom(
           bigBlind: buyIn.buyIn > 0 ? buyIn.buyIn : 100,
           startingChips: buyIn.prizePool ~/ 2,
         );
-        if (mounted) {
-          Navigator.push(context, MaterialPageRoute(builder: (context) => MultiplayerGameScreen(roomId: room.id)));
-        }
+        roomId = room.id;
+      }
+
+      if (mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => SitAndGoWaitingScreen(
+              roomId: roomId,
+              buyIn: buyIn.buyIn > 0 ? buyIn.buyIn : 100,
+              requiredPlayers: 6, // Sit & Go tournaments need 6 players
+            ),
+          ),
+        );
       }
     } catch (e) {
       setState(() => _error = 'Failed to join tournament: $e');
