@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -12,7 +13,14 @@ import 'screens/home_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  // Initialize Firebase with error handling for desktop platforms
+  try {
+    await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  } catch (e) {
+    debugPrint('Firebase init error: $e');
+  }
+
   await UserPreferences.init();
   runApp(const MyApp());
 }
@@ -71,54 +79,72 @@ class _AuthCheckScreenState extends State<_AuthCheckScreen> {
   }
 
   Future<void> _checkAuthAndNavigate() async {
-    final auth = FirebaseAuth.instance;
-    final userService = UserService();
+    try {
+      final auth = FirebaseAuth.instance;
+      final userService = UserService();
 
-    // Check if already signed in
-    if (auth.currentUser != null) {
-      // User is already signed in - sync their data from Firestore
-      final needsSetup = await userService.needsUsernameSetup();
+      // Add small delay to let Firebase Auth settle on desktop platforms
+      // This helps avoid threading issues with the native plugin
+      if (defaultTargetPlatform == TargetPlatform.windows ||
+          defaultTargetPlatform == TargetPlatform.linux ||
+          defaultTargetPlatform == TargetPlatform.macOS) {
+        await Future.delayed(const Duration(milliseconds: 500));
+      }
 
-      if (mounted) {
-        if (needsSetup) {
-          // User has auth but no username (shouldn't happen normally)
-          Navigator.of(context).pushReplacementNamed('/username-setup');
-        } else {
-          // Sync data and go to home
+      // Check if already signed in
+      if (auth.currentUser != null) {
+        // User is already signed in - sync their data from Firestore
+        final needsSetup = await userService.needsUsernameSetup();
+
+        if (mounted) {
+          if (needsSetup) {
+            // User has auth but no username (shouldn't happen normally)
+            Navigator.of(context).pushReplacementNamed('/username-setup');
+          } else {
+            // Sync data and go to home
+            await userService.syncAllUserData();
+            if (mounted) {
+              _goToHome();
+            }
+          }
+        }
+        return;
+      }
+
+      // Not signed in - check if we have cached credentials for auto-login
+      if (UserPreferences.hasSetUsername && UserPreferences.cachedPassword != null) {
+        // Try auto-login with cached credentials
+        try {
+          final username = UserPreferences.username;
+          final password = UserPreferences.cachedPassword!;
+          await auth.signInWithEmailAndPassword(
+            email: '${username.toLowerCase()}@allin.app',
+            password: password,
+          );
+          // Auto-login successful - sync and go home
           await userService.syncAllUserData();
           if (mounted) {
             _goToHome();
           }
+          return;
+        } catch (e) {
+          // Auto-login failed - clear cached data and go to setup
+          debugPrint('Auto-login failed: $e');
+          await UserPreferences.clearAllUserData();
         }
       }
-      return;
-    }
 
-    // Not signed in - check if we have cached credentials for auto-login
-    if (UserPreferences.hasSetUsername && UserPreferences.cachedPassword != null) {
-      // Try auto-login with cached credentials
-      try {
-        final username = UserPreferences.username;
-        final password = UserPreferences.cachedPassword!;
-        await auth.signInWithEmailAndPassword(
-          email: '${username.toLowerCase()}@allin.app',
-          password: password,
-        );
-        // Auto-login successful - sync and go home
-        await userService.syncAllUserData();
-        if (mounted) {
-          _goToHome();
-        }
-        return;
-      } catch (e) {
-        // Auto-login failed - clear cached data and go to setup
-        await UserPreferences.clearAllUserData();
+      // No valid session - go to username setup (create account)
+      if (mounted) {
+        Navigator.of(context).pushReplacementNamed('/username-setup');
       }
-    }
-
-    // No valid session - go to username setup (create account)
-    if (mounted) {
-      Navigator.of(context).pushReplacementNamed('/username-setup');
+    } catch (e) {
+      // Handle any Firebase Auth errors gracefully
+      debugPrint('Auth check error: $e');
+      // On error, still navigate to setup screen
+      if (mounted) {
+        Navigator.of(context).pushReplacementNamed('/username-setup');
+      }
     }
   }
 

@@ -43,17 +43,32 @@ class ProfileTabState extends State<ProfileTab> {
       if (mounted) setState(() => _friends = friends);
     });
     // Listen for auth state changes to refresh username
-    _authSub = AuthService().authStateChanges.listen((user) async {
-      if (user != null && mounted) {
-        // Sync data from Firestore when user changes
-        await UserService().syncAllUserData();
-        if (mounted) {
-          setState(() {
-            _displayUsername = UserPreferences.username;
-          });
-        }
-      }
-    });
+    // Wrapped with try-catch for Windows desktop Firebase threading issues
+    _authSub = AuthService().authStateChanges.listen(
+      (user) async {
+        if (!mounted) return;
+        // Use post frame callback to ensure we're on the UI thread
+        WidgetsBinding.instance.addPostFrameCallback((_) async {
+          if (!mounted) return;
+          if (user != null) {
+            // Sync data from Firestore when user changes
+            try {
+              await UserService().syncAllUserData();
+              if (mounted) {
+                setState(() {
+                  _displayUsername = UserPreferences.username;
+                });
+              }
+            } catch (e) {
+              debugPrint('Profile sync error: $e');
+            }
+          }
+        });
+      },
+      onError: (e) {
+        debugPrint('Auth state listener error: $e');
+      },
+    );
   }
 
   @override
@@ -755,9 +770,23 @@ class ProfileTabState extends State<ProfileTab> {
                     child: Container(
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.03),
+                        gradient: _statisticsExpanded
+                            ? LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [
+                                  const Color(0xFF6366F1).withValues(alpha: 0.15),
+                                  const Color(0xFF8B5CF6).withValues(alpha: 0.08),
+                                ],
+                              )
+                            : null,
+                        color: _statisticsExpanded ? null : Colors.white.withValues(alpha: 0.03),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+                        border: Border.all(
+                          color: _statisticsExpanded
+                              ? const Color(0xFF6366F1).withValues(alpha: 0.3)
+                              : Colors.white.withValues(alpha: 0.06),
+                        ),
                       ),
                       child: Row(
                         children: [
@@ -765,7 +794,11 @@ class ProfileTabState extends State<ProfileTab> {
                             width: 36,
                             height: 36,
                             decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.05),
+                              gradient: const LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+                              ),
                               borderRadius: BorderRadius.circular(10),
                             ),
                             child: const Center(child: Text('📊', style: TextStyle(fontSize: 18))),
@@ -785,7 +818,7 @@ class ProfileTabState extends State<ProfileTab> {
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
-                                  '0 games played',
+                                  'Performance & Analytics',
                                   style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 11),
                                 ),
                               ],
@@ -796,7 +829,8 @@ class ProfileTabState extends State<ProfileTab> {
                             duration: const Duration(milliseconds: 200),
                             child: Icon(
                               Icons.keyboard_arrow_down,
-                              color: Colors.white.withValues(alpha: 0.4),
+                              color:
+                                  _statisticsExpanded ? const Color(0xFF6366F1) : Colors.white.withValues(alpha: 0.4),
                               size: 22,
                             ),
                           ),
@@ -809,84 +843,214 @@ class ProfileTabState extends State<ProfileTab> {
             ),
           ),
 
-          // Statistics Content (Expandable)
+          // Statistics Content (Expandable) - Revamped
           if (_statisticsExpanded)
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
                 child: Column(
                   children: [
+                    // Hero Stats Row - Big numbers with trends
                     Row(
                       children: [
-                        const Expanded(
-                          child: StatCard(value: '0', label: 'Games'),
-                        ),
-                        const SizedBox(width: 8),
-                        const Expanded(
-                          child: StatCard(value: '0', label: 'Wins'),
-                        ),
-                        const SizedBox(width: 8),
-                        const Expanded(
-                          child: StatCard(value: '0%', label: 'Win Rate'),
-                        ),
+                        Expanded(
+                            child: _buildHeroStatCard(
+                                '1,247', 'Total Games', Icons.sports_esports, const Color(0xFF6366F1), '+12%')),
+                        const SizedBox(width: 10),
+                        Expanded(
+                            child:
+                                _buildHeroStatCard('847', 'Wins', Icons.emoji_events, const Color(0xFF10B981), '+8%')),
+                        const SizedBox(width: 10),
+                        Expanded(
+                            child: _buildHeroStatCard(
+                                '67.9%', 'Win Rate', Icons.trending_up, const Color(0xFFFFBB00), '+2.3%')),
                       ],
                     ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        const Expanded(
-                          child: StatCard(value: '0', label: 'Best Streak'),
+                    const SizedBox(height: 16),
+
+                    // Chip Balance Graph - Premium Look
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            Colors.white.withValues(alpha: 0.05),
+                            Colors.white.withValues(alpha: 0.02),
+                          ],
                         ),
-                        const SizedBox(width: 8),
-                        const Expanded(
-                          child: StatCard(value: '0', label: 'Earnings'),
-                        ),
-                        const SizedBox(width: 8),
-                        const Expanded(
-                          child: StatCard(value: 'Lv.1', label: 'Level'),
-                        ),
-                      ],
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Chip Balance',
+                                    style: TextStyle(
+                                      color: Colors.white.withValues(alpha: 0.5),
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                    children: [
+                                      const Text(
+                                        '2.4M',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 28,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            Icon(Icons.arrow_upward, size: 10, color: const Color(0xFF10B981)),
+                                            const SizedBox(width: 2),
+                                            const Text(
+                                              '+340K',
+                                              style: TextStyle(
+                                                color: Color(0xFF10B981),
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                              _buildTimeRangeSelector(),
+                            ],
+                          ),
+                          const SizedBox(height: 20),
+                          // Smooth animated graph
+                          SizedBox(
+                            height: 140,
+                            child: CustomPaint(
+                              size: const Size(double.infinity, 140),
+                              painter: AdvancedChipGraphPainter(),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          // X-axis labels
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+                                .map((day) => Text(
+                                      day,
+                                      style: TextStyle(
+                                        color: Colors.white.withValues(alpha: 0.3),
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ))
+                                .toList(),
+                          ),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 16),
+
+                    // Win/Loss Breakdown & Hand Stats Row
                     Row(
                       children: [
-                        const Expanded(
-                          child: StatCard(value: '-', label: 'Rank'),
+                        // Donut Chart - Win Distribution
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [
+                                  Colors.white.withValues(alpha: 0.05),
+                                  Colors.white.withValues(alpha: 0.02),
+                                ],
+                              ),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                            ),
+                            child: Column(
+                              children: [
+                                Text(
+                                  'Session Results',
+                                  style: TextStyle(
+                                    color: Colors.white.withValues(alpha: 0.6),
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                SizedBox(
+                                  height: 100,
+                                  width: 100,
+                                  child: CustomPaint(
+                                    painter: WinLossDonutPainter(),
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    _buildLegendDot(const Color(0xFF10B981), 'Win'),
+                                    const SizedBox(width: 12),
+                                    _buildLegendDot(const Color(0xFFEF4444), 'Loss'),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
-                        const SizedBox(width: 8),
-                        const Expanded(
-                          child: StatCard(value: '1,000', label: 'ELO'),
-                        ),
-                        const SizedBox(width: 8),
-                        const Expanded(
-                          child: StatCard(value: '0', label: 'Trophies'),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        const Expanded(
-                          child: StatCard(value: '0', label: 'Tourneys Won'),
-                        ),
-                        const SizedBox(width: 8),
-                        const Expanded(
-                          child: StatCard(value: '0', label: 'Cash Games'),
-                        ),
-                        const SizedBox(width: 8),
-                        const Expanded(
-                          child: StatCard(value: '0', label: 'Hands'),
+                        const SizedBox(width: 12),
+                        // Quick Stats Column
+                        Expanded(
+                          child: Column(
+                            children: [
+                              _buildMiniStatCard('🔥', 'Best Streak', '12', const Color(0xFFFF6B35)),
+                              const SizedBox(height: 8),
+                              _buildMiniStatCard('💰', 'Biggest Win', '450K', const Color(0xFFFFBB00)),
+                              const SizedBox(height: 8),
+                              _buildMiniStatCard('📈', 'ROI', '+24.7%', const Color(0xFF10B981)),
+                            ],
+                          ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 16),
-                    // Profit/Loss Graph
+
+                    // Hand Frequency Bar Chart
                     Container(
-                      padding: const EdgeInsets.all(14),
+                      padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.03),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            Colors.white.withValues(alpha: 0.05),
+                            Colors.white.withValues(alpha: 0.02),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -895,47 +1059,97 @@ class ProfileTabState extends State<ProfileTab> {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Text(
-                                'Chip Balance History',
+                                'Winning Hands',
                                 style: TextStyle(
                                   color: Colors.white.withValues(alpha: 0.8),
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.05),
-                                  borderRadius: BorderRadius.circular(4),
+                                  color: const Color(0xFF6366F1).withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(6),
                                 ),
-                                child: Text(
-                                  '7 Days',
+                                child: const Text(
+                                  '847 hands',
                                   style: TextStyle(
-                                    color: Colors.white.withValues(alpha: 0.5),
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.w500,
+                                    color: Color(0xFF6366F1),
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
                               ),
                             ],
                           ),
-                          const SizedBox(height: 12),
-                          // Simple line graph representation
-                          SizedBox(
-                            height: 80,
-                            child: CustomPaint(size: const Size(double.infinity, 80), painter: ChipGraphPainter()),
+                          const SizedBox(height: 16),
+                          _buildHandBar('High Card', 0.35, '296', const Color(0xFF64748B)),
+                          _buildHandBar('One Pair', 0.28, '237', const Color(0xFF3B82F6)),
+                          _buildHandBar('Two Pair', 0.18, '152', const Color(0xFF8B5CF6)),
+                          _buildHandBar('Three of a Kind', 0.09, '76', const Color(0xFFEC4899)),
+                          _buildHandBar('Straight+', 0.10, '86', const Color(0xFFFFBB00)),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Detailed Stats Grid
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            Colors.white.withValues(alpha: 0.05),
+                            Colors.white.withValues(alpha: 0.02),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Detailed Statistics',
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.8),
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 16),
                           Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text('Mon', style: TextStyle(color: Colors.white.withValues(alpha: 0.25), fontSize: 9)),
-                              Text('Tue', style: TextStyle(color: Colors.white.withValues(alpha: 0.25), fontSize: 9)),
-                              Text('Wed', style: TextStyle(color: Colors.white.withValues(alpha: 0.25), fontSize: 9)),
-                              Text('Thu', style: TextStyle(color: Colors.white.withValues(alpha: 0.25), fontSize: 9)),
-                              Text('Fri', style: TextStyle(color: Colors.white.withValues(alpha: 0.25), fontSize: 9)),
-                              Text('Sat', style: TextStyle(color: Colors.white.withValues(alpha: 0.25), fontSize: 9)),
-                              Text('Sun', style: TextStyle(color: Colors.white.withValues(alpha: 0.25), fontSize: 9)),
+                              Expanded(child: _buildDetailStat('Hands Played', '15,247')),
+                              Expanded(child: _buildDetailStat('Showdowns', '4,821')),
+                              Expanded(child: _buildDetailStat('All-Ins', '892')),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(child: _buildDetailStat('Fold Rate', '42%')),
+                              Expanded(child: _buildDetailStat('Call Rate', '35%')),
+                              Expanded(child: _buildDetailStat('Raise Rate', '23%')),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(child: _buildDetailStat('Tourneys Won', '23')),
+                              Expanded(child: _buildDetailStat('Cash Games', '1,224')),
+                              Expanded(child: _buildDetailStat('Sit & Go', '156')),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(child: _buildDetailStat('Current ELO', '1,847')),
+                              Expanded(child: _buildDetailStat('Peak ELO', '2,124')),
+                              Expanded(child: _buildDetailStat('Rank', '#1,247')),
                             ],
                           ),
                         ],
@@ -1830,6 +2044,269 @@ class ProfileTabState extends State<ProfileTab> {
           ),
         ),
       ),
+    );
+  }
+
+  // ============================================================================
+  // STATISTICS HELPER WIDGETS
+  // ============================================================================
+
+  Widget _buildHeroStatCard(String value, String label, IconData icon, Color color, String trend) {
+    final isPositive = trend.startsWith('+');
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            color.withValues(alpha: 0.15),
+            color.withValues(alpha: 0.05),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Icon(icon, color: color, size: 16),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                decoration: BoxDecoration(
+                  color: isPositive
+                      ? const Color(0xFF10B981).withValues(alpha: 0.2)
+                      : const Color(0xFFEF4444).withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  trend,
+                  style: TextStyle(
+                    color: isPositive ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                    fontSize: 9,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.5),
+              fontSize: 10,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTimeRangeSelector() {
+    return Container(
+      padding: const EdgeInsets.all(2),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _buildTimeButton('7D', true),
+          _buildTimeButton('1M', false),
+          _buildTimeButton('ALL', false),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTimeButton(String label, bool isSelected) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: isSelected ? const Color(0xFF6366F1) : Colors.transparent,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.4),
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLegendDot(Color color, String label) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: 0.5),
+            fontSize: 10,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMiniStatCard(String emoji, String label, String value, Color accentColor) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.white.withValues(alpha: 0.05),
+            Colors.white.withValues(alpha: 0.02),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      child: Row(
+        children: [
+          Text(emoji, style: const TextStyle(fontSize: 16)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.4),
+                    fontSize: 9,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                Text(
+                  value,
+                  style: TextStyle(
+                    color: accentColor,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHandBar(String hand, double percentage, String count, Color color) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                hand,
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.7),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              Text(
+                count,
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.4),
+                  fontSize: 10,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Stack(
+            children: [
+              Container(
+                height: 6,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.05),
+                  borderRadius: BorderRadius.circular(3),
+                ),
+              ),
+              FractionallySizedBox(
+                widthFactor: percentage,
+                child: Container(
+                  height: 6,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [color, color.withValues(alpha: 0.7)],
+                    ),
+                    borderRadius: BorderRadius.circular(3),
+                    boxShadow: [
+                      BoxShadow(
+                        color: color.withValues(alpha: 0.4),
+                        blurRadius: 4,
+                        offset: const Offset(0, 1),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetailStat(String label, String value) {
+    return Column(
+      children: [
+        Text(
+          value,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          label,
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: 0.4),
+            fontSize: 10,
+          ),
+          textAlign: TextAlign.center,
+        ),
+      ],
     );
   }
 }
@@ -4026,6 +4503,242 @@ class ChipGraphPainter extends CustomPainter {
       ..strokeWidth = 1;
 
     canvas.drawLine(Offset(0, size.height / 2), Offset(size.width, size.height / 2), baselinePaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+// ============================================================================
+// ADVANCED CHIP GRAPH PAINTER - Smooth Bezier Curves with Glow
+// ============================================================================
+
+class AdvancedChipGraphPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    // Sample data - chip balance over time (normalized 0-1)
+    final dataPoints = [0.35, 0.42, 0.38, 0.55, 0.48, 0.72, 0.85];
+
+    final stepWidth = size.width / (dataPoints.length - 1);
+
+    // Create gradient for the line
+    final lineGradient = LinearGradient(
+      colors: [
+        const Color(0xFF6366F1),
+        const Color(0xFF8B5CF6),
+        const Color(0xFF10B981),
+      ],
+    ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
+
+    // Grid lines
+    final gridPaint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.04)
+      ..strokeWidth = 1;
+
+    for (int i = 1; i < 4; i++) {
+      final y = size.height * (i / 4);
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
+    }
+
+    // Build smooth bezier path
+    final path = Path();
+    final fillPath = Path();
+
+    // Calculate points
+    final points = <Offset>[];
+    for (int i = 0; i < dataPoints.length; i++) {
+      final x = stepWidth * i;
+      final y = size.height * (1 - dataPoints[i]);
+      points.add(Offset(x, y));
+    }
+
+    // Start paths
+    path.moveTo(points[0].dx, points[0].dy);
+    fillPath.moveTo(0, size.height);
+    fillPath.lineTo(points[0].dx, points[0].dy);
+
+    // Draw smooth curves using cubic bezier
+    for (int i = 0; i < points.length - 1; i++) {
+      final current = points[i];
+      final next = points[i + 1];
+      final controlX = (current.dx + next.dx) / 2;
+
+      path.cubicTo(controlX, current.dy, controlX, next.dy, next.dx, next.dy);
+      fillPath.cubicTo(controlX, current.dy, controlX, next.dy, next.dx, next.dy);
+    }
+
+    // Complete fill path
+    fillPath.lineTo(size.width, size.height);
+    fillPath.close();
+
+    // Draw gradient fill
+    final fillPaint = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [
+          const Color(0xFF6366F1).withValues(alpha: 0.25),
+          const Color(0xFF8B5CF6).withValues(alpha: 0.1),
+          const Color(0xFF8B5CF6).withValues(alpha: 0.0),
+        ],
+        stops: const [0.0, 0.5, 1.0],
+      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
+
+    canvas.drawPath(fillPath, fillPaint);
+
+    // Draw glow effect
+    final glowPaint = Paint()
+      ..shader = lineGradient
+      ..strokeWidth = 8
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
+    canvas.drawPath(path, glowPaint);
+
+    // Draw main line
+    final linePaint = Paint()
+      ..shader = lineGradient
+      ..strokeWidth = 3
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+    canvas.drawPath(path, linePaint);
+
+    // Draw dots at data points
+    for (int i = 0; i < points.length; i++) {
+      final point = points[i];
+
+      // Outer glow
+      canvas.drawCircle(
+        point,
+        8,
+        Paint()
+          ..color = const Color(0xFF6366F1).withValues(alpha: 0.3)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
+      );
+
+      // White ring
+      canvas.drawCircle(
+        point,
+        5,
+        Paint()
+          ..color = const Color(0xFF1A1A1A)
+          ..style = PaintingStyle.fill,
+      );
+
+      // Colored center
+      canvas.drawCircle(
+        point,
+        3,
+        Paint()
+          ..color = i == points.length - 1 ? const Color(0xFF10B981) : const Color(0xFF6366F1)
+          ..style = PaintingStyle.fill,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+// ============================================================================
+// WIN/LOSS DONUT CHART PAINTER
+// ============================================================================
+
+class WinLossDonutPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.width / 2 - 8;
+    final strokeWidth = 12.0;
+
+    // Win percentage (68% wins)
+    const winPercentage = 0.68;
+    const lossPercentage = 1 - winPercentage;
+
+    final rect = Rect.fromCircle(center: center, radius: radius);
+
+    // Background track
+    final trackPaint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.05)
+      ..strokeWidth = strokeWidth
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+    canvas.drawCircle(center, radius, trackPaint);
+
+    // Loss arc (draw first, underneath)
+    final lossPaint = Paint()
+      ..color = const Color(0xFFEF4444)
+      ..strokeWidth = strokeWidth
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    const startAngle = -1.5708; // -90 degrees in radians (top)
+    final winSweep = 2 * 3.14159 * winPercentage;
+    final lossSweep = 2 * 3.14159 * lossPercentage;
+
+    // Draw loss arc
+    canvas.drawArc(rect, startAngle + winSweep, lossSweep, false, lossPaint);
+
+    // Win arc with gradient
+    final winPaint = Paint()
+      ..shader = SweepGradient(
+        startAngle: startAngle,
+        endAngle: startAngle + winSweep,
+        colors: const [
+          Color(0xFF10B981),
+          Color(0xFF34D399),
+        ],
+      ).createShader(rect)
+      ..strokeWidth = strokeWidth
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    canvas.drawArc(rect, startAngle, winSweep, false, winPaint);
+
+    // Glow effect on win arc
+    final glowPaint = Paint()
+      ..color = const Color(0xFF10B981).withValues(alpha: 0.3)
+      ..strokeWidth = strokeWidth + 4
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
+    canvas.drawArc(rect, startAngle, winSweep, false, glowPaint);
+
+    // Center text
+    final textPainter = TextPainter(
+      text: const TextSpan(
+        text: '68%',
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: 18,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    );
+    textPainter.layout();
+    textPainter.paint(
+      canvas,
+      Offset(center.dx - textPainter.width / 2, center.dy - textPainter.height / 2 - 4),
+    );
+
+    // Sub text
+    final subTextPainter = TextPainter(
+      text: TextSpan(
+        text: 'wins',
+        style: TextStyle(
+          color: Colors.white.withValues(alpha: 0.4),
+          fontSize: 10,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    );
+    subTextPainter.layout();
+    subTextPainter.paint(
+      canvas,
+      Offset(center.dx - subTextPainter.width / 2, center.dy + 6),
+    );
   }
 
   @override

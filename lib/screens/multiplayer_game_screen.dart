@@ -1931,25 +1931,26 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
             children: [
               // Player's cards - fixed width to prevent shifting
               SizedBox(
-                width: 120, // Fixed width for 2 overlapping cards
+                width: 120, // Fixed width for 2 overlapping cards (70 * 2 - 20 overlap)
+                height: 98,
                 child: player.hasFolded && _foldedCards.isNotEmpty
-                    ? Row(
-                        mainAxisSize: MainAxisSize.min,
+                    ? Stack(
+                        clipBehavior: Clip.none,
                         children: [
                           _buildMinimalCard(_foldedCards[0], isHoleCard: true, isGhost: true),
                           if (_foldedCards.length > 1)
-                            Transform.translate(
-                              offset: const Offset(-20, 0),
+                            Positioned(
+                              left: 50, // 70 - 20 overlap
                               child: _buildMinimalCard(_foldedCards[1], isHoleCard: true, isGhost: true),
                             ),
                         ],
                       )
-                    : Row(
-                        mainAxisSize: MainAxisSize.min,
+                    : Stack(
+                        clipBehavior: Clip.none,
                         children: [
                           _buildCardBack(width: 70, height: 98),
-                          Transform.translate(
-                            offset: const Offset(-20, 0),
+                          Positioned(
+                            left: 50, // 70 - 20 overlap
                             child: _buildCardBack(width: 70, height: 98),
                           ),
                         ],
@@ -2148,15 +2149,20 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
                 position: _foldSlideAnimation,
                 child: FadeTransition(
                   opacity: _foldOpacityAnimation,
-                  child: Row(
-                    children: [
-                      if (player.cards.isNotEmpty) _buildMinimalCard(player.cards[0], isHoleCard: true),
-                      if (player.cards.length > 1)
-                        Transform.translate(
-                          offset: const Offset(-20, 0),
-                          child: _buildMinimalCard(player.cards[1], isHoleCard: true),
-                        ),
-                    ],
+                  child: SizedBox(
+                    width: 120, // 70 * 2 - 20 overlap
+                    height: 98,
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        if (player.cards.isNotEmpty) _buildMinimalCard(player.cards[0], isHoleCard: true),
+                        if (player.cards.length > 1)
+                          Positioned(
+                            left: 50, // 70 - 20 overlap
+                            child: _buildMinimalCard(player.cards[1], isHoleCard: true),
+                          ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -2251,27 +2257,42 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> with Tick
 
   /// Build large player cards for bottom area
   Widget _buildPlayerCardsLarge(GamePlayer player) {
+    const cardWidth = 90.0;
+    const cardHeight = 126.0;
+    const overlap = 15.0;
+    const totalWidth = cardWidth * 2 - overlap;
+
     // If player has no cards yet or phase is waiting, show card backs
     if (player.cards.isEmpty || player.cards.length < 2) {
-      return Row(
-        children: [
-          _buildCardBack(width: 90, height: 126),
-          Transform.translate(
-            offset: const Offset(-15, 0),
-            child: _buildCardBack(width: 90, height: 126),
-          ),
-        ],
+      return SizedBox(
+        width: totalWidth,
+        height: cardHeight,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            _buildCardBack(width: cardWidth, height: cardHeight),
+            Positioned(
+              left: cardWidth - overlap,
+              child: _buildCardBack(width: cardWidth, height: cardHeight),
+            ),
+          ],
+        ),
       );
     }
 
-    return Row(
-      children: [
-        _buildLargeCard(player.cards[0]),
-        Transform.translate(
-          offset: const Offset(-15, 0),
-          child: _buildLargeCard(player.cards[1]),
-        ),
-      ],
+    return SizedBox(
+      width: totalWidth,
+      height: cardHeight,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          _buildLargeCard(player.cards[0]),
+          Positioned(
+            left: cardWidth - overlap,
+            child: _buildLargeCard(player.cards[1]),
+          ),
+        ],
+      ),
     );
   }
 
