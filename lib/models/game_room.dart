@@ -86,10 +86,11 @@ class GameRoom {
   factory GameRoom.fromJson(Map<String, dynamic> json, String docId) {
     return GameRoom(
       id: docId,
-      hostId: json['hostId'] as String,
-      players: (json['players'] as List<dynamic>)
-          .map((p) => GamePlayer.fromJson(Map<String, dynamic>.from(p as Map)))
-          .toList(),
+      hostId: json['hostId'] as String? ?? '',
+      players: (json['players'] as List<dynamic>?)
+              ?.map((p) => GamePlayer.fromJson(Map<String, dynamic>.from(p as Map)))
+              .toList() ??
+          [],
       maxPlayers: json['maxPlayers'] as int? ?? 6,
       bigBlind: json['bigBlind'] as int? ?? 100,
       smallBlind: json['smallBlind'] as int? ?? 50,

@@ -360,44 +360,6 @@ class _SitAndGoWaitingScreenState extends State<SitAndGoWaitingScreen> {
                 ] else
                   const Spacer(),
 
-                // Fill with Bots button (for testing - only show if host and not full)
-                if (_room?.hostId == _gameService.currentUserId &&
-                    (_room?.players.length ?? 0) < widget.requiredPlayers)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: GestureDetector(
-                      onTap: _fillWithBots,
-                      child: Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFF4CAF50), Color(0xFF2E7D32)],
-                          ),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Center(
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.smart_toy, color: Colors.white, size: 18),
-                              SizedBox(width: 8),
-                              Text(
-                                'FILL WITH BOTS',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                  letterSpacing: 1,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-
                 // Leave button
                 GestureDetector(
                   onTap: _leaveRoom,

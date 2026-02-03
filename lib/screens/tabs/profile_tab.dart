@@ -972,644 +972,112 @@ class ProfileTabState extends State<ProfileTab> {
             ),
           ),
 
-          // Statistics Dropdown
+          // Statistics & Achievements Row
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Row(
                 children: [
-                  GestureDetector(
-                    onTap: () => setState(() => _statisticsExpanded = !_statisticsExpanded),
-                    child: Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        gradient: _statisticsExpanded
-                            ? LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors: [
-                                  const Color(0xFF6366F1).withValues(alpha: 0.15),
-                                  const Color(0xFF8B5CF6).withValues(alpha: 0.08),
-                                ],
-                              )
-                            : null,
-                        color: _statisticsExpanded ? null : Colors.white.withValues(alpha: 0.03),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: _statisticsExpanded
-                              ? const Color(0xFF6366F1).withValues(alpha: 0.3)
-                              : Colors.white.withValues(alpha: 0.06),
+                  // Statistics Button
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => _showStatisticsPopup(context),
+                      child: Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.03),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
                         ),
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 36,
-                            height: 36,
-                            decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 36,
+                              height: 36,
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                  colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+                                ),
+                                borderRadius: BorderRadius.circular(10),
                               ),
-                              borderRadius: BorderRadius.circular(10),
+                              child: const Center(child: Icon(Icons.analytics_rounded, color: Colors.white, size: 20)),
                             ),
-                            child: const Center(child: Icon(Icons.analytics_rounded, color: Colors.white, size: 20)),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Statistics',
-                                  style: TextStyle(
-                                    color: Colors.white.withValues(alpha: 0.9),
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  'Performance & Analytics',
-                                  style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 11),
-                                ),
-                              ],
-                            ),
-                          ),
-                          AnimatedRotation(
-                            turns: _statisticsExpanded ? 0.5 : 0,
-                            duration: const Duration(milliseconds: 200),
-                            child: Icon(
-                              Icons.keyboard_arrow_down,
-                              color:
-                                  _statisticsExpanded ? const Color(0xFF6366F1) : Colors.white.withValues(alpha: 0.4),
-                              size: 22,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // Statistics Content (Expandable) - Revamped
-          if (_statisticsExpanded)
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-                child: Column(
-                  children: [
-                    // Hero Stats Row - Big numbers with trends (Connected to real data)
-                    Row(
-                      children: [
-                        Expanded(
-                            child: _buildHeroStatCard(UserPreferences.formatChips(UserPreferences.gamesPlayed),
-                                'Total Games', Icons.sports_esports, const Color(0xFF6366F1), '')),
-                        const SizedBox(width: 10),
-                        Expanded(
-                            child: _buildHeroStatCard(UserPreferences.formatChips(UserPreferences.gamesWon), 'Wins',
-                                Icons.emoji_events, const Color(0xFF10B981), '')),
-                        const SizedBox(width: 10),
-                        Expanded(
-                            child: _buildHeroStatCard('${UserPreferences.winRate.toStringAsFixed(1)}%', 'Win Rate',
-                                Icons.trending_up, const Color(0xFFFFBB00), '')),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Graph Card with Toggle
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.03),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Header with toggle and dropdown
-                          Row(
-                            children: [
-                              // Graph type toggle
-                              Container(
-                                padding: const EdgeInsets.all(2),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.05),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    GestureDetector(
-                                      onTap: () => setState(() => _showMMRGraph = false),
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                        decoration: BoxDecoration(
-                                          color: !_showMMRGraph ? const Color(0xFF6366F1) : Colors.transparent,
-                                          borderRadius: BorderRadius.circular(6),
-                                        ),
-                                        child: Text(
-                                          'Chips',
-                                          style: TextStyle(
-                                            color: !_showMMRGraph ? Colors.white : Colors.white.withValues(alpha: 0.5),
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    GestureDetector(
-                                      onTap: () => setState(() => _showMMRGraph = true),
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                        decoration: BoxDecoration(
-                                          color: _showMMRGraph ? const Color(0xFFFFBB00) : Colors.transparent,
-                                          borderRadius: BorderRadius.circular(6),
-                                        ),
-                                        child: Text(
-                                          'MMR',
-                                          style: TextStyle(
-                                            color: _showMMRGraph ? Colors.white : Colors.white.withValues(alpha: 0.5),
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const Spacer(),
-                              _buildTimeRangeSelector(),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          // Value display
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              Text(
-                                _showMMRGraph ? '1,247' : '2.4M',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 28,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF10B981).withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: Row(
-                                  children: [
-                                    const Icon(Icons.arrow_upward, size: 10, color: Color(0xFF10B981)),
-                                    const SizedBox(width: 2),
-                                    Text(
-                                      _showMMRGraph ? '+47' : '+340K',
-                                      style: const TextStyle(
-                                        color: Color(0xFF10B981),
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                _showMMRGraph ? 'Ranked Rating' : 'Chip Balance',
-                                style: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.4),
-                                  fontSize: 11,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 20),
-                          // Graph
-                          SizedBox(
-                            height: 140,
-                            child: CustomPaint(
-                              size: const Size(double.infinity, 140),
-                              painter: _showMMRGraph ? MMRGraphPainter() : AdvancedChipGraphPainter(),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          // X-axis labels
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: _getXAxisLabels()
-                                .map((label) => Text(
-                                      label,
-                                      style: TextStyle(
-                                        color: Colors.white.withValues(alpha: 0.3),
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ))
-                                .toList(),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Win/Loss Breakdown & Hand Stats Row
-                    Row(
-                      children: [
-                        // Donut Chart - Win Distribution
-                        Expanded(
-                          child: Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors: [
-                                  Colors.white.withValues(alpha: 0.05),
-                                  Colors.white.withValues(alpha: 0.02),
-                                ],
-                              ),
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-                            ),
-                            child: Column(
-                              children: [
-                                Text(
-                                  'Session Results',
-                                  style: TextStyle(
-                                    color: Colors.white.withValues(alpha: 0.6),
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-                                SizedBox(
-                                  height: 100,
-                                  width: 100,
-                                  child: CustomPaint(
-                                    painter: WinLossDonutPainter(),
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    _buildLegendDot(const Color(0xFF10B981), 'Win'),
-                                    const SizedBox(width: 12),
-                                    _buildLegendDot(const Color(0xFFEF4444), 'Loss'),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        // Quick Stats Column
-                        Expanded(
-                          child: Column(
-                            children: [
-                              _buildMiniStatCard(
-                                  Icons.local_fire_department, 'Best Streak', '12', const Color(0xFFFF6B35)),
-                              const SizedBox(height: 8),
-                              _buildMiniStatCard(Icons.monetization_on, 'Biggest Win', '450K', const Color(0xFFFFBB00)),
-                              const SizedBox(height: 8),
-                              _buildMiniStatCard(Icons.trending_up, 'ROI', '+24.7%', const Color(0xFF10B981)),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Hand Frequency Bar Chart
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            Colors.white.withValues(alpha: 0.05),
-                            Colors.white.withValues(alpha: 0.02),
-                          ],
-                        ),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                'Winning Hands',
-                                style: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.8),
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF6366F1).withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  '${UserPreferences.handsWon} hands',
-                                  style: const TextStyle(
-                                    color: Color(0xFF6366F1),
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          _buildHandBarFromStats('High Card', UserPreferences.highCards, UserPreferences.handsWon,
-                              const Color(0xFF64748B)),
-                          _buildHandBarFromStats(
-                              'One Pair', UserPreferences.onePairs, UserPreferences.handsWon, const Color(0xFF3B82F6)),
-                          _buildHandBarFromStats(
-                              'Two Pair', UserPreferences.twoPairs, UserPreferences.handsWon, const Color(0xFF8B5CF6)),
-                          _buildHandBarFromStats('Three of a Kind', UserPreferences.threeOfKinds,
-                              UserPreferences.handsWon, const Color(0xFFEC4899)),
-                          // Expandable Straight+ section
-                          GestureDetector(
-                            onTap: () => setState(() => _straightPlusExpanded = !_straightPlusExpanded),
-                            child: Padding(
-                              padding: const EdgeInsets.only(bottom: 10),
+                            const SizedBox(width: 10),
+                            Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          Text(
-                                            'Straight+',
-                                            style: TextStyle(
-                                              color: Colors.white.withValues(alpha: 0.7),
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.w500,
-                                            ),
-                                          ),
-                                          const SizedBox(width: 4),
-                                          AnimatedRotation(
-                                            turns: _straightPlusExpanded ? 0.5 : 0,
-                                            duration: const Duration(milliseconds: 200),
-                                            child: Icon(
-                                              Icons.keyboard_arrow_down,
-                                              size: 16,
-                                              color: const Color(0xFFFFBB00),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      Text(
-                                        '${UserPreferences.straightPlusTotal}',
-                                        style: TextStyle(
-                                          color: Colors.white.withValues(alpha: 0.4),
-                                          fontSize: 10,
-                                        ),
-                                      ),
-                                    ],
+                                  Text(
+                                    'Statistics',
+                                    style: TextStyle(
+                                      color: Colors.white.withValues(alpha: 0.9),
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                   ),
-                                  const SizedBox(height: 4),
-                                  Stack(
-                                    children: [
-                                      Container(
-                                        height: 6,
-                                        width: double.infinity,
-                                        decoration: BoxDecoration(
-                                          color: Colors.white.withValues(alpha: 0.05),
-                                          borderRadius: BorderRadius.circular(3),
-                                        ),
-                                      ),
-                                      FractionallySizedBox(
-                                        widthFactor: UserPreferences.handsWon > 0
-                                            ? (UserPreferences.straightPlusTotal / UserPreferences.handsWon)
-                                                .clamp(0.0, 1.0)
-                                            : 0.0,
-                                        child: Container(
-                                          height: 6,
-                                          decoration: BoxDecoration(
-                                            gradient: LinearGradient(
-                                              colors: [
-                                                const Color(0xFFFFBB00),
-                                                const Color(0xFFFFBB00).withValues(alpha: 0.7)
-                                              ],
-                                            ),
-                                            borderRadius: BorderRadius.circular(3),
-                                            boxShadow: [
-                                              BoxShadow(
-                                                color: const Color(0xFFFFBB00).withValues(alpha: 0.4),
-                                                blurRadius: 4,
-                                                offset: const Offset(0, 1),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                    ],
+                                  Text(
+                                    'Performance & Analytics',
+                                    style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 10),
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ],
                               ),
                             ),
-                          ),
-                          // Expanded high hands breakdown
-                          if (_straightPlusExpanded)
-                            Container(
-                              margin: const EdgeInsets.only(left: 12, bottom: 10),
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.03),
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(color: const Color(0xFFFFBB00).withValues(alpha: 0.2)),
-                              ),
-                              child: Column(
-                                children: [
-                                  _buildHandBarFromStats('Straight', UserPreferences.straights,
-                                      UserPreferences.straightPlusTotal, const Color(0xFFFFBB00)),
-                                  _buildHandBarFromStats('Flush', UserPreferences.flushes,
-                                      UserPreferences.straightPlusTotal, const Color(0xFF22C55E)),
-                                  _buildHandBarFromStats('Full House', UserPreferences.fullHouses,
-                                      UserPreferences.straightPlusTotal, const Color(0xFF3B82F6)),
-                                  _buildHandBarFromStats('Four of a Kind', UserPreferences.fourOfKinds,
-                                      UserPreferences.straightPlusTotal, const Color(0xFF8B5CF6)),
-                                  _buildHandBarFromStats('Straight Flush', UserPreferences.straightFlushes,
-                                      UserPreferences.straightPlusTotal, const Color(0xFFEC4899)),
-                                  _buildHandBarFromStats('Royal Flush', UserPreferences.royalFlushes,
-                                      UserPreferences.straightPlusTotal, const Color(0xFFFFD700)),
-                                ],
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Detailed Stats Grid
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            Colors.white.withValues(alpha: 0.05),
-                            Colors.white.withValues(alpha: 0.02),
+                            Icon(Icons.chevron_right_rounded, color: Colors.white.withValues(alpha: 0.3), size: 20),
                           ],
                         ),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Detailed Statistics',
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.8),
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          Row(
-                            children: [
-                              Expanded(
-                                  child: _buildDetailStat(
-                                      'Hands Played', UserPreferences.formatChips(UserPreferences.handsPlayed))),
-                              Expanded(
-                                  child: _buildDetailStat(
-                                      'Hands Won', UserPreferences.formatChips(UserPreferences.handsWon))),
-                              Expanded(
-                                  child: _buildDetailStat(
-                                      'All-Ins Won', UserPreferences.formatChips(UserPreferences.allInsWon))),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              Expanded(child: _buildDetailStat('Win Streak', '${UserPreferences.currentWinStreak}')),
-                              Expanded(child: _buildDetailStat('Best Streak', '${UserPreferences.bestWinStreak}')),
-                              Expanded(
-                                  child: _buildDetailStat(
-                                      'Biggest Pot', UserPreferences.formatChips(UserPreferences.biggestPot))),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              Expanded(child: _buildDetailStat('Sit & Go Wins', '${UserPreferences.sitAndGoWins}')),
-                              Expanded(
-                                  child: _buildDetailStat(
-                                      'Total Won', UserPreferences.formatChips(UserPreferences.totalChipsWon))),
-                              Expanded(child: _buildDetailStat('Daily Claims', '${UserPreferences.dailyBonusClaims}')),
-                            ],
-                          ),
-                        ],
                       ),
                     ),
-                  ],
-                ),
-              ),
-            ),
-
-          // Achievements Section
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  GestureDetector(
-                    onTap: () => setState(() => _achievementsExpanded = !_achievementsExpanded),
-                    child: Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF1A1A1A),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFFFB800).withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(12),
+                  ),
+                  const SizedBox(width: 10),
+                  // Achievements Button
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => _showAchievementsPopup(context),
+                      child: Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.03),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 36,
+                              height: 36,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFFB800).withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Center(
+                                  child: Icon(Icons.emoji_events_rounded, color: Color(0xFFFFB800), size: 20)),
                             ),
-                            child: const Center(
-                              child: Icon(Icons.emoji_events_rounded, color: Color(0xFFFFB800), size: 24),
-                            ),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'Achievements',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Achievements',
+                                    style: TextStyle(
+                                      color: Colors.white.withValues(alpha: 0.9),
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(height: 6),
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: ClipRRect(
-                                        borderRadius: BorderRadius.circular(3),
-                                        child: LinearProgressIndicator(
-                                          value: 0.0,
-                                          backgroundColor: Colors.white.withValues(alpha: 0.08),
-                                          valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFFFFB800)),
-                                          minHeight: 4,
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Text(
-                                      '0 / 20',
-                                      style: TextStyle(
-                                        color: Colors.white.withValues(alpha: 0.5),
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
+                                  Text(
+                                    '0 / 20',
+                                    style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 10),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          AnimatedRotation(
-                            turns: _achievementsExpanded ? 0.5 : 0,
-                            duration: const Duration(milliseconds: 200),
-                            child: Icon(
-                              Icons.keyboard_arrow_down_rounded,
-                              color: Colors.white.withValues(alpha: 0.4),
-                              size: 24,
-                            ),
-                          ),
-                        ],
+                            Icon(Icons.chevron_right_rounded, color: Colors.white.withValues(alpha: 0.3), size: 20),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -1617,24 +1085,6 @@ class ProfileTabState extends State<ProfileTab> {
               ),
             ),
           ),
-
-          // Achievement Grid (Expandable) - Larger cards
-          if (_achievementsExpanded)
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
-              sliver: SliverGrid(
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 3,
-                  mainAxisSpacing: 10,
-                  crossAxisSpacing: 10,
-                  childAspectRatio: 0.75,
-                ),
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) => AchievementCard.fromIndex(index),
-                  childCount: 20,
-                ),
-              ),
-            ),
 
           // Pro Pass Section
           SliverToBoxAdapter(
@@ -2232,6 +1682,325 @@ class ProfileTabState extends State<ProfileTab> {
     );
   }
 
+  void _showStatisticsPopup(BuildContext context) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.85),
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 420, maxHeight: 700),
+          decoration: BoxDecoration(
+            color: const Color(0xFF141414),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+          ),
+          child: Column(
+            children: [
+              // Header
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  border: Border(bottom: BorderSide(color: Colors.white.withValues(alpha: 0.06))),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+                        ),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Center(child: Icon(Icons.analytics_rounded, color: Colors.white, size: 22)),
+                    ),
+                    const SizedBox(width: 12),
+                    const Text(
+                      'Statistics',
+                      style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600),
+                    ),
+                    const Spacer(),
+                    GestureDetector(
+                      onTap: () => Navigator.pop(context),
+                      child: Icon(Icons.close_rounded, color: Colors.white.withValues(alpha: 0.5), size: 24),
+                    ),
+                  ],
+                ),
+              ),
+              // Content
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      // Hero Stats Row
+                      Row(
+                        children: [
+                          Expanded(
+                              child: _buildHeroStatCard(UserPreferences.formatChips(UserPreferences.gamesPlayed),
+                                  'Total Games', Icons.sports_esports, const Color(0xFF6366F1), '')),
+                          const SizedBox(width: 8),
+                          Expanded(
+                              child: _buildHeroStatCard(UserPreferences.formatChips(UserPreferences.gamesWon), 'Wins',
+                                  Icons.emoji_events, const Color(0xFF10B981), '')),
+                          const SizedBox(width: 8),
+                          Expanded(
+                              child: _buildHeroStatCard('${UserPreferences.winRate.toStringAsFixed(1)}%', 'Win Rate',
+                                  Icons.trending_up, const Color(0xFFFFBB00), '')),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      // Quick Stats
+                      Row(
+                        children: [
+                          Expanded(
+                              child: _buildMiniStatCard(Icons.local_fire_department, 'Best Streak',
+                                  '${UserPreferences.bestWinStreak}', const Color(0xFFFF6B35))),
+                          const SizedBox(width: 8),
+                          Expanded(
+                              child: _buildMiniStatCard(Icons.monetization_on, 'Biggest Pot',
+                                  UserPreferences.formatChips(UserPreferences.biggestPot), const Color(0xFFFFBB00))),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      // Detailed Stats
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.03),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Game Stats',
+                                style: TextStyle(
+                                    color: Colors.white.withValues(alpha: 0.7),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600)),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(
+                                    child: _buildDetailStat(
+                                        'Hands Played', UserPreferences.formatChips(UserPreferences.handsPlayed))),
+                                Expanded(
+                                    child: _buildDetailStat(
+                                        'Hands Won', UserPreferences.formatChips(UserPreferences.handsWon))),
+                                Expanded(
+                                    child: _buildDetailStat(
+                                        'All-Ins Won', UserPreferences.formatChips(UserPreferences.allInsWon))),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            Row(
+                              children: [
+                                Expanded(child: _buildDetailStat('Win Streak', '${UserPreferences.currentWinStreak}')),
+                                Expanded(child: _buildDetailStat('Sit & Go Wins', '${UserPreferences.sitAndGoWins}')),
+                                Expanded(
+                                    child: _buildDetailStat('Daily Claims', '${UserPreferences.dailyBonusClaims}')),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      // Hand Stats
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.03),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text('Winning Hands',
+                                    style: TextStyle(
+                                        color: Colors.white.withValues(alpha: 0.7),
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600)),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF6366F1).withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text('${UserPreferences.handsWon} total',
+                                      style: const TextStyle(
+                                          color: Color(0xFF6366F1), fontSize: 10, fontWeight: FontWeight.w600)),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            _buildHandBarFromStats('High Card', UserPreferences.highCards, UserPreferences.handsWon,
+                                const Color(0xFF64748B)),
+                            _buildHandBarFromStats('One Pair', UserPreferences.onePairs, UserPreferences.handsWon,
+                                const Color(0xFF3B82F6)),
+                            _buildHandBarFromStats('Two Pair', UserPreferences.twoPairs, UserPreferences.handsWon,
+                                const Color(0xFF8B5CF6)),
+                            _buildHandBarFromStats('Three of a Kind', UserPreferences.threeOfKinds,
+                                UserPreferences.handsWon, const Color(0xFFEC4899)),
+                            _buildHandBarFromStats('Straight', UserPreferences.straights, UserPreferences.handsWon,
+                                const Color(0xFFFFBB00)),
+                            _buildHandBarFromStats(
+                                'Flush', UserPreferences.flushes, UserPreferences.handsWon, const Color(0xFF22C55E)),
+                            _buildHandBarFromStats('Full House', UserPreferences.fullHouses, UserPreferences.handsWon,
+                                const Color(0xFF3B82F6)),
+                            _buildHandBarFromStats('Four of a Kind', UserPreferences.fourOfKinds,
+                                UserPreferences.handsWon, const Color(0xFF8B5CF6)),
+                            _buildHandBarFromStats('Straight Flush', UserPreferences.straightFlushes,
+                                UserPreferences.handsWon, const Color(0xFFEC4899)),
+                            _buildHandBarFromStats('Royal Flush', UserPreferences.royalFlushes,
+                                UserPreferences.handsWon, const Color(0xFFFFD700)),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      // Chips Stats
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.03),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Chip Stats',
+                                style: TextStyle(
+                                    color: Colors.white.withValues(alpha: 0.7),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600)),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(
+                                    child: _buildDetailStat(
+                                        'Total Won', UserPreferences.formatChips(UserPreferences.totalChipsWon))),
+                                Expanded(
+                                    child: _buildDetailStat(
+                                        'Biggest Pot', UserPreferences.formatChips(UserPreferences.biggestPot))),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showAchievementsPopup(BuildContext context) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.85),
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 420, maxHeight: 650),
+          decoration: BoxDecoration(
+            color: const Color(0xFF141414),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+          ),
+          child: Column(
+            children: [
+              // Header
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  border: Border(bottom: BorderSide(color: Colors.white.withValues(alpha: 0.06))),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFB800).withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Center(child: Icon(Icons.emoji_events_rounded, color: Color(0xFFFFB800), size: 22)),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Achievements',
+                            style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600),
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(2),
+                                  child: LinearProgressIndicator(
+                                    value: 0.0,
+                                    backgroundColor: Colors.white.withValues(alpha: 0.08),
+                                    valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFFFFB800)),
+                                    minHeight: 3,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text('0 / 20',
+                                  style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 11)),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    GestureDetector(
+                      onTap: () => Navigator.pop(context),
+                      child: Icon(Icons.close_rounded, color: Colors.white.withValues(alpha: 0.5), size: 24),
+                    ),
+                  ],
+                ),
+              ),
+              // Grid
+              Expanded(
+                child: GridView.builder(
+                  padding: const EdgeInsets.all(14),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 3,
+                    mainAxisSpacing: 10,
+                    crossAxisSpacing: 10,
+                    childAspectRatio: 0.75,
+                  ),
+                  itemCount: 20,
+                  itemBuilder: (context, index) => AchievementCard.fromIndex(index),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   void _showBattlePassDialog(BuildContext context) {
     showDialog(
       context: context,
@@ -2406,8 +2175,9 @@ class ProfileTabState extends State<ProfileTab> {
               ),
 
               // Tier List
-              Expanded(
+              Flexible(
                 child: ListView.builder(
+                  shrinkWrap: true,
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                   itemCount: 50,
                   itemBuilder: (context, index) {
@@ -2522,14 +2292,16 @@ class ProfileTabState extends State<ProfileTab> {
               ),
               child: Row(
                 children: [
-                  Text(freeReward['icon'] as String, style: const TextStyle(fontSize: 18)),
+                  freeReward['icon'] is IconData
+                      ? Icon(freeReward['icon'] as IconData, color: Colors.white70, size: 18)
+                      : Text(freeReward['icon'].toString(), style: const TextStyle(fontSize: 18)),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          freeReward['name'] as String,
+                          freeReward['label'] as String,
                           style: TextStyle(
                             color: Colors.white.withValues(alpha: 0.9),
                             fontSize: 12,
@@ -2563,14 +2335,16 @@ class ProfileTabState extends State<ProfileTab> {
               ),
               child: Row(
                 children: [
-                  Text(premiumReward['icon'] as String, style: const TextStyle(fontSize: 18)),
+                  premiumReward['icon'] is IconData
+                      ? Icon(premiumReward['icon'] as IconData, color: const Color(0xFFFFD700), size: 18)
+                      : Text(premiumReward['icon'].toString(), style: const TextStyle(fontSize: 18)),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          premiumReward['name'] as String,
+                          premiumReward['label'] as String,
                           style: TextStyle(
                             color: Colors.white.withValues(alpha: 0.9),
                             fontSize: 12,

@@ -974,10 +974,10 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                 ),
                 SliderTheme(
                   data: SliderTheme.of(context).copyWith(
-                    activeTrackColor: const Color(0xFFD4AF37),
+                    activeTrackColor: const Color(0xFF00D46A),
                     inactiveTrackColor: Colors.white.withValues(alpha: 0.1),
-                    thumbColor: const Color(0xFFD4AF37),
-                    overlayColor: const Color(0xFFD4AF37).withValues(alpha: 0.2),
+                    thumbColor: const Color(0xFF00D46A),
+                    overlayColor: const Color(0xFF00D46A).withValues(alpha: 0.2),
                   ),
                   child: Slider(
                     value: selectedBuyIn.toDouble(),
@@ -1045,7 +1045,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                   _processBuyBack(selectedBuyIn);
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFD4AF37),
+                  backgroundColor: const Color(0xFF00D46A),
                 ),
                 child: const Text('Buy In', style: TextStyle(color: Colors.white)),
               ),
@@ -1172,7 +1172,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
               navigator.pop(); // Exit game
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFD4AF37),
+              backgroundColor: const Color(0xFF00D46A),
             ),
             child: const Text('Cash Out', style: TextStyle(color: Colors.white)),
           ),
@@ -1308,10 +1308,10 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
                           color: isSelected
-                              ? const Color(0xFFD4AF37).withValues(alpha: 0.2)
+                              ? const Color(0xFF00D46A).withValues(alpha: 0.2)
                               : Colors.white.withValues(alpha: isLocked ? 0.02 : 0.06),
                           borderRadius: BorderRadius.circular(16),
-                          border: isSelected ? Border.all(color: const Color(0xFFD4AF37), width: 2) : null,
+                          border: isSelected ? Border.all(color: const Color(0xFF00D46A), width: 2) : null,
                         ),
                         child: Row(
                           children: [
@@ -1400,10 +1400,10 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                   ),
                   SliderTheme(
                     data: SliderTheme.of(context).copyWith(
-                      activeTrackColor: const Color(0xFFD4AF37),
+                      activeTrackColor: const Color(0xFF00D46A),
                       inactiveTrackColor: Colors.white.withValues(alpha: 0.1),
-                      thumbColor: const Color(0xFFD4AF37),
-                      overlayColor: const Color(0xFFD4AF37).withValues(alpha: 0.2),
+                      thumbColor: const Color(0xFF00D46A),
+                      overlayColor: const Color(0xFF00D46A).withValues(alpha: 0.2),
                       trackHeight: 4,
                       thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 10),
                     ),
@@ -1568,7 +1568,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(vertical: 18),
                     decoration: BoxDecoration(
-                      color: canAfford ? const Color(0xFFD4AF37) : Colors.white.withValues(alpha: 0.1),
+                      color: canAfford ? const Color(0xFF00D46A) : Colors.white.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Center(
@@ -2609,13 +2609,13 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
         ),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isMyTurn ? const Color(0xFFD4AF37) : Colors.white.withValues(alpha: 0.1),
+          color: isMyTurn ? const Color(0xFF00D46A) : Colors.white.withValues(alpha: 0.1),
           width: isMyTurn ? 2 : 1,
         ),
         boxShadow: isMyTurn
             ? [
                 BoxShadow(
-                  color: const Color(0xFFD4AF37).withValues(alpha: 0.3),
+                  color: const Color(0xFF00D46A).withValues(alpha: 0.3),
                   blurRadius: 16,
                   spreadRadius: 0,
                 ),
@@ -2634,9 +2634,9 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                 height: 52,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: isMyTurn ? const Color(0xFFD4AF37) : Colors.white.withValues(alpha: 0.1),
+                  color: isMyTurn ? const Color(0xFF00D46A) : Colors.white.withValues(alpha: 0.1),
                   border: Border.all(
-                    color: isMyTurn ? const Color(0xFFD4AF37) : Colors.white.withValues(alpha: 0.2),
+                    color: isMyTurn ? const Color(0xFF00D46A) : Colors.white.withValues(alpha: 0.2),
                     width: 2,
                   ),
                 ),
@@ -2685,7 +2685,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
           Text(
             'YOU',
             style: TextStyle(
-              color: isMyTurn ? const Color(0xFFD4AF37) : Colors.white.withValues(alpha: 0.5),
+              color: isMyTurn ? const Color(0xFF00D46A) : Colors.white.withValues(alpha: 0.5),
               fontSize: 10,
               fontWeight: FontWeight.w600,
               letterSpacing: 1,

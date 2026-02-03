@@ -47,9 +47,9 @@ class GamePlayer {
 
   factory GamePlayer.fromJson(Map<String, dynamic> json) {
     return GamePlayer(
-      uid: json['uid'] as String,
-      displayName: json['displayName'] as String,
-      chips: json['chips'] as int,
+      uid: json['uid'] as String? ?? '',
+      displayName: json['displayName'] as String? ?? 'Player',
+      chips: json['chips'] as int? ?? 0,
       cards:
           (json['cards'] as List<dynamic>?)?.map((c) => PlayingCard.fromJson(c as Map<String, dynamic>)).toList() ?? [],
       hasFolded: json['hasFolded'] as bool? ?? false,
