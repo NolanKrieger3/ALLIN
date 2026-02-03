@@ -560,6 +560,41 @@ class RoomService {
     }
   }
 
+  /// Update a player's chips (for buy-back/rebuy functionality)
+  Future<void> updatePlayerChips(String roomId, String playerId, int newChips) async {
+    final token = await getAuthToken();
+
+    final response = await http.get(Uri.parse('$databaseUrl/game_rooms/$roomId.json?auth=$token'));
+
+    if (response.statusCode != 200 || response.body == 'null') {
+      throw Exception('Failed to fetch room');
+    }
+
+    final roomData = jsonDecode(response.body) as Map<String, dynamic>;
+    final room = GameRoom.fromJson(roomData, roomId);
+
+    final playerIndex = room.players.indexWhere((p) => p.uid == playerId);
+    if (playerIndex == -1) {
+      throw Exception('Player not found in room');
+    }
+
+    // Patch the player's chips
+    final patchResponse = await http.patch(
+      Uri.parse('$databaseUrl/game_rooms/$roomId/players/$playerIndex.json?auth=$token'),
+      headers: _jsonHeaders,
+      body: jsonEncode({
+        'chips': newChips,
+        'hasFolded': false, // Reset folded status for new hand
+      }),
+    );
+
+    if (patchResponse.statusCode != 200) {
+      throw Exception('Failed to update player chips');
+    }
+
+    print('✅ Updated player $playerId chips to $newChips');
+  }
+
   // ============================================================================
   // FETCHING & STREAMS
   // ============================================================================

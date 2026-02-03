@@ -15,12 +15,20 @@ class MultiplayerGameScreen extends StatefulWidget {
   final String roomId;
   final bool autoStart;
   final int requiredPlayers;
+  final bool allowRebuy;
+  final int bigBlind;
+  final int minBuyIn;
+  final int maxBuyIn;
 
   const MultiplayerGameScreen({
     super.key,
     required this.roomId,
     this.autoStart = false,
     this.requiredPlayers = 2,
+    this.allowRebuy = false,
+    this.bigBlind = 100,
+    this.minBuyIn = 5000,
+    this.maxBuyIn = 10000,
   });
 
   @override
@@ -35,6 +43,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
   bool _isLoading = false;
   bool _hasAutoStarted = false;
   bool _hasTriggeredNewHand = false;
+  bool _showingBuyBackDialog = false; // Track if buy-back dialog is open
 
   // Heartbeat timer for presence detection
   Timer? _heartbeatTimer;
@@ -617,6 +626,21 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
           // Check for when only 1 player has chips remaining
           final playersWithChips = room.players.where((p) => p.chips > 0).toList();
 
+          // Check if current player is out of chips and show buy-back dialog (for quick play)
+          if (widget.allowRebuy && room.status == 'finished') {
+            final currentPlayer = room.players.firstWhere(
+              (p) => p.uid == _gameService.currentUserId,
+              orElse: () => room.players.first,
+            );
+            if (currentPlayer.chips <= 0 && !_showingBuyBackDialog) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted && !_showingBuyBackDialog) {
+                  _showBuyBackDialog();
+                }
+              });
+            }
+          }
+
           // Auto-start new hand after game finishes (if 2+ players still have chips)
           if (room.status == 'finished' && playersWithChips.length >= 2) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1050,6 +1074,204 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
 
   // Use formatChips from game_utils.dart
   String _formatChips(int chips) => formatChips(chips);
+
+  // Format chips with commas for dialogs
+  String _formatChipsLong(int chips) {
+    if (chips >= 1000000) {
+      return '${(chips / 1000000).toStringAsFixed(1)}M';
+    } else if (chips >= 1000) {
+      return '${(chips / 1000).toStringAsFixed(0)}K';
+    }
+    return chips.toString();
+  }
+
+  void _showBuyBackDialog() {
+    if (_showingBuyBackDialog) return; // Prevent multiple dialogs
+    _showingBuyBackDialog = true;
+
+    final userBalance = UserPreferences.chips;
+    final minBuyIn = widget.minBuyIn;
+    final maxBuyIn = widget.maxBuyIn;
+    final canBuyBack = userBalance >= minBuyIn;
+    int selectedBuyIn = minBuyIn.clamp(minBuyIn, userBalance.clamp(minBuyIn, maxBuyIn));
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: const Color(0xFF1A1A1A),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Column(
+            children: [
+              Text('💀', style: TextStyle(fontSize: 48)),
+              SizedBox(height: 8),
+              Text(
+                'YOU BUSTED!',
+                style: TextStyle(
+                  color: Colors.red,
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // User balance display
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.05),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text('💰', style: TextStyle(fontSize: 24)),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Balance: ${_formatChipsLong(userBalance)}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              if (canBuyBack) ...[
+                Text(
+                  'Buy back in?',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.7),
+                    fontSize: 16,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                // Buy-in slider
+                Text(
+                  _formatChipsLong(selectedBuyIn),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 32,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                SliderTheme(
+                  data: SliderTheme.of(context).copyWith(
+                    activeTrackColor: const Color(0xFF00D46A),
+                    inactiveTrackColor: Colors.white.withValues(alpha: 0.1),
+                    thumbColor: const Color(0xFF00D46A),
+                    overlayColor: const Color(0xFF00D46A).withValues(alpha: 0.2),
+                  ),
+                  child: Slider(
+                    value: selectedBuyIn.toDouble(),
+                    min: minBuyIn.toDouble(),
+                    max: userBalance.clamp(minBuyIn, maxBuyIn).toDouble(),
+                    onChanged: (value) {
+                      setDialogState(() => selectedBuyIn = value.toInt());
+                    },
+                  ),
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      _formatChipsLong(minBuyIn),
+                      style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 12),
+                    ),
+                    Text(
+                      _formatChipsLong(userBalance.clamp(minBuyIn, maxBuyIn)),
+                      style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 12),
+                    ),
+                  ],
+                ),
+              ] else ...[
+                const Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 48),
+                const SizedBox(height: 8),
+                Text(
+                  'Not enough chips!\nNeed at least ${_formatChipsLong(minBuyIn)} to continue.',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.7),
+                    fontSize: 14,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ],
+          ),
+          actions: [
+            // Exit button
+            TextButton(
+              onPressed: () {
+                _showingBuyBackDialog = false;
+                Navigator.pop(context); // Close dialog
+                Navigator.pop(context); // Exit game
+              },
+              child: const Text('Exit', style: TextStyle(color: Colors.white54)),
+            ),
+            // Shop button (if can't afford)
+            if (!canBuyBack)
+              ElevatedButton(
+                onPressed: () {
+                  _showingBuyBackDialog = false;
+                  Navigator.pop(context); // Close dialog
+                  Navigator.pop(context); // Exit game
+                  // Navigate to shop - this will be handled by home screen
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF6366F1),
+                ),
+                child: const Text('Go to Shop', style: TextStyle(color: Colors.white)),
+              ),
+            // Buy back button (if can afford)
+            if (canBuyBack)
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  _processBuyBack(selectedBuyIn);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF00D46A),
+                ),
+                child: const Text('Buy In', style: TextStyle(color: Colors.white)),
+              ),
+          ],
+        ),
+      ),
+    ).then((_) {
+      // Reset flag when dialog closes
+      _showingBuyBackDialog = false;
+    });
+  }
+
+  Future<void> _processBuyBack(int amount) async {
+    // Deduct from user balance
+    final newBalance = UserPreferences.chips - amount;
+    await UserPreferences.setChips(newBalance);
+
+    // Update player chips in the room
+    try {
+      await _gameService.updatePlayerChips(widget.roomId, _gameService.currentUserId ?? '', amount);
+      _showingBuyBackDialog = false;
+    } catch (e) {
+      print('Error processing buy-back: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to buy back: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
 
   Widget _buildCommunityCardsMinimal(GameRoom room) {
     final isShowdown = room.phase == 'showdown' && _showdownAnimationComplete;
