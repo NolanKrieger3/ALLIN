@@ -290,6 +290,19 @@ class GameActionService {
             lastAction: 'ALL-IN',
           );
           if (newTotalBet > currentBet) {
+            final raiseBy = newTotalBet - currentBet;
+            final isFullRaise = raiseBy >= lastRaiseAmount;
+
+            if (isFullRaise) {
+              lastRaiseAmount = raiseBy;
+              // Reset hasActed for all other players since this is a full raise
+              updatedPlayers = updatedPlayers.map((p) {
+                if (p.uid != botId && !p.hasFolded) {
+                  return p.copyWith(hasActed: false);
+                }
+                return p;
+              }).toList();
+            }
             currentBet = newTotalBet;
           }
         } else {
@@ -423,6 +436,10 @@ class GameActionService {
     final allBetsEqual = playersWhoCanAct.every((p) => p.currentBet == currentBet);
     final isPreflop = currentPhase == GamePhase.preflop;
     final bettingComplete = allPlayersActed && allBetsEqual && (isPreflop ? bbOptionUsed : true);
+
+    print('🔍 Betting check: acted=$allPlayersActed, equal=$allBetsEqual, complete=$bettingComplete');
+    print('   Players who can act: ${playersWhoCanAct.map((p) => '${p.displayName}(acted:${p.hasActed}, bet:${p.currentBet})').join(', ')}');
+    print('   Current bet: $currentBet');
 
     if (bettingComplete) {
       await Future.delayed(const Duration(milliseconds: 1500));

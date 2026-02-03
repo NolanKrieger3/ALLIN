@@ -658,34 +658,35 @@ FUNCTION: _processPostAction(roomId, room, players, pot, ...)
            }
 ```
 
-### Betting Complete Check: `_isBettingRoundComplete()`
+### Betting Complete Check (Inline in `_processPostAction()`)
+
+Note: The actual implementation handles betting completion inline within `_processPostAction()` rather than a separate function:
 
 ```dart
-FUNCTION: _isBettingRoundComplete(players, room, currentBet, bbHasOption)
+// In _processPostAction():
 │
-├── activePlayers = players.where(p => !p.hasFolded)
+├── playersWhoCanAct = players.where(p => !p.hasFolded && p.chips > 0)
 │
-├── if (activePlayers.length <= 1):
-│   └── return true  // Only 1 player = complete
+├── allPlayersActed = playersWhoCanAct.every(p => p.hasActed)
 │
-├── playersWithChips = activePlayers.where(p => p.chips > 0)
+├── allBetsEqual = playersWhoCanAct.every(p => p.currentBet == currentBet)
 │
-├── for each player in playersWithChips:
+├── BB OPTION HANDLING (preflop only):
 │   │
-│   ├── if (!player.hasActed):
-│   │   └── return false  // Someone hasn't acted
+│   bbOptionUsed = !room.bbHasOption  // Start with inverse
 │   │
-│   └── if (player.currentBet < currentBet && player.chips > 0):
-│       └── return false  // Someone owes chips and can pay
+│   if (room.bbHasOption):
+│   │   ├── Get bbIndex based on heads-up or 3+ players
+│   │   ├── if (current acting player IS the BB):
+│   │   │   └── bbOptionUsed = true  // BB used their option
+│   │   └── if (action == 'raise' || action == 'allin'):
+│   │       └── bbOptionUsed = true  // Raise cancels BB option
 │
-├── SPECIAL CASE: BB Option
-│   │
-│   if (bbHasOption && room.phase == 'preflop'):
-│   │   ├── bbPlayer = players[room.bigBlindIndex]
-│   │   └── if (!bbPlayer.hasFolded && bbPlayer.chips > 0 && !bbPlayer.hasActed):
-│   │       └── return false  // BB gets option to raise
+├── bettingComplete = allPlayersActed && allBetsEqual &&
+│                     (isPreflop ? bbOptionUsed : true)
 │
-└── return true  // All conditions met
+└── if (bettingComplete): _advancePhase(...)
+   else: update Firebase with next player
 ```
 
 ---
@@ -766,18 +767,27 @@ FUNCTION: _advancePhase(roomId, room, players, pot)
 ```dart
 FUNCTION: _dealToShowdown(roomId, room, players, pot)
 │
-├── PURPOSE: When all active players are all-in, deal remaining cards
+├── PURPOSE: When all active players are all-in and no betting actions
+│            remain, deal all remaining community cards at once
 │
-├── Calculate cards needed:
-│   │   phase    │ community │ needed │
-│   │ 'preflop' │     0     │   5    │
-│   │ 'flop'    │     3     │   2    │
-│   │ 'turn'    │     4     │   1    │
-│   │ 'river'   │     5     │   0    │
+├── Cards needed (INCLUDING BURN CARDS):
+│   │   phase    │ community │ burns │ cards needed │
+│   │ 'preflop' │     0     │   3   │   8 (3+3+2)  │  ← burn+3flop+burn+turn+burn+river
+│   │ 'flop'    │     3     │   2   │   4 (2+2)    │  ← burn+turn+burn+river
+│   │ 'turn'    │     4     │   1   │   2 (1+1)    │  ← burn+river
+│   │ 'river'   │     5     │   0   │   0          │  ← already complete
 │
-├── Deal remaining cards from deck
+├── SAFETY CHECK: deck.length >= required cards
+│   └── If preflop: requires >= 8 cards in deck
 │
-└── Go directly to _handleShowdown()
+├── Deal remaining cards with burns:
+│   └── For each street: deck.removeLast() for burn, then community cards
+│
+├── Evaluate hands via HandEvaluator.determineWinners()
+│
+├── Distribute pot via PotService.distributePots()
+│
+└── Update Firebase with showdown results
 ```
 
 ---
@@ -1216,9 +1226,14 @@ game_action_service.dart:
 **Debug Points**:
 ```
 game_action_service.dart:
-  └── _isBettingRoundComplete() - Is it returning true?
+  └── _processPostAction() - Check betting complete logic (inline, not separate function)
   └── _advancePhase() - Is it being called?
   └── Check bbHasOption handling
+
+game_flow_service.dart:
+  └── handleTurnTimeout() - Does NOT check betting complete!
+      ⚠️ After timeout fold, it just moves to next player without
+         checking if phase should advance. This could cause bugs.
 ```
 
 **Common Causes**:
@@ -1311,7 +1326,7 @@ room_service.dart:
 - Heartbeat timer not started
 - Only HOST removes inactive players
 - If host leaves, no one is checking for inactive
-- Timeout too long (check TIMEOUT_SECONDS constant)
+- Timeout is 15 seconds (inactiveTimeoutSeconds constant)
 
 **Key Insight**:
 ```
@@ -1322,6 +1337,12 @@ If the HOST disconnects:
   - No one is calling removeInactivePlayers
   - Other players stay stuck
   - SOLUTION: Transfer host before disconnect, or have all players check
+
+⚠️ KNOWN GAP: When a non-host player disconnects mid-turn:
+  - Their turn timer will expire
+  - handleTurnTimeout() folds them and moves to next player
+  - BUT: handleTurnTimeout() does NOT check if phase should advance!
+  - This could leave game in inconsistent state
 ```
 
 ---
@@ -1672,6 +1693,101 @@ HEARTBEAT:
 
 ---
 
+## ⚠️ Identified Issues & Recommended Fixes
+
+### Issue #1: `handleTurnTimeout()` Doesn't Advance Phase
+
+**Location**: [game_flow_service.dart](lib/services/game_flow_service.dart#L248-L296)
+
+**Problem**: When a player times out, `handleTurnTimeout()` folds them and moves to the next player, but it does NOT check if the betting round is complete. If the timed-out player was the last to act, the phase won't advance.
+
+**Fix Required**: After folding the timed-out player, call the same betting-complete logic used in `_processPostAction()`:
+```dart
+// After folding timed-out player, check if betting complete
+final playersWhoCanAct = updatedPlayers.where((p) => !p.hasFolded && p.chips > 0).toList();
+final allPlayersActed = playersWhoCanAct.every((p) => p.hasActed);
+final allBetsEqual = playersWhoCanAct.every((p) => p.currentBet == room.currentBet);
+
+if (allPlayersActed && allBetsEqual) {
+  // Call _advancePhase logic or refactor to shared function
+}
+```
+
+---
+
+### Issue #2: Bot `raise` Doesn't Always Reset Others' `hasActed`
+
+**Location**: [game_action_service.dart](lib/services/game_action_service.dart#L280-L314)
+
+**Problem**: In `botAction()`, when bot raises but doesn't have enough chips (goes all-in instead), the `hasActed` flag for other players is NOT reset. This could allow phase to advance prematurely.
+
+**Current Code** (lines ~280-300):
+```dart
+if (addAmount > player.chips) {
+  // Goes all-in instead - but doesn't reset others' hasActed!
+  ...
+  if (newTotalBet > currentBet) {
+    currentBet = newTotalBet;
+    // Missing: Reset hasActed for other players
+  }
+}
+```
+
+**Fix Required**: Add the hasActed reset when all-in exceeds current bet.
+
+---
+
+### Issue #3: Missing `winningHandName` Field When Single Player Wins
+
+**Location**: [game_action_service.dart](lib/services/game_action_service.dart#L349-L362)
+
+**Problem**: When all but one player folds (instant win), the `winningHandName` is not set in Firebase. The UI may show "undefined" or empty.
+
+**Current Code**:
+```dart
+'winnerId': updatedPlayers[winnerIndex].uid,
+// Missing: 'winningHandName': 'All Others Folded',
+```
+
+**Note**: This is handled in some paths but not consistently. Verify all instant-win paths set this field.
+
+---
+
+### Issue #4: 1.5 Second Delay Before Phase Advance
+
+**Location**: [game_action_service.dart](lib/services/game_action_service.dart#L427)
+
+**Current**:
+```dart
+if (bettingComplete) {
+  await Future.delayed(const Duration(milliseconds: 1500));  // ⬅️ This
+  await _advancePhase(roomId, room, updatedPlayers, pot);
+}
+```
+
+**Consideration**: This hardcoded delay can feel sluggish. Consider:
+- Making it configurable
+- Reducing it for experienced players
+- Removing it for all-bot scenarios
+
+---
+
+### Optimization #1: Redundant `hasActed = true` Assignment
+
+**Location**: [game_action_service.dart](lib/services/game_action_service.dart#L84) and [line 184](lib/services/game_action_service.dart#L184)
+
+`hasActed = true` is set at line 84 (before switch) AND again at line 184 (after switch). The second assignment is redundant.
+
+---
+
+### Optimization #2: Consider Database Transactions
+
+**Issue**: Multiple players acting simultaneously could cause race conditions. The current retry logic in `joinRoom()` helps, but game actions don't have similar protection.
+
+**Recommendation**: Consider Firebase transactions or optimistic locking for critical state updates.
+
+---
+
 ## Quick Debug Commands
 
 ### Print Statements to Add
@@ -1682,12 +1798,12 @@ print('🎯 ACTION: $action by ${player.username}');
 print('   chips: ${player.chips}, currentBet: ${player.currentBet}');
 print('   room currentBet: ${room.currentBet}, pot: ${room.pot}');
 
-// In _isBettingRoundComplete() - track betting state
+// In _processPostAction() - track betting state
 print('📊 BETTING CHECK:');
-for (final p in activePlayers) {
+for (final p in playersWhoCanAct) {
   print('   ${p.username}: acted=${p.hasActed}, bet=${p.currentBet}, chips=${p.chips}');
 }
-print('   bbHasOption: $bbHasOption');
+print('   bbHasOption: ${room.bbHasOption}');
 
 // In _advancePhase() - track phase changes
 print('⏩ ADVANCING: ${room.phase} → $nextPhase');

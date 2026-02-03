@@ -394,7 +394,7 @@ class RoomService {
       }
 
       // Verify the join was successful by re-reading the room
-      await Future.delayed(const Duration(milliseconds: 100));
+      await Future.delayed(const Duration(milliseconds: 50));
       final verifyResponse = await http.get(Uri.parse('$databaseUrl/game_rooms/$roomId.json?auth=$token'));
 
       if (verifyResponse.statusCode == 200 && verifyResponse.body != 'null') {
@@ -408,7 +408,7 @@ class RoomService {
 
         // We're not in the room - our update was overwritten by another player
         print('⚠️ Join attempt $attempt failed (race condition), retrying...');
-        await Future.delayed(Duration(milliseconds: 50 + (attempt * 100)));
+        await Future.delayed(Duration(milliseconds: 30 + (attempt * 50)));
         continue;
       }
     }
@@ -429,6 +429,14 @@ class RoomService {
 
     final roomData = jsonDecode(response.body) as Map<String, dynamic>;
     final room = GameRoom.fromJson(roomData, roomId);
+
+    // Find the leaving player to get their chips (for forfeit in Sit & Go)
+    final leavingPlayer = room.players.firstWhere(
+      (p) => p.uid == userId,
+      orElse: () => GamePlayer(uid: '', displayName: '', chips: 0),
+    );
+    final forfeitedChips = leavingPlayer.chips;
+
     final updatedPlayers = room.players.where((p) => p.uid != userId).toList();
 
     if (updatedPlayers.isEmpty) {
@@ -442,10 +450,12 @@ class RoomService {
       // CRITICAL: If game is in progress and only 1 player remains, they win!
       if (room.status == RoomStatus.playing && updatedPlayers.length == 1) {
         final winner = updatedPlayers.first;
+        // Award both the pot AND the leaving player's forfeited chips
+        final totalWinnings = room.pot + forfeitedChips;
         final winnerWithPot = GamePlayer(
           uid: winner.uid,
           displayName: winner.displayName,
-          chips: winner.chips + room.pot,
+          chips: winner.chips + totalWinnings,
           cards: winner.cards,
           hasFolded: winner.hasFolded,
           hasActed: winner.hasActed,
@@ -456,7 +466,7 @@ class RoomService {
           lastAction: winner.lastAction,
         );
 
-        print('🏆 Player left mid-game! Awarding pot (${room.pot}) to ${winner.displayName}');
+        print('🏆 Player left mid-game! Awarding pot ($totalWinnings) to ${winner.displayName}');
 
         final patchResponse = await http.patch(
           Uri.parse('$databaseUrl/game_rooms/$roomId.json?auth=$token'),
@@ -478,6 +488,29 @@ class RoomService {
         return;
       }
 
+      // Game is in progress with 2+ players remaining - add forfeited chips to pot
+      // and continue the game
+      if (room.status == RoomStatus.playing && updatedPlayers.length >= 2) {
+        final newPot = room.pot + forfeitedChips;
+        print('💸 Player forfeited $forfeitedChips chips. Pot is now $newPot');
+
+        final patchResponse = await http.patch(
+          Uri.parse('$databaseUrl/game_rooms/$roomId.json?auth=$token'),
+          headers: _jsonHeaders,
+          body: jsonEncode({
+            'players': updatedPlayers.map((p) => p.toJson()).toList(),
+            'hostId': newHostId,
+            'pot': newPot,
+            'lastActivityAt': DateTime.now().millisecondsSinceEpoch,
+          }),
+        );
+        if (patchResponse.statusCode != 200) {
+          print('⚠️ Failed to update room after player left mid-game');
+        }
+        return;
+      }
+
+      // Room is in waiting status or other - just remove player normally
       final patchResponse = await http.patch(
         Uri.parse('$databaseUrl/game_rooms/$roomId.json?auth=$token'),
         headers: _jsonHeaders,
@@ -807,6 +840,10 @@ class RoomService {
     // Reduced timeout from 45s to 15s for quicker disconnect detection
     const inactiveTimeoutSeconds = 15;
     final activePlayers = room.players.where((p) {
+      // Bots are always considered active - they don't send heartbeats
+      if (p.uid.startsWith('bot_')) {
+        return true;
+      }
       if (p.lastActiveAt == null) {
         return now.difference(room.createdAt).inSeconds < inactiveTimeoutSeconds;
       }

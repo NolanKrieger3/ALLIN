@@ -97,74 +97,39 @@ class _QuickPlayScreenState extends State<QuickPlayScreen> {
 
       String? roomId;
 
-      // Retry logic: Try to find and join a room multiple times before creating
-      // Use more attempts with longer delays to handle race conditions
-      for (int attempt = 0; attempt < 5; attempt++) {
-        print('🔍 Matchmaking attempt ${attempt + 1}/5 for blind $bigBlind');
+      // FAST matchmaking: Try to find a room immediately, create if none exist
+      print('🔍 Quick matchmaking for blind $bigBlind');
 
-        // Search for joinable Quick Play rooms (separate from Cash Games)
-        final rooms = await _gameService.fetchJoinableRoomsByBlind(bigBlind, gameType: 'quickplay');
+      // Step 1: Search for joinable rooms
+      final rooms = await _gameService.fetchJoinableRoomsByBlind(bigBlind, gameType: 'quickplay');
 
-        if (rooms.isNotEmpty) {
-          // Try to join each room until one succeeds
-          for (final room in rooms) {
-            try {
-              print('🎯 Attempting to join room ${room.id}');
-              await _gameService.joinRoom(room.id, startingChips: buyIn);
-              roomId = room.id;
-              print('✅ Successfully joined room ${room.id}');
-              break;
-            } catch (e) {
-              print('❌ Failed to join room ${room.id}: $e');
-              // Room might be full or game started, try next room
-              continue;
-            }
+      if (rooms.isNotEmpty) {
+        // Try to join the first available room
+        for (final room in rooms) {
+          try {
+            print('🎯 Joining room ${room.id}');
+            await _gameService.joinRoom(room.id, startingChips: buyIn);
+            roomId = room.id;
+            print('✅ Joined room ${room.id}');
+            break;
+          } catch (e) {
+            print('❌ Room ${room.id} unavailable: $e');
+            continue;
           }
-        }
-
-        if (roomId != null) break;
-
-        // Longer delay before next attempt to allow other rooms to appear
-        // This helps prevent race conditions where multiple players create rooms simultaneously
-        if (attempt < 4) {
-          await Future.delayed(Duration(milliseconds: 800 + (attempt * 200)));
         }
       }
 
-      // If no room found after retries, check if we should create a new one
+      // Step 2: If no room found, create one immediately
       if (roomId == null) {
-        // Only create a new room if all existing rooms for this blind are full
-        final allRoomsFull = await _gameService.areAllRoomsFull(bigBlind, 'quickplay');
-
-        if (allRoomsFull) {
-          print('📦 All rooms are full, creating new room');
-          final room = await _gameService.createRoom(
-            bigBlind: bigBlind,
-            startingChips: buyIn,
-            gameType: 'quickplay',
-            maxPlayers: 6, // Allow up to 6 players in Quick Play lobbies
-          );
-          roomId = room.id;
-          print('✅ Created room ${room.id}');
-        } else {
-          // Wait and retry - there should be a room available
-          print('⏳ Rooms exist but join failed, waiting before retry...');
-          await Future.delayed(const Duration(milliseconds: 1000));
-          // Do one final retry
-          final rooms = await _gameService.fetchJoinableRoomsByBlind(bigBlind, gameType: 'quickplay');
-          if (rooms.isNotEmpty) {
-            for (final room in rooms) {
-              try {
-                await _gameService.joinRoom(room.id, startingChips: buyIn);
-                roomId = room.id;
-                print('✅ Final retry succeeded, joined room ${room.id}');
-                break;
-              } catch (e) {
-                continue;
-              }
-            }
-          }
-        }
+        print('📦 Creating new room');
+        final room = await _gameService.createRoom(
+          bigBlind: bigBlind,
+          startingChips: buyIn,
+          gameType: 'quickplay',
+          maxPlayers: 6,
+        );
+        roomId = room.id;
+        print('✅ Created room ${room.id}');
       }
 
       if (mounted) {

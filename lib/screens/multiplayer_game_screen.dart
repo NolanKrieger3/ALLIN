@@ -322,6 +322,103 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
     _isBotActing = false;
   }
 
+  /// Show leave confirmation dialog
+  void _showLeaveConfirmation(GameRoom room) {
+    final isGameInProgress = room.status == 'playing';
+    final myPlayer = room.players.firstWhere(
+      (p) => p.uid == _gameService.currentUserId,
+      orElse: () => room.players.first,
+    );
+    final myChips = myPlayer.chips;
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A1A),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(
+              isGameInProgress ? Icons.warning_amber : Icons.exit_to_app,
+              color: isGameInProgress ? const Color(0xFFEF4444) : Colors.white,
+              size: 28,
+            ),
+            const SizedBox(width: 12),
+            const Text(
+              'Leave Game?',
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (isGameInProgress) ...[
+              const Text(
+                'You will forfeit all your chips!',
+                style: TextStyle(
+                  color: Color(0xFFEF4444),
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEF4444).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.casino, color: Color(0xFFEF4444), size: 20),
+                    const SizedBox(width: 8),
+                    Text(
+                      '${_formatChips(myChips)} chips at stake',
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
+                    ),
+                  ],
+                ),
+              ),
+            ] else
+              Text(
+                'Are you sure you want to leave?',
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
+              ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'STAY',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.7),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context); // Close dialog
+              await _gameService.leaveRoom(widget.roomId);
+              if (mounted) Navigator.pop(context); // Leave screen
+            },
+            child: Text(
+              isGameInProgress ? 'FORFEIT & LEAVE' : 'LEAVE',
+              style: const TextStyle(
+                color: Color(0xFFEF4444),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// Animate cards flying away then trigger fold action
   Future<void> _animateFold(List<PlayingCard> cards) async {
     if (_isFolding) return;
@@ -412,7 +509,11 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
     final isHost = room.hostId == _gameService.currentUserId;
     final requiredPlayers = widget.requiredPlayers;
 
-    // Case 1: Room doesn't have enough players yet - wait for more
+    // IMPORTANT: Once game is 'playing', we don't need requiredPlayers anymore!
+    // Players can leave mid-game and the game continues with remaining players.
+    // Only check requiredPlayers when room is still in 'waiting' status.
+
+    // Case 1: Room is waiting and doesn't have enough players yet
     if (room.status == 'waiting' && room.players.length < requiredPlayers) {
       print('⏳ Waiting for more players (${room.players.length}/$requiredPlayers)...');
       return;
@@ -439,15 +540,12 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
       return;
     }
 
-    // Case 3: Room is 'playing' but in 'waiting_for_players' phase and has required players
-    // This means enough players joined - start the real game
-    if (room.status == 'playing' &&
-        room.phase == 'waiting_for_players' &&
-        room.players.length >= requiredPlayers &&
-        isHost) {
+    // Case 3: Room is 'playing' but in 'waiting_for_players' phase
+    // Only need 2+ players to continue, not the original requiredPlayers
+    if (room.status == 'playing' && room.phase == 'waiting_for_players' && room.players.length >= 2 && isHost) {
       _hasAutoStarted = true;
       setState(() => _isLoading = true);
-      print('🎮 Starting game from waiting_for_players phase!');
+      print('🎮 Starting game from waiting_for_players phase with ${room.players.length} players!');
       try {
         await _gameService.startGameFromWaiting(widget.roomId);
       } catch (e) {
@@ -511,8 +609,15 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
             });
           }
 
-          // Auto-start new hand after game finishes
-          if (room.status == 'finished' && room.players.length >= 2) {
+          // Check for tournament victory (only 1 player with chips remaining)
+          final playersWithChips = room.players.where((p) => p.chips > 0).toList();
+          if (room.status == 'finished' && playersWithChips.length == 1) {
+            // Tournament is over! Show victory screen
+            return _buildTournamentVictoryScreen(room, playersWithChips.first);
+          }
+
+          // Auto-start new hand after game finishes (if 2+ players still have chips)
+          if (room.status == 'finished' && playersWithChips.length >= 2) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
               _triggerNewHand(room);
             });
@@ -715,6 +820,141 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
   }
 
   // ============================================================================
+  // TOURNAMENT VICTORY SCREEN
+  // ============================================================================
+
+  Widget _buildTournamentVictoryScreen(GameRoom room, GamePlayer winner) {
+    final isMe = winner.uid == _gameService.currentUserId;
+
+    return Scaffold(
+      backgroundColor: const Color(0xFF0A0A0A),
+      body: SafeArea(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // Trophy icon
+                Container(
+                  width: 120,
+                  height: 120,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFFFD700), Color(0xFFD4AF37)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFFFD700).withValues(alpha: 0.4),
+                        blurRadius: 30,
+                        spreadRadius: 10,
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.emoji_events,
+                    color: Colors.white,
+                    size: 64,
+                  ),
+                ),
+
+                const SizedBox(height: 32),
+
+                // Victory text
+                Text(
+                  isMe ? 'YOU WON!' : '${winner.displayName} WINS!',
+                  style: const TextStyle(
+                    color: Color(0xFFFFD700),
+                    fontSize: 36,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 2,
+                  ),
+                ),
+
+                const SizedBox(height: 8),
+
+                const Text(
+                  'TOURNAMENT CHAMPION',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: 3,
+                  ),
+                ),
+
+                const SizedBox(height: 32),
+
+                // Final chip count
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: const Color(0xFFFFD700).withValues(alpha: 0.3),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.casino,
+                        color: Color(0xFFFFD700),
+                        size: 28,
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        '${_formatChips(winner.chips)} chips',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 24,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 48),
+
+                // Leave button
+                GestureDetector(
+                  onTap: () => Navigator.pop(context),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFEF4444), Color(0xFFDC2626)],
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Center(
+                      child: Text(
+                        'LEAVE TABLE',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ============================================================================
   // GAME TABLE
   // ============================================================================
 
@@ -741,10 +981,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
               child: Row(
                 children: [
                   GestureDetector(
-                    onTap: () async {
-                      await _gameService.leaveRoom(widget.roomId);
-                      if (mounted) Navigator.pop(context);
-                    },
+                    onTap: () => _showLeaveConfirmation(room),
                     child: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
                   ),
                   const Spacer(),
