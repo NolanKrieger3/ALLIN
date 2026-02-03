@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
 import '../models/game_room.dart';
-import '../services/room_service.dart';
 import '../services/game_service.dart';
 import '../services/bot_service.dart';
 import '../widgets/mobile_wrapper.dart';
@@ -379,14 +378,13 @@ class _PrivateGameWaitingScreenState extends State<PrivateGameWaitingScreen> {
                         try {
                           await _botService.fillRoomWithBots(widget.roomId);
                         } catch (e) {
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Failed to add bots: $e'),
-                                backgroundColor: const Color(0xFFEF4444),
-                              ),
-                            );
-                          }
+                          if (!mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Failed to add bots: $e'),
+                              backgroundColor: const Color(0xFFEF4444),
+                            ),
+                          );
                         }
                       },
                       child: Container(

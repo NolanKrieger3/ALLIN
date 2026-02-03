@@ -114,6 +114,7 @@ class _SitAndGoWaitingScreenState extends State<SitAndGoWaitingScreen> {
     );
   }
 
+  // ignore: unused_element
   Future<void> _fillWithBots() async {
     try {
       await _botService.fillRoomWithBots(widget.roomId);
@@ -299,7 +300,7 @@ class _SitAndGoWaitingScreenState extends State<SitAndGoWaitingScreen> {
                                 ),
                                 child: Center(
                                   child: Text(
-                                    player.displayName[0].toUpperCase(),
+                                    player.displayName.isNotEmpty ? player.displayName[0].toUpperCase() : '?',
                                     style: const TextStyle(
                                       color: Color(0xFFEF4444),
                                       fontSize: 16,

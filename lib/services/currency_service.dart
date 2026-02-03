@@ -85,18 +85,27 @@ class CurrencyService {
 
   // ============ FORMATTING ============
 
-  /// Format chips with K/M suffixes for display
+  /// Format chips with K/M/B/T/Q suffixes for display
   static String formatChips(int amount) {
+    if (amount >= 1000000000000000) {
+      final q = amount / 1000000000000000;
+      return '${q.toStringAsFixed(q % 1 == 0 ? 0 : 1)}Q';
+    }
+    if (amount >= 1000000000000) {
+      final t = amount / 1000000000000;
+      return '${t.toStringAsFixed(t % 1 == 0 ? 0 : 1)}T';
+    }
+    if (amount >= 1000000000) {
+      final b = amount / 1000000000;
+      return '${b.toStringAsFixed(b % 1 == 0 ? 0 : 1)}B';
+    }
     if (amount >= 1000000) {
-      final millions = amount / 1000000;
-      return '${millions.toStringAsFixed(millions % 1 == 0 ? 0 : 1)}M';
+      final m = amount / 1000000;
+      return '${m.toStringAsFixed(m % 1 == 0 ? 0 : 1)}M';
     }
     if (amount >= 10000) {
-      final thousands = amount / 1000;
-      return '${thousands.toStringAsFixed(thousands % 1 == 0 ? 0 : 1)}K';
-    }
-    if (amount >= 1000) {
-      return '${amount ~/ 1000},${(amount % 1000).toString().padLeft(3, '0')}';
+      final k = amount / 1000;
+      return '${k.toStringAsFixed(k % 1 == 0 ? 0 : 1)}k';
     }
     return amount.toString();
   }

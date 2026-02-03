@@ -167,17 +167,26 @@ class GameActionService {
           final raiseBy = newTotalBet - currentBet;
           final isFullRaise = raiseBy >= lastRaiseAmount;
 
+          // Update lastRaiseAmount only for full raises
           if (isFullRaise) {
             lastRaiseAmount = raiseBy;
-            updatedPlayers = updatedPlayers.map((p) {
-              if (p.uid != userId && !p.hasFolded) {
-                return p.copyWith(hasActed: false);
-              }
-              return p;
-            }).toList();
           }
+
+          // ALWAYS reset hasActed for other players when all-in increases the bet
+          // They need a chance to respond (call/fold/raise) regardless of raise size
+          print('🎲 ALL-IN RAISE: resetting hasActed for opponents (currentBet $currentBet -> $newTotalBet)');
+          updatedPlayers = updatedPlayers.map((p) {
+            if (p.uid != userId && !p.hasFolded && p.chips > 0) {
+              print('   Resetting hasActed for ${p.displayName} (chips: ${p.chips})');
+              return p.copyWith(hasActed: false);
+            }
+            return p;
+          }).toList();
+
           currentBet = newTotalBet;
         }
+
+        print('🎲 ALL-IN: player bet=$newTotalBet, currentBet=$currentBet, chips=0');
         break;
     }
 
@@ -419,13 +428,22 @@ class GameActionService {
     // Other players must still get a chance to call/fold/raise.
 
     // First, check if any player still needs to respond to the current bet
+    // A player needs to respond if:
+    // - They haven't acted yet in this round, OR
+    // - Their current bet is less than the table's current bet
     final playersNeedingToRespond = playersWhoCanAct.where((p) => !p.hasActed || p.currentBet < currentBet).toList();
+
+    print(
+        '🔍 All-in check: playersWhoCanAct=${playersWhoCanAct.length}, needingToRespond=${playersNeedingToRespond.length}');
+    print(
+        '   Players needing to respond: ${playersNeedingToRespond.map((p) => '${p.displayName}(acted:${p.hasActed}, bet:${p.currentBet})').join(', ')}');
 
     // Only consider all-in showdown if NO players need to respond
     if (playersNeedingToRespond.isEmpty && activePlayers.length >= 2) {
       // Now check if we should run out the board:
       // - No one can bet anymore (0 or 1 players have chips)
       if (playersWhoCanAct.length <= 1) {
+        print('📢 All players all-in or called - dealing to showdown');
         await _dealToShowdown(roomId, room, updatedPlayers, pot);
         return;
       }
@@ -461,62 +479,99 @@ class GameActionService {
     }
   }
 
-  /// Deal remaining cards and go to showdown
+  /// Deal remaining cards and go to showdown with animations
+  /// Cards are dealt one phase at a time with delays for visual effect
   Future<void> _dealToShowdown(String roomId, GameRoom room, List<GamePlayer> players, int pot) async {
     final token = await _getAuthToken();
-    final deck = List<String>.from(room.deck);
-    final communityCards = List<PlayingCard>.from(room.communityCards);
-    final currentPhase = GamePhase.fromString(room.phase);
+    var deck = List<String>.from(room.deck);
+    var communityCards = List<PlayingCard>.from(room.communityCards);
+    var currentPhase = GamePhase.fromString(room.phase);
 
     // Safety check: ensure deck has enough cards
-    // Worst case: preflop needs 3 burns + 5 community cards = 8 cards
     if (deck.length < 8 && currentPhase == GamePhase.preflop) {
       print('⚠️ Deck too small (${deck.length} cards), cannot deal to showdown');
       return;
     }
 
-    try {
-      switch (currentPhase) {
-        case GamePhase.preflop:
-          if (deck.length >= 8) {
-            deck.removeLast(); // burn
-            for (var i = 0; i < 3; i++) {
-              final card = deck.removeLast().split('|');
-              communityCards.add(PlayingCard(rank: card[0], suit: card[1]));
-            }
-            deck.removeLast(); // burn
-            final turnCard = deck.removeLast().split('|');
-            communityCards.add(PlayingCard(rank: turnCard[0], suit: turnCard[1]));
-            deck.removeLast(); // burn
-            final riverCard = deck.removeLast().split('|');
-            communityCards.add(PlayingCard(rank: riverCard[0], suit: riverCard[1]));
-          }
-          break;
-        case GamePhase.flop:
-          if (deck.length >= 4) {
-            deck.removeLast(); // burn
-            final turnCard2 = deck.removeLast().split('|');
-            communityCards.add(PlayingCard(rank: turnCard2[0], suit: turnCard2[1]));
-            deck.removeLast(); // burn
-            final riverCard2 = deck.removeLast().split('|');
-            communityCards.add(PlayingCard(rank: riverCard2[0], suit: riverCard2[1]));
-          }
-          break;
-        case GamePhase.turn:
-          if (deck.length >= 2) {
-            deck.removeLast(); // burn
-            final riverCard3 = deck.removeLast().split('|');
-            communityCards.add(PlayingCard(rank: riverCard3[0], suit: riverCard3[1]));
-          }
-          break;
-        default:
-          break;
+    // Reset player states for runout (no betting, just dealing)
+    var updatedPlayers = players
+        .map((p) => p.copyWith(
+              currentBet: 0,
+              hasActed: true,
+              lastAction: p.chips == 0 && !p.hasFolded ? 'ALL-IN' : p.lastAction,
+            ))
+        .toList();
+
+    // Deal cards phase by phase with delays for animation
+    // Phase 1: Deal flop if needed
+    if (currentPhase == GamePhase.preflop && deck.length >= 4) {
+      deck.removeLast(); // burn
+      for (var i = 0; i < 3; i++) {
+        final card = deck.removeLast().split('|');
+        communityCards.add(PlayingCard(rank: card[0], suit: card[1]));
       }
-    } catch (e) {
-      print('❌ Error dealing cards to showdown: $e');
-      return;
+
+      // Update to flop phase
+      await http.patch(
+        Uri.parse('${RoomService.databaseUrl}/game_rooms/$roomId.json?auth=$token'),
+        body: jsonEncode({
+          'communityCards': communityCards.map((c) => c.toJson()).toList(),
+          'deck': deck,
+          'phase': GamePhase.flop.toDbString(),
+          'players': updatedPlayers.map((p) => p.toJson()).toList(),
+          'isAllInRunout': true,
+        }),
+      );
+
+      // Wait for animation
+      await Future.delayed(const Duration(milliseconds: 1500));
+      currentPhase = GamePhase.flop;
     }
 
+    // Phase 2: Deal turn if needed
+    if (currentPhase == GamePhase.flop && deck.length >= 2) {
+      deck.removeLast(); // burn
+      final turnCard = deck.removeLast().split('|');
+      communityCards.add(PlayingCard(rank: turnCard[0], suit: turnCard[1]));
+
+      // Update to turn phase
+      await http.patch(
+        Uri.parse('${RoomService.databaseUrl}/game_rooms/$roomId.json?auth=$token'),
+        body: jsonEncode({
+          'communityCards': communityCards.map((c) => c.toJson()).toList(),
+          'deck': deck,
+          'phase': GamePhase.turn.toDbString(),
+          'isAllInRunout': true,
+        }),
+      );
+
+      // Wait for animation
+      await Future.delayed(const Duration(milliseconds: 1500));
+      currentPhase = GamePhase.turn;
+    }
+
+    // Phase 3: Deal river if needed
+    if (currentPhase == GamePhase.turn && deck.length >= 2) {
+      deck.removeLast(); // burn
+      final riverCard = deck.removeLast().split('|');
+      communityCards.add(PlayingCard(rank: riverCard[0], suit: riverCard[1]));
+
+      // Update to river phase
+      await http.patch(
+        Uri.parse('${RoomService.databaseUrl}/game_rooms/$roomId.json?auth=$token'),
+        body: jsonEncode({
+          'communityCards': communityCards.map((c) => c.toJson()).toList(),
+          'deck': deck,
+          'phase': GamePhase.river.toDbString(),
+          'isAllInRunout': true,
+        }),
+      );
+
+      // Wait for animation
+      await Future.delayed(const Duration(milliseconds: 1500));
+    }
+
+    // Final phase: Showdown with winner determination
     final activePlayers = players.where((p) => !p.hasFolded).toList();
     final finalPlayers = PotService.distributePots(players, communityCards, pot);
 
@@ -540,6 +595,7 @@ class GameActionService {
         'winnerId': winnerUids.first,
         'winnerIds': winnerUids,
         'winningHandName': winningHand.description,
+        'isAllInRunout': false,
       }),
     );
   }

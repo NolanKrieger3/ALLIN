@@ -84,6 +84,7 @@ class _TutorialScreenState extends State<TutorialScreen> with TickerProviderStat
   bool _lessonComplete = false;
 
   // Game state
+  // ignore: unused_field
   String _gamePhase = 'preflop';
   int _pot = 150; // Starting with blinds posted
   int _playerChips = 10000;
@@ -765,9 +766,10 @@ class _TutorialScreenState extends State<TutorialScreen> with TickerProviderStat
 
   Widget _buildBotAvatar(String name, int chips, String action, List<TutorialCard>? cards) {
     final hasFolded = action.contains('FOLD');
+    // ignore: unused_local_variable
     final isCurrentTurn = false; // Tutorial doesn't track bot turns visually
 
-    return Container(
+    return SizedBox(
       width: 64,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -919,6 +921,7 @@ class _TutorialScreenState extends State<TutorialScreen> with TickerProviderStat
     );
   }
 
+  // ignore: unused_element
   Widget _buildMiniCard(TutorialCard card) {
     final isRed = card.isRed;
     return Container(
@@ -953,6 +956,7 @@ class _TutorialScreenState extends State<TutorialScreen> with TickerProviderStat
     );
   }
 
+  // ignore: unused_element
   Widget _buildMiniCardBack() {
     return Container(
       width: 24,
@@ -974,6 +978,7 @@ class _TutorialScreenState extends State<TutorialScreen> with TickerProviderStat
     return chips.toString();
   }
 
+  // ignore: unused_element
   Widget _buildBotSeat(String name, int chips, List<TutorialCard>? cards, String action) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
@@ -1108,6 +1113,7 @@ class _TutorialScreenState extends State<TutorialScreen> with TickerProviderStat
     final canCheck = _currentBet <= _playerBet;
     final isCallRequired = step.requiredAction == 'call' || step.requiredAction == 'check';
     final isRaiseRequired = step.requiredAction == 'raise' || step.requiredAction == 'allin';
+    // ignore: unused_local_variable
     final isFoldRequired = step.requiredAction == 'fold';
 
     return Row(
@@ -1169,6 +1175,7 @@ class _TutorialScreenState extends State<TutorialScreen> with TickerProviderStat
     );
   }
 
+  // ignore: unused_element
   Widget _buildActionBtn(String label, Color color, bool isRequired) {
     final isWhite = color == Colors.white;
     return GestureDetector(
@@ -1221,6 +1228,7 @@ class _TutorialScreenState extends State<TutorialScreen> with TickerProviderStat
     );
   }
 
+  // ignore: unused_element
   Widget _buildTutorialActionButton(String label, Color color, bool isRequired, {bool fullWidth = false}) {
     return GestureDetector(
       onTap: () {
@@ -1261,6 +1269,7 @@ class _TutorialScreenState extends State<TutorialScreen> with TickerProviderStat
     );
   }
 
+  // ignore: unused_element
   Widget _buildPlayerSeat() {
     return Column(
       children: [
@@ -1366,6 +1375,7 @@ class _TutorialScreenState extends State<TutorialScreen> with TickerProviderStat
     );
   }
 
+  // ignore: unused_element
   Widget _buildActionButtons() {
     final step = _currentStep;
     final isActionStep = step.requiredAction != null;

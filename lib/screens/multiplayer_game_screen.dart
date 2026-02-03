@@ -329,11 +329,15 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
       (p) => p.uid == _gameService.currentUserId,
       orElse: () => room.players.first,
     );
-    final myChips = myPlayer.chips;
+    final isSitAndGo = room.gameType.contains('sitandgo');
+    final chipsAtStake = isSitAndGo ? myPlayer.chips : myPlayer.totalContributed;
+
+    // Capture the navigator before showing dialog to avoid context issues
+    final navigator = Navigator.of(context);
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         backgroundColor: const Color(0xFF1A1A1A),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
@@ -355,9 +359,9 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (isGameInProgress) ...[
-              const Text(
-                'You will forfeit all your chips!',
-                style: TextStyle(
+              Text(
+                isSitAndGo ? 'You will forfeit all your chips!' : 'You will forfeit your current bet!',
+                style: const TextStyle(
                   color: Color(0xFFEF4444),
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
@@ -376,7 +380,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
                     const Icon(Icons.casino, color: Color(0xFFEF4444), size: 20),
                     const SizedBox(width: 8),
                     Text(
-                      '${_formatChips(myChips)} chips at stake',
+                      '${_formatChips(chipsAtStake)} chips at stake',
                       style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
                     ),
                   ],
@@ -391,7 +395,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: Text(
               'STAY',
               style: TextStyle(
@@ -402,9 +406,10 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
           ),
           TextButton(
             onPressed: () async {
-              Navigator.pop(context); // Close dialog
+              Navigator.pop(dialogContext); // Close dialog first
               await _gameService.leaveRoom(widget.roomId);
-              if (mounted) Navigator.pop(context); // Leave screen
+              if (!mounted) return;
+              navigator.pop(); // Leave screen using captured navigator
             },
             child: Text(
               isGameInProgress ? 'FORFEIT & LEAVE' : 'LEAVE',
@@ -609,12 +614,8 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
             });
           }
 
-          // Check for tournament victory (only 1 player with chips remaining)
+          // Check for when only 1 player has chips remaining
           final playersWithChips = room.players.where((p) => p.chips > 0).toList();
-          if (room.status == 'finished' && playersWithChips.length == 1) {
-            // Tournament is over! Show victory screen
-            return _buildTournamentVictoryScreen(room, playersWithChips.first);
-          }
 
           // Auto-start new hand after game finishes (if 2+ players still have chips)
           if (room.status == 'finished' && playersWithChips.length >= 2) {
@@ -637,6 +638,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
     );
   }
 
+  // ignore: unused_element
   Widget _buildPlayerCard(GamePlayer player, String hostId) {
     return LobbyPlayerCard(
       player: player,
@@ -645,6 +647,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
     );
   }
 
+  // ignore: unused_element
   void _sendChatMessage(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -678,6 +681,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
     // TODO: Send message to other players via Firebase
   }
 
+  // ignore: unused_element
   void _sendEmote(String emoji, String label) {
     // Display the emote on screen briefly
     ScaffoldMessenger.of(context).showSnackBar(
@@ -710,15 +714,118 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
   }
 
   // ============================================================================
-  // TOURNAMENT VICTORY SCREEN
+  // WAITING FOR BUY-BACK SCREEN (for quickplay/cash games) - NO LONGER USED
   // ============================================================================
 
-  Widget _buildTournamentVictoryScreen(GameRoom room, GamePlayer winner) {
-    return TournamentVictoryOverlay(
-      room: room,
-      winner: winner,
-      currentUserId: _gameService.currentUserId ?? '',
-      onLeave: () => Navigator.pop(context),
+  // ignore: unused_element
+  Widget _buildWaitingForBuyBackScreen(GameRoom room, GamePlayer lastPlayerWithChips) {
+    final isMe = lastPlayerWithChips.uid == _gameService.currentUserId;
+
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: SafeArea(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // Trophy or waiting icon
+                Container(
+                  width: 100,
+                  height: 100,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: isMe ? const Color(0xFFFFD700) : Colors.white.withValues(alpha: 0.1),
+                    boxShadow: isMe
+                        ? [
+                            BoxShadow(
+                              color: const Color(0xFFFFD700).withValues(alpha: 0.5),
+                              blurRadius: 30,
+                              spreadRadius: 10,
+                            ),
+                          ]
+                        : null,
+                  ),
+                  child: Icon(
+                    isMe ? Icons.emoji_events : Icons.hourglass_empty,
+                    size: 50,
+                    color: isMe ? Colors.white : Colors.white60,
+                  ),
+                ),
+                const SizedBox(height: 32),
+                Text(
+                  isMe ? 'YOU\'RE AHEAD!' : 'OPPONENT AHEAD',
+                  style: TextStyle(
+                    color: isMe ? const Color(0xFFFFD700) : Colors.white,
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 2,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Waiting for opponent to buy back in...',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.7),
+                    fontSize: 16,
+                    letterSpacing: 1,
+                  ),
+                ),
+                const SizedBox(height: 32),
+                // Chip count display
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFFFD700).withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text('🎰', style: TextStyle(fontSize: 24)),
+                      const SizedBox(width: 12),
+                      Text(
+                        '${_formatChips(lastPlayerWithChips.chips)} chips',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 48),
+                // Leave table button
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFDC2626),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text(
+                      'LEAVE TABLE',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -1253,6 +1360,9 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
   Widget _buildSwipeablePlayerArea(GamePlayer player, GameRoom room) {
     final callAmount = room.currentBet - player.currentBet;
     final canCheck = room.currentBet == player.currentBet;
+    // Player can only raise if they have more chips than needed to call
+    // If opponent's bet >= player's total chips, they can only call (all-in) or fold
+    final canRaise = player.chips > callAmount;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 40),
@@ -1309,21 +1419,29 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
               Expanded(
                 child: GestureDetector(
                   onTap: () {
-                    // Prevent opening dialog during action processing
-                    if (_isProcessingAction) return;
+                    // Prevent opening dialog during action processing or if can't raise
+                    if (_isProcessingAction || !canRaise) return;
                     _showRaiseDialog(room, player);
                   },
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     decoration: BoxDecoration(
-                      color: _isProcessingAction ? Colors.grey.withValues(alpha: 0.5) : Colors.white,
+                      color: !canRaise
+                          ? Colors.grey.withValues(alpha: 0.3)
+                          : _isProcessingAction
+                              ? Colors.grey.withValues(alpha: 0.5)
+                              : Colors.white,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Center(
                       child: Text(
                         'Raise',
                         style: TextStyle(
-                          color: _isProcessingAction ? Colors.black.withValues(alpha: 0.5) : Colors.black,
+                          color: !canRaise
+                              ? Colors.black.withValues(alpha: 0.3)
+                              : _isProcessingAction
+                                  ? Colors.black.withValues(alpha: 0.5)
+                                  : Colors.black,
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
                         ),
@@ -1941,14 +2059,13 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
                   onTap: () async {
                     Navigator.pop(context);
                     final success = await friendsService.sendFriendRequest(player.uid);
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(success ? 'Friend request sent!' : 'Failed to send request'),
-                          backgroundColor: success ? Colors.green : Colors.red,
-                        ),
-                      );
-                    }
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(success ? 'Friend request sent!' : 'Failed to send request'),
+                        backgroundColor: success ? Colors.green : Colors.red,
+                      ),
+                    );
                   },
                   child: Container(
                     width: double.infinity,

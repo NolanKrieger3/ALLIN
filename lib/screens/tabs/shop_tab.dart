@@ -12,6 +12,7 @@ class ShopTab extends StatefulWidget {
 
 class ShopTabState extends State<ShopTab> with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  // ignore: unused_field
   int _selectedCategory = 0;
 
   final List<Map<String, dynamic>> _categories = [

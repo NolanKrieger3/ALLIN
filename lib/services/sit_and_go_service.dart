@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/game_room.dart';
-import '../models/game_player.dart';
 import 'auth_service.dart';
 import 'room_service.dart';
 
@@ -225,6 +224,7 @@ class SitAndGoService {
       }
 
       // Record player count before patch for validation
+      // ignore: unused_local_variable
       final expectedPlayerCount = room.players.length + 1;
 
       // Add player to room

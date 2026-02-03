@@ -328,18 +328,27 @@ class UserPreferences {
     await setGems(current + amount);
   }
 
-  /// Format number with commas
+  /// Format number with K/M/B/T/Q suffixes for display
   static String formatChips(int amount) {
-    if (amount >= 1000000) {
-      return '${(amount / 1000000).toStringAsFixed(amount % 1000000 == 0 ? 0 : 1)}M';
+    if (amount >= 1000000000000000) {
+      final q = amount / 1000000000000000;
+      return '${q.toStringAsFixed(q % 1 == 0 ? 0 : 1)}Q';
     }
-    if (amount >= 1000) {
-      final thousands = amount ~/ 1000;
-      final remainder = amount % 1000;
-      if (remainder == 0) {
-        return '${thousands}K';
-      }
-      return '${thousands},${remainder.toString().padLeft(3, '0')}';
+    if (amount >= 1000000000000) {
+      final t = amount / 1000000000000;
+      return '${t.toStringAsFixed(t % 1 == 0 ? 0 : 1)}T';
+    }
+    if (amount >= 1000000000) {
+      final b = amount / 1000000000;
+      return '${b.toStringAsFixed(b % 1 == 0 ? 0 : 1)}B';
+    }
+    if (amount >= 1000000) {
+      final m = amount / 1000000;
+      return '${m.toStringAsFixed(m % 1 == 0 ? 0 : 1)}M';
+    }
+    if (amount >= 10000) {
+      final k = amount / 1000;
+      return '${k.toStringAsFixed(k % 1 == 0 ? 0 : 1)}k';
     }
     return amount.toString();
   }
@@ -407,19 +416,25 @@ class UserPreferences {
     if (lucky.contains('straight') &&
         !lucky.contains('flush') &&
         check.contains('straight') &&
-        !check.contains('flush')) return true;
+        !check.contains('flush')) {
+      return true;
+    }
     if (lucky.contains('flush') &&
         !lucky.contains('straight') &&
         !lucky.contains('royal') &&
         check.contains('flush') &&
         !check.contains('straight') &&
-        !check.contains('royal')) return true;
+        !check.contains('royal')) {
+      return true;
+    }
     if (lucky.contains('full house') && check.contains('full house')) return true;
     if (lucky.contains('four of a kind') && (check.contains('four') || check.contains('quads'))) return true;
     if (lucky.contains('straight flush') &&
         !lucky.contains('royal') &&
         check.contains('straight flush') &&
-        !check.contains('royal')) return true;
+        !check.contains('royal')) {
+      return true;
+    }
     if (lucky.contains('royal flush') && check.contains('royal')) return true;
 
     return lucky == check;

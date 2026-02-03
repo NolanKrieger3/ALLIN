@@ -122,6 +122,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
     }
   }
 
+  // ignore: unused_element - Reserved for future private room join feature
   Future<void> _joinRoom(String roomId) async {
     if (roomId.isEmpty) {
       setState(() => _error = 'Please enter a room code');

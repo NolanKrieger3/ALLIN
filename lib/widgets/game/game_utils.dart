@@ -1,9 +1,27 @@
 import '../../services/hand_evaluator.dart';
 
-/// Format chips for display (e.g., 1500 -> "1.5k", 1000000 -> "1M")
+/// Format chips for display (e.g., 12000 -> "12k", 1000000 -> "1M")
 String formatChips(int chips) {
-  if (chips >= 1000000) return '${(chips / 1000000).toStringAsFixed(1)}M';
-  if (chips >= 1000) return '${(chips / 1000).toStringAsFixed(chips % 1000 == 0 ? 0 : 1)}k';
+  if (chips >= 1000000000000000) {
+    final q = chips / 1000000000000000;
+    return '${q.toStringAsFixed(q % 1 == 0 ? 0 : 1)}Q';
+  }
+  if (chips >= 1000000000000) {
+    final t = chips / 1000000000000;
+    return '${t.toStringAsFixed(t % 1 == 0 ? 0 : 1)}T';
+  }
+  if (chips >= 1000000000) {
+    final b = chips / 1000000000;
+    return '${b.toStringAsFixed(b % 1 == 0 ? 0 : 1)}B';
+  }
+  if (chips >= 1000000) {
+    final m = chips / 1000000;
+    return '${m.toStringAsFixed(m % 1 == 0 ? 0 : 1)}M';
+  }
+  if (chips >= 10000) {
+    final k = chips / 1000;
+    return '${k.toStringAsFixed(k % 1 == 0 ? 0 : 1)}k';
+  }
   return chips.toString();
 }
 

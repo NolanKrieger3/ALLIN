@@ -35,9 +35,12 @@ class HomeTabState extends State<HomeTab> {
   final TeamService _teamService = TeamService();
   final AuthService _authService = AuthService();
   final UserService _userService = UserService();
+  // ignore: unused_field
   List<Friend> _friends = [];
+  // ignore: unused_field
   int _unreadNotifications = 0;
   int _pendingFriendRequests = 0;
+  // ignore: unused_field
   int _chipBalance = 1000;
   Team? _userTeam;
   StreamSubscription? _friendsSub;
@@ -697,11 +700,13 @@ class HomeTabState extends State<HomeTab> {
     );
   }
 
+  // ignore: unused_element
   String _formatDate(DateTime date) {
     final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     return '${months[date.month - 1]} ${date.day}';
   }
 
+  // ignore: unused_element
   Widget _buildHeaderButton({required IconData icon, required Color color, required VoidCallback onTap}) {
     return GestureDetector(
       onTap: onTap,
@@ -1455,8 +1460,10 @@ class HomeTabState extends State<HomeTab> {
                               await _teamService.updateIsOpen(_userTeam!.id, isOpenTeam);
                             }
                             _loadUserTeam();
-                            if (mounted) Navigator.pop(context);
+                            if (!mounted) return;
+                            Navigator.pop(context);
                           } catch (e) {
+                            if (!mounted) return;
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
                             );
@@ -1735,6 +1742,7 @@ class HomeTabState extends State<HomeTab> {
     }
   }
 
+  // ignore: unused_element
   void _showNotificationPanel() {
     showDialog(
       context: context,
@@ -1749,6 +1757,7 @@ class HomeTabState extends State<HomeTab> {
     );
   }
 
+  // ignore: unused_element
   void _showAddFriendDialog() {
     showDialog(context: context, builder: (context) => const AddFriendDialog());
   }
@@ -1757,6 +1766,7 @@ class HomeTabState extends State<HomeTab> {
     showDialog(context: context, builder: (context) => const FriendsListDialog());
   }
 
+  // ignore: unused_element
   void _showDevMenu() {
     final parentNavigator = Navigator.of(context);
     final parentScaffoldMessenger = ScaffoldMessenger.of(context);
@@ -1873,8 +1883,9 @@ class HomeTabState extends State<HomeTab> {
                           Navigator.pop(dialogContext);
                           try {
                             await AuthService().signOut();
-                            if (mounted)
+                            if (mounted) {
                               parentScaffoldMessenger.showSnackBar(const SnackBar(content: Text('Signed out!')));
+                            }
                           } catch (e) {
                             if (mounted) parentScaffoldMessenger.showSnackBar(SnackBar(content: Text('Error: $e')));
                           }
@@ -2665,26 +2676,24 @@ class HomeTabState extends State<HomeTab> {
                           setModalState(() => isCreating = true);
                           try {
                             final result = await RoomService().createPrivateRoom();
-                            if (mounted) {
-                              Navigator.pop(context);
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => PrivateGameWaitingScreen(
-                                    roomId: result['roomId']!,
-                                    roomPin: result['roomPin']!,
-                                    isHost: true,
-                                  ),
+                            if (!mounted) return;
+                            Navigator.pop(context);
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => PrivateGameWaitingScreen(
+                                  roomId: result['roomId']!,
+                                  roomPin: result['roomPin']!,
+                                  isHost: true,
                                 ),
-                              );
-                            }
+                              ),
+                            );
                           } catch (e) {
                             setModalState(() => isCreating = false);
-                            if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-                              );
-                            }
+                            if (!mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+                            );
                           }
                         },
                   child: Container(
@@ -2875,26 +2884,24 @@ class HomeTabState extends State<HomeTab> {
                           setModalState(() => isJoining = true);
                           try {
                             final roomId = await RoomService().joinPrivateRoom(pin);
-                            if (mounted) {
-                              Navigator.pop(context);
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => PrivateGameWaitingScreen(
-                                    roomId: roomId,
-                                    roomPin: pin,
-                                    isHost: false,
-                                  ),
+                            if (!mounted) return;
+                            Navigator.pop(context);
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => PrivateGameWaitingScreen(
+                                  roomId: roomId,
+                                  roomPin: pin,
+                                  isHost: false,
                                 ),
-                              );
-                            }
+                              ),
+                            );
                           } catch (e) {
                             setModalState(() => isJoining = false);
-                            if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('$e'), backgroundColor: Colors.red),
-                              );
-                            }
+                            if (!mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('$e'), backgroundColor: Colors.red),
+                            );
                           }
                         },
                   child: Container(
@@ -3036,6 +3043,7 @@ class HomeTabState extends State<HomeTab> {
     );
   }
 
+  // ignore: unused_element
   void _showCreateRoomDialog(BuildContext context) {
     showDialog(
       context: context,
@@ -3098,6 +3106,7 @@ class HomeTabState extends State<HomeTab> {
     );
   }
 
+  // ignore: unused_element
   void _showJoinRoomDialog(BuildContext context) {
     final codeController = TextEditingController();
 

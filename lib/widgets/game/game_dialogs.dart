@@ -20,6 +20,21 @@ class LeaveConfirmationDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isGameInProgress = room.status == 'playing';
+
+    // Guard against empty player list
+    if (room.players.isEmpty) {
+      return AlertDialog(
+        backgroundColor: const Color(0xFF1A1A1A),
+        content: const Text('Error: No players in room', style: TextStyle(color: Colors.white)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      );
+    }
+
     final myPlayer = room.players.firstWhere(
       (p) => p.uid == gameService.currentUserId,
       orElse: () => room.players.first,

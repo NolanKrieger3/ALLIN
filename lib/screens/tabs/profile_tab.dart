@@ -20,10 +20,14 @@ class ProfileTab extends StatefulWidget {
 }
 
 class ProfileTabState extends State<ProfileTab> {
+  // ignore: unused_field, prefer_final_fields
   bool _achievementsExpanded = false;
+  // ignore: unused_field, prefer_final_fields
   bool _statisticsExpanded = false;
   bool _referralExpanded = false;
+  // ignore: unused_field, prefer_final_fields
   bool _straightPlusExpanded = false;
+  // ignore: unused_field, prefer_final_fields
   bool _showMMRGraph = false;
   String _graphTimeRange = '7D';
   final FriendsService _friendsService = FriendsService();
@@ -82,10 +86,12 @@ class ProfileTabState extends State<ProfileTab> {
     if (mounted) setState(() {}); // Rebuild after loading
   }
 
+  // ignore: unused_element
   void _showAddFriendDialog() {
     showDialog(context: context, builder: (context) => const AddFriendDialog());
   }
 
+  // ignore: unused_element
   void _showFriendsListDialog() {
     showDialog(context: context, builder: (context) => const FriendsListDialog());
   }
@@ -216,8 +222,9 @@ class ProfileTabState extends State<ProfileTab> {
                           Navigator.pop(dialogContext);
                           try {
                             await AuthService().signOut();
-                            if (mounted)
+                            if (mounted) {
                               parentScaffoldMessenger.showSnackBar(const SnackBar(content: Text('Signed out!')));
+                            }
                           } catch (e) {
                             if (mounted) parentScaffoldMessenger.showSnackBar(SnackBar(content: Text('Error: $e')));
                           }
@@ -499,6 +506,7 @@ class ProfileTabState extends State<ProfileTab> {
   }
 
   // Achievement category chip builder
+  // ignore: unused_element
   Widget _buildCategoryChip(String label, IconData icon, bool isSelected) {
     return Container(
       margin: const EdgeInsets.only(right: 8),
@@ -547,6 +555,7 @@ class ProfileTabState extends State<ProfileTab> {
   }
 
   // Rarity badge builder for legend
+  // ignore: unused_element
   Widget _buildRarityBadge(String label, Color color) {
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -579,6 +588,7 @@ class ProfileTabState extends State<ProfileTab> {
   }
 
   // Tier icon builder for achievement tiers
+  // ignore: unused_element
   Widget _buildTierIcon(String tier, Color color) {
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -1508,6 +1518,7 @@ class ProfileTabState extends State<ProfileTab> {
     );
   }
 
+  // ignore: unused_element
   void _showChallengeDialog(BuildContext context, String friendName) {
     showDialog(
       context: context,
@@ -1597,6 +1608,7 @@ class ProfileTabState extends State<ProfileTab> {
     );
   }
 
+  // ignore: unused_element
   void _showGiftDialog(BuildContext context, String friendName) {
     showDialog(
       context: context,
@@ -1686,225 +1698,7 @@ class ProfileTabState extends State<ProfileTab> {
     showDialog(
       context: context,
       barrierColor: Colors.black.withValues(alpha: 0.85),
-      builder: (context) => Dialog(
-        backgroundColor: Colors.transparent,
-        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: 420, maxHeight: 700),
-          decoration: BoxDecoration(
-            color: const Color(0xFF141414),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-          ),
-          child: Column(
-            children: [
-              // Header
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  border: Border(bottom: BorderSide(color: Colors.white.withValues(alpha: 0.06))),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
-                        ),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Center(child: Icon(Icons.analytics_rounded, color: Colors.white, size: 22)),
-                    ),
-                    const SizedBox(width: 12),
-                    const Text(
-                      'Statistics',
-                      style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600),
-                    ),
-                    const Spacer(),
-                    GestureDetector(
-                      onTap: () => Navigator.pop(context),
-                      child: Icon(Icons.close_rounded, color: Colors.white.withValues(alpha: 0.5), size: 24),
-                    ),
-                  ],
-                ),
-              ),
-              // Content
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    children: [
-                      // Hero Stats Row
-                      Row(
-                        children: [
-                          Expanded(
-                              child: _buildHeroStatCard(UserPreferences.formatChips(UserPreferences.gamesPlayed),
-                                  'Total Games', Icons.sports_esports, const Color(0xFF6366F1), '')),
-                          const SizedBox(width: 8),
-                          Expanded(
-                              child: _buildHeroStatCard(UserPreferences.formatChips(UserPreferences.gamesWon), 'Wins',
-                                  Icons.emoji_events, const Color(0xFF10B981), '')),
-                          const SizedBox(width: 8),
-                          Expanded(
-                              child: _buildHeroStatCard('${UserPreferences.winRate.toStringAsFixed(1)}%', 'Win Rate',
-                                  Icons.trending_up, const Color(0xFFFFBB00), '')),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      // Quick Stats
-                      Row(
-                        children: [
-                          Expanded(
-                              child: _buildMiniStatCard(Icons.local_fire_department, 'Best Streak',
-                                  '${UserPreferences.bestWinStreak}', const Color(0xFFFF6B35))),
-                          const SizedBox(width: 8),
-                          Expanded(
-                              child: _buildMiniStatCard(Icons.monetization_on, 'Biggest Pot',
-                                  UserPreferences.formatChips(UserPreferences.biggestPot), const Color(0xFFFFBB00))),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      // Detailed Stats
-                      Container(
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.03),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Game Stats',
-                                style: TextStyle(
-                                    color: Colors.white.withValues(alpha: 0.7),
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600)),
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                Expanded(
-                                    child: _buildDetailStat(
-                                        'Hands Played', UserPreferences.formatChips(UserPreferences.handsPlayed))),
-                                Expanded(
-                                    child: _buildDetailStat(
-                                        'Hands Won', UserPreferences.formatChips(UserPreferences.handsWon))),
-                                Expanded(
-                                    child: _buildDetailStat(
-                                        'All-Ins Won', UserPreferences.formatChips(UserPreferences.allInsWon))),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-                            Row(
-                              children: [
-                                Expanded(child: _buildDetailStat('Win Streak', '${UserPreferences.currentWinStreak}')),
-                                Expanded(child: _buildDetailStat('Sit & Go Wins', '${UserPreferences.sitAndGoWins}')),
-                                Expanded(
-                                    child: _buildDetailStat('Daily Claims', '${UserPreferences.dailyBonusClaims}')),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      // Hand Stats
-                      Container(
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.03),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text('Winning Hands',
-                                    style: TextStyle(
-                                        color: Colors.white.withValues(alpha: 0.7),
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w600)),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF6366F1).withValues(alpha: 0.15),
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: Text('${UserPreferences.handsWon} total',
-                                      style: const TextStyle(
-                                          color: Color(0xFF6366F1), fontSize: 10, fontWeight: FontWeight.w600)),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            _buildHandBarFromStats('High Card', UserPreferences.highCards, UserPreferences.handsWon,
-                                const Color(0xFF64748B)),
-                            _buildHandBarFromStats('One Pair', UserPreferences.onePairs, UserPreferences.handsWon,
-                                const Color(0xFF3B82F6)),
-                            _buildHandBarFromStats('Two Pair', UserPreferences.twoPairs, UserPreferences.handsWon,
-                                const Color(0xFF8B5CF6)),
-                            _buildHandBarFromStats('Three of a Kind', UserPreferences.threeOfKinds,
-                                UserPreferences.handsWon, const Color(0xFFEC4899)),
-                            _buildHandBarFromStats('Straight', UserPreferences.straights, UserPreferences.handsWon,
-                                const Color(0xFFFFBB00)),
-                            _buildHandBarFromStats(
-                                'Flush', UserPreferences.flushes, UserPreferences.handsWon, const Color(0xFF22C55E)),
-                            _buildHandBarFromStats('Full House', UserPreferences.fullHouses, UserPreferences.handsWon,
-                                const Color(0xFF3B82F6)),
-                            _buildHandBarFromStats('Four of a Kind', UserPreferences.fourOfKinds,
-                                UserPreferences.handsWon, const Color(0xFF8B5CF6)),
-                            _buildHandBarFromStats('Straight Flush', UserPreferences.straightFlushes,
-                                UserPreferences.handsWon, const Color(0xFFEC4899)),
-                            _buildHandBarFromStats('Royal Flush', UserPreferences.royalFlushes,
-                                UserPreferences.handsWon, const Color(0xFFFFD700)),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      // Chips Stats
-                      Container(
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.03),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Chip Stats',
-                                style: TextStyle(
-                                    color: Colors.white.withValues(alpha: 0.7),
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600)),
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                Expanded(
-                                    child: _buildDetailStat(
-                                        'Total Won', UserPreferences.formatChips(UserPreferences.totalChipsWon))),
-                                Expanded(
-                                    child: _buildDetailStat(
-                                        'Biggest Pot', UserPreferences.formatChips(UserPreferences.biggestPot))),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+      builder: (context) => const _StatisticsDialog(),
     );
   }
 
@@ -2377,6 +2171,7 @@ class ProfileTabState extends State<ProfileTab> {
     );
   }
 
+  // ignore: unused_element
   Widget _buildInteractiveTierRow({
     required BuildContext context,
     required int tier,
@@ -2936,10 +2731,9 @@ class ProfileTabState extends State<ProfileTab> {
                                     await UserService().setProPass(true);
                                     // Update Firestore gems
                                     await UserService().setGems(newGems);
-                                    if (mounted) {
-                                      setState(() {});
-                                      widget.onChipsChanged?.call();
-                                    }
+                                    if (!mounted) return;
+                                    setState(() {});
+                                    widget.onChipsChanged?.call();
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
                                         content: Row(
@@ -3109,6 +2903,7 @@ class ProfileTabState extends State<ProfileTab> {
     );
   }
 
+  // ignore: unused_element
   Widget _buildBattlePassTier({
     required int tier,
     required bool isUnlocked,
@@ -3324,6 +3119,7 @@ class ProfileTabState extends State<ProfileTab> {
     return rewards[(tier - 1) % rewards.length];
   }
 
+  // ignore: unused_element
   Widget _buildChallengeItem({
     required String icon,
     required String title,
@@ -3508,9 +3304,8 @@ class ProfileTabState extends State<ProfileTab> {
                     onTap: isUnlocked
                         ? () async {
                             await UserPreferences.setAvatar(index);
-                            if (mounted) {
-                              setState(() => _selectedAvatar = avatar);
-                            }
+                            if (!mounted) return;
+                            setState(() => _selectedAvatar = avatar);
                             Navigator.pop(dialogContext);
                           }
                         : () {
@@ -3637,6 +3432,7 @@ class ProfileTabState extends State<ProfileTab> {
   // STATISTICS HELPER WIDGETS
   // ============================================================================
 
+  // ignore: unused_element
   Widget _buildHeroStatCard(String value, String label, IconData icon, Color color, String trend) {
     final isPositive = trend.startsWith('+');
     final hasTrend = trend.isNotEmpty;
@@ -3704,6 +3500,7 @@ class ProfileTabState extends State<ProfileTab> {
     );
   }
 
+  // ignore: unused_element
   Widget _buildTimeRangeSelector() {
     return PopupMenuButton<String>(
       onSelected: (value) => setState(() => _graphTimeRange = value),
@@ -3781,6 +3578,7 @@ class ProfileTabState extends State<ProfileTab> {
     }
   }
 
+  // ignore: unused_element
   List<String> _getXAxisLabels() {
     switch (_graphTimeRange) {
       case '7D':
@@ -3798,6 +3596,7 @@ class ProfileTabState extends State<ProfileTab> {
     }
   }
 
+  // ignore: unused_element
   Widget _buildLegendDot(Color color, String label) {
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -3822,6 +3621,7 @@ class ProfileTabState extends State<ProfileTab> {
     );
   }
 
+  // ignore: unused_element
   Widget _buildMiniStatCard(IconData icon, String label, String value, Color accentColor) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -3933,11 +3733,13 @@ class ProfileTabState extends State<ProfileTab> {
   }
 
   /// Build hand bar from actual stats data
+  // ignore: unused_element
   Widget _buildHandBarFromStats(String hand, int count, int total, Color color) {
     final percentage = total > 0 ? (count / total).clamp(0.0, 1.0) : 0.0;
     return _buildHandBar(hand, percentage, '$count', color);
   }
 
+  // ignore: unused_element
   Widget _buildDetailStat(String label, String value) {
     return Column(
       children: [
@@ -4203,7 +4005,7 @@ class SettingsItem extends StatelessWidget {
             ),
           ),
           if (hasToggle)
-            Switch(value: true, onChanged: (v) {}, activeColor: const Color(0xFF4CAF50))
+            Switch(value: true, onChanged: (v) {}, activeTrackColor: const Color(0xFF4CAF50))
           else
             Icon(Icons.chevron_right, color: Colors.white.withValues(alpha: 0.3), size: 20),
         ],
@@ -4215,6 +4017,619 @@ class SettingsItem extends StatelessWidget {
 // ============================================================================
 // DIALOGS
 // ============================================================================
+
+class _StatisticsDialog extends StatefulWidget {
+  const _StatisticsDialog();
+
+  @override
+  State<_StatisticsDialog> createState() => _StatisticsDialogState();
+}
+
+class _StatisticsDialogState extends State<_StatisticsDialog> {
+  bool _showMMRGraph = false;
+  String _graphTimeRange = '7D';
+
+  String _getTimeRangeLabel() {
+    switch (_graphTimeRange) {
+      case '7D':
+        return '7 Days';
+      case '1M':
+        return '1 Month';
+      case '6M':
+        return '6 Months';
+      case '1Y':
+        return '1 Year';
+      case 'ALL':
+        return 'All Time';
+      default:
+        return '7 Days';
+    }
+  }
+
+  List<String> _getXAxisLabels() {
+    final now = DateTime.now();
+    switch (_graphTimeRange) {
+      case '7D':
+        return List.generate(7, (i) {
+          final day = now.subtract(Duration(days: 6 - i));
+          return ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][day.weekday - 1];
+        });
+      case '1M':
+        return ['Week 1', 'Week 2', 'Week 3', 'Week 4'];
+      case '6M':
+        return ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
+      case '1Y':
+        return ['Q1', 'Q2', 'Q3', 'Q4'];
+      case 'ALL':
+        return ['2023', '2024', '2025'];
+      default:
+        return ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    }
+  }
+
+  Widget _buildTimeRangeSelector() {
+    return PopupMenuButton<String>(
+      onSelected: (value) {
+        setState(() {
+          _graphTimeRange = value;
+        });
+      },
+      offset: const Offset(0, 30),
+      color: const Color(0xFF1E1E1E),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+        side: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+      ),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              _getTimeRangeLabel(),
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.8),
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(Icons.keyboard_arrow_down, size: 14, color: Colors.white.withValues(alpha: 0.5)),
+          ],
+        ),
+      ),
+      itemBuilder: (context) => [
+        _buildTimeRangeOption('7D', '7 Days'),
+        _buildTimeRangeOption('1M', '1 Month'),
+        _buildTimeRangeOption('6M', '6 Months'),
+        _buildTimeRangeOption('1Y', '1 Year'),
+        _buildTimeRangeOption('ALL', 'All Time'),
+      ],
+    );
+  }
+
+  PopupMenuItem<String> _buildTimeRangeOption(String value, String label) {
+    final isSelected = _graphTimeRange == value;
+    return PopupMenuItem<String>(
+      value: value,
+      height: 36,
+      child: Row(
+        children: [
+          Icon(
+            isSelected ? Icons.check_circle : Icons.circle_outlined,
+            size: 16,
+            color: isSelected ? const Color(0xFF00D46A) : Colors.white.withValues(alpha: 0.3),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: TextStyle(
+              color: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.7),
+              fontSize: 13,
+              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeroStatCard(String value, String label, IconData icon, Color color, String suffix) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, color: color, size: 20),
+          const SizedBox(height: 6),
+          Text(
+            value,
+            style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 10),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMiniStatCard(IconData icon, String label, String value, Color color) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.03),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, color: color, size: 16),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 10)),
+                const SizedBox(height: 2),
+                Text(value, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetailStat(String label, String value) {
+    return Column(
+      children: [
+        Text(value, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 2),
+        Text(label, style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 10)),
+      ],
+    );
+  }
+
+  Widget _buildHandBarFromStats(String hand, int count, int total, Color color) {
+    final percentage = total > 0 ? (count / total * 100) : 0.0;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 90,
+            child: Text(
+              hand,
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 10),
+            ),
+          ),
+          Expanded(
+            child: Stack(
+              children: [
+                Container(
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                FractionallySizedBox(
+                  widthFactor: (percentage / 100).clamp(0.0, 1.0),
+                  child: Container(
+                    height: 8,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [color.withValues(alpha: 0.8), color],
+                      ),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          SizedBox(
+            width: 30,
+            child: Text(
+              '$count',
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 10),
+              textAlign: TextAlign.right,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final xLabels = _getXAxisLabels();
+
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 420, maxHeight: 700),
+        decoration: BoxDecoration(
+          color: const Color(0xFF141414),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        ),
+        child: Column(
+          children: [
+            // Header
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                border: Border(bottom: BorderSide(color: Colors.white.withValues(alpha: 0.06))),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+                      ),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Center(child: Icon(Icons.analytics_rounded, color: Colors.white, size: 22)),
+                  ),
+                  const SizedBox(width: 12),
+                  const Text(
+                    'Statistics',
+                    style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600),
+                  ),
+                  const Spacer(),
+                  GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Icon(Icons.close_rounded, color: Colors.white.withValues(alpha: 0.5), size: 24),
+                  ),
+                ],
+              ),
+            ),
+            // Content
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    // Hero Stats Row
+                    Row(
+                      children: [
+                        Expanded(
+                            child: _buildHeroStatCard(UserPreferences.formatChips(UserPreferences.gamesPlayed),
+                                'Total Games', Icons.sports_esports, const Color(0xFF6366F1), '')),
+                        const SizedBox(width: 8),
+                        Expanded(
+                            child: _buildHeroStatCard(UserPreferences.formatChips(UserPreferences.gamesWon), 'Wins',
+                                Icons.emoji_events, const Color(0xFF10B981), '')),
+                        const SizedBox(width: 8),
+                        Expanded(
+                            child: _buildHeroStatCard('${UserPreferences.winRate.toStringAsFixed(1)}%', 'Win Rate',
+                                Icons.trending_up, const Color(0xFFFFBB00), '')),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    // Quick Stats
+                    Row(
+                      children: [
+                        Expanded(
+                            child: _buildMiniStatCard(Icons.local_fire_department, 'Best Streak',
+                                '${UserPreferences.bestWinStreak}', const Color(0xFFFF6B35))),
+                        const SizedBox(width: 8),
+                        Expanded(
+                            child: _buildMiniStatCard(Icons.monetization_on, 'Biggest Pot',
+                                UserPreferences.formatChips(UserPreferences.biggestPot), const Color(0xFFFFBB00))),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    // Graph Card with Toggle & Time Range
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.03),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Graph Header with Toggle & Time Range
+                          Row(
+                            children: [
+                              // Chips/MMR Toggle
+                              Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.05),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    GestureDetector(
+                                      onTap: () => setState(() => _showMMRGraph = false),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                        decoration: BoxDecoration(
+                                          color: !_showMMRGraph
+                                              ? const Color(0xFF00D46A).withValues(alpha: 0.2)
+                                              : Colors.transparent,
+                                          borderRadius: BorderRadius.circular(6),
+                                          border: !_showMMRGraph
+                                              ? Border.all(color: const Color(0xFF00D46A).withValues(alpha: 0.5))
+                                              : null,
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(Icons.monetization_on,
+                                                size: 14,
+                                                color: !_showMMRGraph
+                                                    ? const Color(0xFF00D46A)
+                                                    : Colors.white.withValues(alpha: 0.4)),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              'Chips',
+                                              style: TextStyle(
+                                                color: !_showMMRGraph
+                                                    ? const Color(0xFF00D46A)
+                                                    : Colors.white.withValues(alpha: 0.4),
+                                                fontSize: 11,
+                                                fontWeight: !_showMMRGraph ? FontWeight.w600 : FontWeight.w400,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                    GestureDetector(
+                                      onTap: () => setState(() => _showMMRGraph = true),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                        decoration: BoxDecoration(
+                                          color: _showMMRGraph
+                                              ? const Color(0xFF6366F1).withValues(alpha: 0.2)
+                                              : Colors.transparent,
+                                          borderRadius: BorderRadius.circular(6),
+                                          border: _showMMRGraph
+                                              ? Border.all(color: const Color(0xFF6366F1).withValues(alpha: 0.5))
+                                              : null,
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(Icons.show_chart,
+                                                size: 14,
+                                                color: _showMMRGraph
+                                                    ? const Color(0xFF6366F1)
+                                                    : Colors.white.withValues(alpha: 0.4)),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              'MMR',
+                                              style: TextStyle(
+                                                color: _showMMRGraph
+                                                    ? const Color(0xFF6366F1)
+                                                    : Colors.white.withValues(alpha: 0.4),
+                                                fontSize: 11,
+                                                fontWeight: _showMMRGraph ? FontWeight.w600 : FontWeight.w400,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const Spacer(),
+                              // Time Range Selector
+                              _buildTimeRangeSelector(),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          // Graph Title with change indicator
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                _showMMRGraph ? 'MMR Progress' : 'Chip Balance',
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.7),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: (_showMMRGraph ? const Color(0xFF6366F1) : const Color(0xFF10B981))
+                                      .withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.arrow_upward,
+                                      size: 10,
+                                      color: _showMMRGraph ? const Color(0xFF6366F1) : const Color(0xFF10B981),
+                                    ),
+                                    const SizedBox(width: 2),
+                                    Text(
+                                      _showMMRGraph
+                                          ? '+${UserPreferences.gamesWon}'
+                                          : '+${UserPreferences.formatChips(UserPreferences.totalChipsWon)}',
+                                      style: TextStyle(
+                                        color: _showMMRGraph ? const Color(0xFF6366F1) : const Color(0xFF10B981),
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          // The Graph
+                          SizedBox(
+                            height: 100,
+                            child: CustomPaint(
+                              size: const Size(double.infinity, 100),
+                              painter: _showMMRGraph ? MMRGraphPainter() : AdvancedChipGraphPainter(),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          // X-axis labels
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: xLabels
+                                .map((label) => Text(
+                                      label,
+                                      style: TextStyle(
+                                        color: Colors.white.withValues(alpha: 0.3),
+                                        fontSize: 9,
+                                      ),
+                                    ))
+                                .toList(),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    // Detailed Stats
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.03),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Game Stats',
+                              style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.7),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600)),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(
+                                  child: _buildDetailStat(
+                                      'Hands Played', UserPreferences.formatChips(UserPreferences.handsPlayed))),
+                              Expanded(
+                                  child: _buildDetailStat(
+                                      'Hands Won', UserPreferences.formatChips(UserPreferences.handsWon))),
+                              Expanded(
+                                  child: _buildDetailStat(
+                                      'All-Ins Won', UserPreferences.formatChips(UserPreferences.allInsWon))),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              Expanded(child: _buildDetailStat('Win Streak', '${UserPreferences.currentWinStreak}')),
+                              Expanded(child: _buildDetailStat('Sit & Go Wins', '${UserPreferences.sitAndGoWins}')),
+                              Expanded(child: _buildDetailStat('Daily Claims', '${UserPreferences.dailyBonusClaims}')),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    // Hand Stats
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.03),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text('Winning Hands',
+                                  style: TextStyle(
+                                      color: Colors.white.withValues(alpha: 0.7),
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600)),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF6366F1).withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text('${UserPreferences.handsWon} total',
+                                    style: const TextStyle(
+                                        color: Color(0xFF6366F1), fontSize: 10, fontWeight: FontWeight.w600)),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          _buildHandBarFromStats('High Card', UserPreferences.highCards, UserPreferences.handsWon,
+                              const Color(0xFF64748B)),
+                          _buildHandBarFromStats(
+                              'One Pair', UserPreferences.onePairs, UserPreferences.handsWon, const Color(0xFF3B82F6)),
+                          _buildHandBarFromStats(
+                              'Two Pair', UserPreferences.twoPairs, UserPreferences.handsWon, const Color(0xFF8B5CF6)),
+                          _buildHandBarFromStats('Three of a Kind', UserPreferences.threeOfKinds,
+                              UserPreferences.handsWon, const Color(0xFFEC4899)),
+                          _buildHandBarFromStats(
+                              'Straight', UserPreferences.straights, UserPreferences.handsWon, const Color(0xFFFFBB00)),
+                          _buildHandBarFromStats(
+                              'Flush', UserPreferences.flushes, UserPreferences.handsWon, const Color(0xFF22C55E)),
+                          _buildHandBarFromStats('Full House', UserPreferences.fullHouses, UserPreferences.handsWon,
+                              const Color(0xFF3B82F6)),
+                          _buildHandBarFromStats('Four of a Kind', UserPreferences.fourOfKinds,
+                              UserPreferences.handsWon, const Color(0xFF8B5CF6)),
+                          _buildHandBarFromStats('Straight Flush', UserPreferences.straightFlushes,
+                              UserPreferences.handsWon, const Color(0xFFEC4899)),
+                          _buildHandBarFromStats('Royal Flush', UserPreferences.royalFlushes, UserPreferences.handsWon,
+                              const Color(0xFFFFD700)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 class DailySpinDialog extends StatefulWidget {
   const DailySpinDialog();
@@ -5429,7 +5844,7 @@ class AchievementCard extends StatelessWidget {
               ),
               const SizedBox(height: 3),
               Text(
-                '${data.currentProgress}/${nextTierRequirement}',
+                '${data.currentProgress}/$nextTierRequirement',
                 style: TextStyle(
                   color: Colors.white.withValues(alpha: 0.35),
                   fontSize: 8,
