@@ -56,10 +56,6 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
   double _dragOffset = 0.0; // Track drag distance for swipe-to-fold
   List<PlayingCard> _foldedCards = []; // Store cards when folded to show ghost outline
 
-  // Stats panel
-  bool _showStatsPanel = false;
-  double _statsPanelOffset = 0.0;
-
   // Turn timer
   Timer? _turnTimer;
   double _remainingSeconds = 10.0;
@@ -874,16 +870,26 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
       body: SafeArea(
         child: Column(
           children: [
-            // Top Bar - Back button and status
+            // Top Bar - Back button and online indicator (matching game_screen.dart)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: Row(
                 children: [
-                  GestureDetector(
+                  _AnimatedPressButton(
                     onTap: () => _showLeaveConfirmation(room),
                     child: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
                   ),
                   const Spacer(),
+                  // Online indicator (green for multiplayer)
+                  Container(
+                    width: 24,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF22C55E).withValues(alpha: 0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.wifi, color: Color(0xFF22C55E), size: 14),
+                  ),
                 ],
               ),
             ),
@@ -1590,14 +1596,13 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
       padding: const EdgeInsets.symmetric(horizontal: 40),
       child: Column(
         children: [
-          // Action buttons row
+          // Action buttons row (using _AnimatedGameButton like game_screen.dart)
           Row(
             children: [
               Expanded(
-                child: GestureDetector(
-                  onTap: () async {
+                child: _AnimatedGameButton(
+                  onTap: _isProcessingAction ? null : () async {
                     // Debounce: prevent rapid button presses
-                    if (_isProcessingAction) return;
                     final now = DateTime.now();
                     if (_lastActionTime != null && now.difference(_lastActionTime!).inMilliseconds < 300) {
                       return;
@@ -1618,55 +1623,38 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
                       setState(() => _isProcessingAction = false);
                     }
                   },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    decoration: BoxDecoration(
-                      color: _isProcessingAction ? Colors.grey.withValues(alpha: 0.3) : Colors.transparent,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
-                    ),
-                    child: Center(
-                      child: Text(
-                        canCheck ? 'Check' : 'Call ${_formatChips(callAmount)}',
-                        style: TextStyle(
-                          color: _isProcessingAction ? Colors.white.withValues(alpha: 0.5) : Colors.white,
-                          fontSize: 16,
-                        ),
-                      ),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  decoration: BoxDecoration(
+                    color: Colors.transparent,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
+                  ),
+                  child: Center(
+                    child: Text(
+                      canCheck ? 'Check' : 'Call ${_formatChips(callAmount)}',
+                      style: const TextStyle(color: Colors.white, fontSize: 16),
                     ),
                   ),
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: GestureDetector(
-                  onTap: () {
-                    // Prevent opening dialog during action processing or if can't raise
-                    if (_isProcessingAction || !canRaise) return;
+                child: _AnimatedGameButton(
+                  onTap: (!canRaise || _isProcessingAction) ? null : () {
                     _showRaiseDialog(room, player);
                   },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    decoration: BoxDecoration(
-                      color: !canRaise
-                          ? Colors.grey.withValues(alpha: 0.3)
-                          : _isProcessingAction
-                              ? Colors.grey.withValues(alpha: 0.5)
-                              : Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Center(
-                      child: Text(
-                        'Raise',
-                        style: TextStyle(
-                          color: !canRaise
-                              ? Colors.black.withValues(alpha: 0.3)
-                              : _isProcessingAction
-                                  ? Colors.black.withValues(alpha: 0.5)
-                                  : Colors.black,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  decoration: BoxDecoration(
+                    color: canRaise ? Colors.white : Colors.grey.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Center(
+                    child: Text(
+                      'Raise',
+                      style: TextStyle(
+                        color: canRaise ? Colors.black : Colors.black.withValues(alpha: 0.3),
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
@@ -1996,168 +1984,129 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
         room.dealerIndex < room.players.length &&
         player.uid == room.players[room.dealerIndex].uid;
 
-    return GestureDetector(
-      onVerticalDragUpdate: (details) {
-        setState(() {
-          // Drag up to reveal stats (negative delta.dy = upward drag)
-          _statsPanelOffset -= details.delta.dy;
-          // Clamp to only allow upward drag to reveal stats
-          _statsPanelOffset = _statsPanelOffset.clamp(0.0, 126.0);
-        });
-      },
-      onVerticalDragEnd: (details) {
-        setState(() {
-          // If dragged up enough, snap to show stats
-          if (_statsPanelOffset > 50) {
-            _statsPanelOffset = 126;
-            _showStatsPanel = true;
-          } else {
-            _statsPanelOffset = 0;
-            _showStatsPanel = false;
-          }
-        });
-      },
-      onTap: () {
-        setState(() {
-          _showStatsPanel = !_showStatsPanel;
-          _statsPanelOffset = _showStatsPanel ? 126 : 0;
-        });
-      },
+    // Simplified player avatar matching game_screen.dart (no stats panel)
+    return Container(
+      width: 100,
+      height: 126, // Match the large card height
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Colors.white.withValues(alpha: 0.08),
+            Colors.white.withValues(alpha: 0.02),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isMyTurn ? const Color(0xFF00D46A) : Colors.white.withValues(alpha: 0.1),
+          width: isMyTurn ? 2 : 1,
+        ),
+        boxShadow: isMyTurn
+            ? [
+                BoxShadow(
+                  color: const Color(0xFF00D46A).withValues(alpha: 0.3),
+                  blurRadius: 16,
+                  spreadRadius: 0,
+                ),
+              ]
+            : null,
+      ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.end,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
+          // Avatar circle
           Stack(
             clipBehavior: Clip.none,
             children: [
-              // Timer border progress around the box
-              if (isMyTurn && room.status == 'playing' && room.phase != 'showdown')
-                TweenAnimationBuilder<double>(
-                  duration: const Duration(milliseconds: 100),
-                  curve: Curves.linear,
-                  tween: Tween<double>(
-                    begin: _remainingSeconds / room.turnTimeLimit,
-                    end: _remainingSeconds / room.turnTimeLimit,
-                  ),
-                  builder: (context, value, child) => CustomPaint(
-                    size: const Size(100, 126),
-                    painter: RoundedRectProgressPainter(
-                      progress: value,
-                      color: _remainingSeconds <= 2 ? Colors.red : Colors.white,
-                      strokeWidth: 4,
-                    ),
-                  ),
-                ),
-              // Fixed container that stays in place
               Container(
-                width: 100,
-                height: 126, // Fixed height
+                width: 52,
+                height: 52,
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.white.withValues(alpha: 0.08),
-                      Colors.white.withValues(alpha: 0.02),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(16),
+                  shape: BoxShape.circle,
+                  color: isMyTurn ? const Color(0xFF00D46A) : Colors.white.withValues(alpha: 0.1),
                   border: Border.all(
-                    color: isMyTurn ? Colors.white.withValues(alpha: 0.9) : Colors.white.withValues(alpha: 0.1),
-                    width: isMyTurn ? 2 : 1,
+                    color: isMyTurn ? const Color(0xFF00D46A) : Colors.white.withValues(alpha: 0.2),
+                    width: 2,
                   ),
-                  boxShadow: isMyTurn
-                      ? [
-                          BoxShadow(
-                            color: Colors.white.withValues(alpha: 0.3),
-                            blurRadius: 16,
-                            spreadRadius: 0,
-                          ),
-                        ]
-                      : null,
                 ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
-                  child: Stack(
-                    children: [
-                      // Scrollable content inside
-                      AnimatedPositioned(
-                        duration: const Duration(milliseconds: 200),
-                        curve: Curves.easeOut,
-                        top: -_statsPanelOffset,
-                        left: 0,
-                        right: 0,
-                        child: Column(
-                          children: [
-                            // Avatar section (scrolls up)
-                            Container(
-                              height: 126,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(playerAvatar, style: const TextStyle(fontSize: 40)),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    _formatChips(player.chips),
-                                    style: const TextStyle(
-                                      color: Colors.white70,
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            // Stats section (revealed when scrolled up)
-                            Container(
-                              height: 126,
-                              padding: const EdgeInsets.all(12),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                                children: [
-                                  _buildStatRow('Chips', _formatChips(player.chips)),
-                                  _buildStatRow('Bet', _formatChips(player.currentBet)),
-                                  _buildStatRow('Total', _formatChips(player.totalContributed)),
-                                  if (player.lastAction != null) _buildStatRow('Action', player.lastAction!),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+                child: Center(
+                  child: Text(
+                    playerAvatar,
+                    style: TextStyle(
+                      fontSize: 24,
+                      color: isMyTurn ? Colors.black : null,
+                    ),
                   ),
                 ),
               ),
               // Dealer badge
               if (isDealer)
                 Positioned(
-                  bottom: -2,
-                  right: -2,
+                  bottom: -4,
+                  right: -4,
                   child: Container(
-                    width: 18,
-                    height: 18,
-                    decoration: const BoxDecoration(
+                    width: 20,
+                    height: 20,
+                    decoration: BoxDecoration(
                       color: Colors.white,
                       shape: BoxShape.circle,
+                      border: Border.all(
+                        color: const Color(0xFF0A0A0A),
+                        width: 2,
+                      ),
                     ),
                     child: const Center(
-                      child: Text('D',
-                          style: TextStyle(
-                            color: Colors.black,
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                          )),
+                      child: Text(
+                        'D',
+                        style: TextStyle(
+                          color: Colors.black,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
                   ),
                 ),
             ],
           ),
+          const SizedBox(height: 8),
+          // Player label
+          Text(
+            'YOU',
+            style: TextStyle(
+              color: isMyTurn ? const Color(0xFF00D46A) : Colors.white.withValues(alpha: 0.5),
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 1,
+            ),
+          ),
+          const SizedBox(height: 2),
+          // Chips amount
+          Text(
+            _formatChips(player.chips),
+            style: TextStyle(
+              color: Colors.yellow.shade500,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          // Current bet if any
+          if (player.currentBet > 0)
+            Text(
+              '(${_formatChips(player.currentBet)})',
+              style: TextStyle(
+                color: Colors.orange.shade400,
+                fontSize: 10,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
         ],
       ),
     );
   }
 
+  // ignore: unused_element
   Widget _buildStatRow(String label, String value) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -2564,6 +2513,152 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+// ============================================================================
+// ANIMATED BUTTONS (matching game_screen.dart)
+// ============================================================================
+
+/// Animated button for game actions with scale and opacity effects
+class _AnimatedGameButton extends StatefulWidget {
+  final Widget child;
+  final VoidCallback? onTap;
+  final BoxDecoration? decoration;
+  final EdgeInsetsGeometry? padding;
+
+  const _AnimatedGameButton({
+    required this.child,
+    this.onTap,
+    this.decoration,
+    this.padding,
+  });
+
+  @override
+  State<_AnimatedGameButton> createState() => _AnimatedGameButtonState();
+}
+
+class _AnimatedGameButtonState extends State<_AnimatedGameButton> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scaleAnimation;
+  late Animation<double> _opacityAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 100),
+    );
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.95).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+    _opacityAnimation = Tween<double>(begin: 1.0, end: 0.8).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isEnabled = widget.onTap != null;
+    return GestureDetector(
+      onTapDown: isEnabled ? (_) => _controller.forward() : null,
+      onTapUp: isEnabled
+          ? (_) {
+              _controller.reverse();
+              widget.onTap!();
+            }
+          : null,
+      onTapCancel: isEnabled ? () => _controller.reverse() : null,
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, child) => Transform.scale(
+          scale: _scaleAnimation.value,
+          child: Opacity(
+            opacity: _opacityAnimation.value,
+            child: child,
+          ),
+        ),
+        child: Container(
+          padding: widget.padding,
+          decoration: widget.decoration,
+          child: widget.child,
+        ),
+      ),
+    );
+  }
+}
+
+/// Generic animated press button for UI elements
+class _AnimatedPressButton extends StatefulWidget {
+  final Widget child;
+  final VoidCallback? onTap;
+
+  const _AnimatedPressButton({
+    required this.child,
+    this.onTap,
+  });
+
+  @override
+  State<_AnimatedPressButton> createState() => _AnimatedPressButtonState();
+}
+
+class _AnimatedPressButtonState extends State<_AnimatedPressButton> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scaleAnimation;
+  late Animation<double> _opacityAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 100),
+    );
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.95).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+    _opacityAnimation = Tween<double>(begin: 1.0, end: 0.8).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isEnabled = widget.onTap != null;
+    return GestureDetector(
+      onTapDown: isEnabled ? (_) => _controller.forward() : null,
+      onTapUp: isEnabled
+          ? (_) {
+              _controller.reverse();
+              widget.onTap!();
+            }
+          : null,
+      onTapCancel: isEnabled ? () => _controller.reverse() : null,
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, child) => Transform.scale(
+          scale: _scaleAnimation.value,
+          child: Opacity(
+            opacity: isEnabled ? _opacityAnimation.value : 0.5,
+            child: child,
+          ),
+        ),
+        child: widget.child,
       ),
     );
   }
