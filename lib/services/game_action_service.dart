@@ -438,7 +438,8 @@ class GameActionService {
     final bettingComplete = allPlayersActed && allBetsEqual && (isPreflop ? bbOptionUsed : true);
 
     print('🔍 Betting check: acted=$allPlayersActed, equal=$allBetsEqual, complete=$bettingComplete');
-    print('   Players who can act: ${playersWhoCanAct.map((p) => '${p.displayName}(acted:${p.hasActed}, bet:${p.currentBet})').join(', ')}');
+    print(
+        '   Players who can act: ${playersWhoCanAct.map((p) => '${p.displayName}(acted:${p.hasActed}, bet:${p.currentBet})').join(', ')}');
     print('   Current bet: $currentBet');
 
     if (bettingComplete) {
