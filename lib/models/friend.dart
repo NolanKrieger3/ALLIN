@@ -26,9 +26,7 @@ class Friend {
       username: json['username'] as String,
       avatarUrl: json['avatarUrl'] as String?,
       isOnline: json['isOnline'] as bool? ?? false,
-      lastOnline: json['lastOnline'] != null 
-          ? DateTime.parse(json['lastOnline'] as String) 
-          : null,
+      lastOnline: json['lastOnline'] != null ? DateTime.parse(json['lastOnline'] as String) : null,
       currentGame: json['currentGame'] as String?,
       rank: json['rank'] as int? ?? 0,
       chips: json['chips'] as int? ?? 0,
@@ -70,13 +68,26 @@ class FriendRequest {
   });
 
   factory FriendRequest.fromJson(Map<String, dynamic> json) {
+    // Handle both String (from JSON) and Timestamp (from Firestore)
+    DateTime parseDateTime(dynamic value) {
+      if (value is String) return DateTime.parse(value);
+      if (value is Map && value['_seconds'] != null) {
+        return DateTime.fromMillisecondsSinceEpoch(value['_seconds'] * 1000);
+      }
+      // Firestore Timestamp has toDate() method
+      if (value != null && value.runtimeType.toString().contains('Timestamp')) {
+        return (value as dynamic).toDate();
+      }
+      return DateTime.now();
+    }
+
     return FriendRequest(
       id: json['id'] as String,
       fromUserId: json['fromUserId'] as String,
       fromUsername: json['fromUsername'] as String,
       fromAvatarUrl: json['fromAvatarUrl'] as String?,
       toUserId: json['toUserId'] as String,
-      createdAt: DateTime.parse(json['createdAt'] as String),
+      createdAt: parseDateTime(json['createdAt']),
       status: FriendRequestStatus.values.firstWhere(
         (e) => e.name == json['status'],
         orElse: () => FriendRequestStatus.pending,
@@ -189,6 +200,19 @@ class AppNotification {
   });
 
   factory AppNotification.fromJson(Map<String, dynamic> json) {
+    // Handle both String (from JSON) and Timestamp (from Firestore)
+    DateTime parseDateTime(dynamic value) {
+      if (value is String) return DateTime.parse(value);
+      if (value is Map && value['_seconds'] != null) {
+        return DateTime.fromMillisecondsSinceEpoch(value['_seconds'] * 1000);
+      }
+      // Firestore Timestamp has toDate() method
+      if (value != null && value.runtimeType.toString().contains('Timestamp')) {
+        return (value as dynamic).toDate();
+      }
+      return DateTime.now();
+    }
+
     return AppNotification(
       id: json['id'] as String,
       type: NotificationType.values.firstWhere(
@@ -197,7 +221,7 @@ class AppNotification {
       ),
       title: json['title'] as String,
       message: json['message'] as String,
-      createdAt: DateTime.parse(json['createdAt'] as String),
+      createdAt: parseDateTime(json['createdAt']),
       isRead: json['isRead'] as bool? ?? false,
       data: json['data'] as Map<String, dynamic>?,
     );

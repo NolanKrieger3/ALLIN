@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter/gestures.dart';
 import 'dart:async';
 import 'dart:math';
@@ -10,6 +9,7 @@ import '../services/hand_evaluator.dart';
 import '../services/user_preferences.dart';
 import '../services/friends_service.dart';
 import '../widgets/mobile_wrapper.dart';
+import '../widgets/game/game_widgets.dart';
 
 class MultiplayerGameScreen extends StatefulWidget {
   final String roomId;
@@ -638,120 +638,10 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
   }
 
   Widget _buildPlayerCard(GamePlayer player, String hostId) {
-    final isMe = player.uid == _gameService.currentUserId;
-    final isHost = player.uid == hostId;
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isMe ? const Color(0xFFD4AF37).withValues(alpha: 0.1) : Colors.white.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isMe ? const Color(0xFFD4AF37).withValues(alpha: 0.3) : Colors.white.withValues(alpha: 0.1),
-        ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: const Color(0xFFD4AF37).withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(24),
-            ),
-            child: Center(
-              child: Text(
-                player.displayName.isNotEmpty ? player.displayName[0].toUpperCase() : '?',
-                style: const TextStyle(
-                  color: Color(0xFFD4AF37),
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      player.displayName,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    if (isMe)
-                      const Text(
-                        ' (You)',
-                        style: TextStyle(
-                          color: Color(0xFFD4AF37),
-                          fontSize: 14,
-                        ),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    if (isHost)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFD4AF37).withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: const Text(
-                          'HOST',
-                          style: TextStyle(
-                            color: Color(0xFFD4AF37),
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    if (isHost) const SizedBox(width: 8),
-                    Text(
-                      '${player.chips} chips',
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.5),
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          if (player.isReady)
-            Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 6,
-              ),
-              decoration: BoxDecoration(
-                color: const Color(0xFF4CAF50).withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: const Text(
-                'READY',
-                style: TextStyle(
-                  color: Color(0xFF4CAF50),
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-        ],
-      ),
+    return LobbyPlayerCard(
+      player: player,
+      hostId: hostId,
+      currentUserId: _gameService.currentUserId ?? '',
     );
   }
 
@@ -824,133 +714,11 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
   // ============================================================================
 
   Widget _buildTournamentVictoryScreen(GameRoom room, GamePlayer winner) {
-    final isMe = winner.uid == _gameService.currentUserId;
-
-    return Scaffold(
-      backgroundColor: const Color(0xFF0A0A0A),
-      body: SafeArea(
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(32),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // Trophy icon
-                Container(
-                  width: 120,
-                  height: 120,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFFFFD700), Color(0xFFD4AF37)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFFFFD700).withValues(alpha: 0.4),
-                        blurRadius: 30,
-                        spreadRadius: 10,
-                      ),
-                    ],
-                  ),
-                  child: const Icon(
-                    Icons.emoji_events,
-                    color: Colors.white,
-                    size: 64,
-                  ),
-                ),
-
-                const SizedBox(height: 32),
-
-                // Victory text
-                Text(
-                  isMe ? 'YOU WON!' : '${winner.displayName} WINS!',
-                  style: const TextStyle(
-                    color: Color(0xFFFFD700),
-                    fontSize: 36,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 2,
-                  ),
-                ),
-
-                const SizedBox(height: 8),
-
-                const Text(
-                  'TOURNAMENT CHAMPION',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w500,
-                    letterSpacing: 3,
-                  ),
-                ),
-
-                const SizedBox(height: 32),
-
-                // Final chip count
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: const Color(0xFFFFD700).withValues(alpha: 0.3),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.casino,
-                        color: Color(0xFFFFD700),
-                        size: 28,
-                      ),
-                      const SizedBox(width: 12),
-                      Text(
-                        '${_formatChips(winner.chips)} chips',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 24,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 48),
-
-                // Leave button
-                GestureDetector(
-                  onTap: () => Navigator.pop(context),
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFFEF4444), Color(0xFFDC2626)],
-                      ),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Center(
-                      child: Text(
-                        'LEAVE TABLE',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 1,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
+    return TournamentVictoryOverlay(
+      room: room,
+      winner: winner,
+      currentUserId: _gameService.currentUserId ?? '',
+      onLeave: () => Navigator.pop(context),
     );
   }
 
@@ -1110,6 +878,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
                       final participantIndex = visibleIndices[slot];
                       final participant = displayList[participantIndex];
                       final isCurrentPlayer = participant.uid == _gameService.currentUserId;
+                      final isTheirTurn = room.currentTurnPlayerId == participant.uid;
 
                       // Calculate x position for this slot
                       final xPos = rowStartX + (slot * slotWidth);
@@ -1121,7 +890,15 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
                         left: xPos,
                         top: 0,
                         bottom: 0,
-                        child: _buildParticipantAvatar(participant, room, isCurrentPlayer: isCurrentPlayer),
+                        child: ParticipantAvatar(
+                          player: participant,
+                          room: room,
+                          isCurrentPlayer: isCurrentPlayer,
+                          isTheirTurn: isTheirTurn,
+                          remainingSeconds: _remainingSeconds,
+                          showdownAnimationComplete: _showdownAnimationComplete,
+                          onTap: () => _showPlayerProfile(participant),
+                        ),
                       );
                     },
                   ),
@@ -1138,7 +915,16 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
             mainAxisSize: MainAxisSize.min,
             children: displayList.map((player) {
               final isCurrentPlayer = player.uid == _gameService.currentUserId;
-              return _buildParticipantAvatar(player, room, isCurrentPlayer: isCurrentPlayer);
+              final isTheirTurn = room.currentTurnPlayerId == player.uid;
+              return ParticipantAvatar(
+                player: player,
+                room: room,
+                isCurrentPlayer: isCurrentPlayer,
+                isTheirTurn: isTheirTurn,
+                remainingSeconds: _remainingSeconds,
+                showdownAnimationComplete: _showdownAnimationComplete,
+                onTap: () => _showPlayerProfile(player),
+              );
             }).toList(),
           );
 
@@ -1155,374 +941,8 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
     );
   }
 
-  /// Build participant avatar (handles both opponents and current player)
-  /// Matches GameScreen's _buildParticipantAvatar visual style
-  Widget _buildParticipantAvatar(GamePlayer player, GameRoom room, {bool isCurrentPlayer = false}) {
-    final isTheirTurn = room.currentTurnPlayerId == player.uid;
-    final hasFolded = player.hasFolded;
-    final isShowdown = room.phase == 'showdown';
-    final isWinner = room.winnerId == player.uid;
-    final isLoser = isShowdown && _showdownAnimationComplete && !isWinner && !hasFolded;
-    final isBot = _botService.isBot(player.uid);
-
-    // Calculate this player's hand for card highlighting
-    EvaluatedHand? playerHand;
-    if (isShowdown && player.cards.isNotEmpty && room.communityCards.length >= 3) {
-      playerHand = HandEvaluator.evaluateBestHand(player.cards, room.communityCards);
-    }
-
-    // Bot-specific avatars (matching practice mode)
-    String getBotAvatar(String name) {
-      final botAvatars = ['🤖', '🦊', '🐸', '🦁', '🐼', '🐮', '🐧', '🐯', '🐻', '🦄', '🐵', '🐺'];
-      // Extract number from bot name or use hash
-      final numMatch = RegExp(r'\d+').firstMatch(name);
-      if (numMatch != null) {
-        final num = int.tryParse(numMatch.group(0)!) ?? 0;
-        return botAvatars[num % botAvatars.length];
-      }
-      // Use name hash for consistent avatar
-      return botAvatars[name.hashCode.abs() % botAvatars.length];
-    }
-
-    // Avatar emojis - use user's selected avatar for current player, bot avatars for bots, letter-based for others
-    String getAvatar(String name) {
-      if (isCurrentPlayer) return UserPreferences.avatar;
-      if (isBot) return getBotAvatar(name);
-      if (name.isEmpty) return '👤';
-      final firstChar = name[0].toLowerCase();
-      final avatars = {
-        'a': '👨',
-        'b': '🧔',
-        'c': '👩',
-        'd': '🧑',
-        'e': '👴',
-        'f': '👵',
-        'g': '🦊',
-        'h': '🦄',
-        'i': '🐸',
-        'j': '🐵',
-        'k': '🐻',
-        'l': '🐼',
-        'm': '🦁',
-        'n': '🐯',
-        'o': '🐨',
-        'p': '🐷',
-        'q': '🐰',
-        'r': '🐶',
-        's': '🐱',
-        't': '🐲',
-        'u': '🦋',
-        'v': '🦅',
-        'w': '🐺',
-        'x': '🦈',
-        'y': '🦜',
-        'z': '🦎',
-      };
-      return avatars[firstChar] ?? '👤';
-    }
-
-    // Display name - "You" for current player
-    final displayName = isCurrentPlayer ? 'You' : player.displayName;
-
-    final isDealer = room.players.isNotEmpty &&
-        room.dealerIndex < room.players.length &&
-        player.uid == room.players[room.dealerIndex].uid;
-
-    return AnimatedOpacity(
-      duration: const Duration(milliseconds: 300),
-      opacity: isLoser ? 0.5 : 1.0,
-      child: Container(
-        width: 68,
-        margin: const EdgeInsets.symmetric(horizontal: 2),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Stack(
-              alignment: Alignment.center,
-              clipBehavior: Clip.none,
-              children: [
-                // Winner glow ring
-                if (isShowdown && _showdownAnimationComplete && isWinner)
-                  Container(
-                    width: 50,
-                    height: 50,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.white.withValues(alpha: 0.4),
-                          blurRadius: 12,
-                          spreadRadius: 3,
-                        ),
-                      ],
-                    ),
-                  ),
-                // Timer ring as border (only show when it's their turn and game is active)
-                if (isTheirTurn && room.status == 'playing' && room.phase != 'showdown')
-                  SizedBox(
-                    width: 48,
-                    height: 48,
-                    child: TweenAnimationBuilder<double>(
-                      duration: const Duration(milliseconds: 100),
-                      curve: Curves.linear,
-                      tween: Tween<double>(
-                        begin: _remainingSeconds / room.turnTimeLimit,
-                        end: _remainingSeconds / room.turnTimeLimit,
-                      ),
-                      builder: (context, value, child) => CircularProgressIndicator(
-                        value: value,
-                        strokeWidth: 3,
-                        backgroundColor: Colors.transparent,
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          _remainingSeconds <= 2 ? Colors.red : Colors.white.withValues(alpha: 0.9),
-                        ),
-                      ),
-                    ),
-                  ),
-                // Winner border (solid when not showing timer)
-                if (isShowdown && _showdownAnimationComplete && isWinner && room.phase == 'showdown')
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.9), width: 3),
-                    ),
-                  ),
-                // Avatar circle with tap handler
-                GestureDetector(
-                  onTap: isCurrentPlayer ? null : () => _showPlayerProfile(player),
-                  child: Container(
-                    width: 42,
-                    height: 42,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: hasFolded ? Colors.grey.shade800 : Colors.white.withValues(alpha: 0.1),
-                      boxShadow: hasFolded
-                          ? [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.6),
-                                blurRadius: 8,
-                                spreadRadius: 2,
-                              ),
-                            ]
-                          : null,
-                    ),
-                    child: Center(
-                      child: Text(
-                        getAvatar(player.displayName),
-                        style: TextStyle(
-                          fontSize: 20,
-                          color: hasFolded ? Colors.grey : null,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                // Dealer badge
-                if (isDealer)
-                  Positioned(
-                    bottom: -2,
-                    right: -2,
-                    child: Container(
-                      width: 16,
-                      height: 16,
-                      decoration: const BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Center(
-                        child: Text('D',
-                            style: TextStyle(
-                              color: Colors.black,
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                            )),
-                      ),
-                    ),
-                  ),
-                // Winner badge
-                if (isShowdown && _showdownAnimationComplete && isWinner)
-                  Positioned(
-                    top: -4,
-                    left: -4,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFFD700),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: const Text('WIN',
-                          style: TextStyle(
-                            color: Colors.black,
-                            fontSize: 7,
-                            fontWeight: FontWeight.bold,
-                          )),
-                    ),
-                  ),
-                // Fold badge
-                if (hasFolded && !isShowdown)
-                  Positioned(
-                    top: -4,
-                    left: -4,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade800,
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(
-                          color: Colors.grey.shade600,
-                          width: 1,
-                        ),
-                      ),
-                      child: Text('FOLD',
-                          style: TextStyle(
-                            color: Colors.grey.shade400,
-                            fontSize: 7,
-                            fontWeight: FontWeight.bold,
-                          )),
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            // Name - use displayName which is "You" for current player
-            Text(
-              displayName.length > 8 ? displayName.substring(0, 8) : displayName,
-              style: TextStyle(
-                color: hasFolded ? Colors.grey : Colors.white,
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
-              ),
-              overflow: TextOverflow.ellipsis,
-            ),
-            // Chips amount
-            Text(
-              _formatChips(player.chips),
-              style: TextStyle(
-                color: hasFolded ? Colors.grey : Colors.white70,
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            // Current bet underneath
-            if (player.currentBet > 0)
-              Text(
-                _formatChips(player.currentBet),
-                style: TextStyle(
-                  color: hasFolded ? Colors.grey.withValues(alpha: 0.6) : Colors.orange.shade400,
-                  fontSize: 9,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            // Show hole cards during showdown
-            if (isShowdown && !hasFolded && player.cards.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    _buildMiniCard(
-                      player.cards[0],
-                      isHighlighted: _showdownAnimationComplete &&
-                          isWinner &&
-                          playerHand != null &&
-                          playerHand.isCardInWinningHand(player.cards[0]),
-                      isDimmed: isLoser,
-                    ),
-                    const SizedBox(width: 2),
-                    if (player.cards.length > 1)
-                      _buildMiniCard(
-                        player.cards[1],
-                        isHighlighted: _showdownAnimationComplete &&
-                            isWinner &&
-                            playerHand != null &&
-                            playerHand.isCardInWinningHand(player.cards[1]),
-                        isDimmed: isLoser,
-                      ),
-                  ],
-                ),
-              ),
-            // Show hand name during showdown
-            if (isShowdown && _showdownAnimationComplete && !hasFolded && playerHand != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 2),
-                child: Text(
-                  _getShortHandName(playerHand.rank),
-                  style: TextStyle(
-                    color: isWinner ? const Color(0xFFFFD700) : Colors.white.withValues(alpha: 0.7),
-                    fontSize: 9,
-                    fontWeight: isWinner ? FontWeight.bold : FontWeight.normal,
-                  ),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// Build a mini card for showdown display on player avatars
-  Widget _buildMiniCard(PlayingCard card, {bool isHighlighted = false, bool isDimmed = false}) {
-    const width = 28.0;
-    const height = 38.0;
-    final isRed = card.suit == '♥' || card.suit == '♦';
-
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      width: width,
-      height: height,
-      decoration: BoxDecoration(
-        color: isDimmed ? Colors.grey.shade300 : Colors.white,
-        borderRadius: BorderRadius.circular(4),
-        boxShadow: [
-          if (isHighlighted) ...[
-            BoxShadow(
-              color: Colors.white.withValues(alpha: 0.6),
-              blurRadius: 8,
-              spreadRadius: 1,
-            ),
-          ] else
-            BoxShadow(
-              color: Colors.black.withValues(alpha: isDimmed ? 0.1 : 0.3),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
-            ),
-        ],
-        border: isHighlighted ? Border.all(color: Colors.white.withValues(alpha: 0.9), width: 1.5) : null,
-      ),
-      child: AnimatedOpacity(
-        duration: const Duration(milliseconds: 300),
-        opacity: isDimmed ? 0.5 : 1.0,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              card.rank,
-              style: TextStyle(
-                color: isDimmed ? Colors.grey : (isRed ? Colors.red.shade700 : Colors.black),
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            Text(
-              card.suit,
-              style: TextStyle(
-                color: isDimmed ? Colors.grey : (isRed ? Colors.red.shade700 : Colors.black),
-                fontSize: 10,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  String _formatChips(int chips) {
-    if (chips >= 1000000) return '${(chips / 1000000).toStringAsFixed(1)}M';
-    if (chips >= 1000) return '${(chips / 1000).toStringAsFixed(chips % 1000 == 0 ? 0 : 1)}k';
-    return chips.toString();
-  }
+  // Use formatChips from game_utils.dart
+  String _formatChips(int chips) => formatChips(chips);
 
   Widget _buildCommunityCardsMinimal(GameRoom room) {
     final isShowdown = room.phase == 'showdown' && _showdownAnimationComplete;
@@ -2105,8 +1525,8 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    // Hand strength indicator
-                    if (player.cards.length >= 2 && room.communityCards.length >= 3)
+                    // Hand strength indicator - always show "High Card" until a better hand is made
+                    if (player.cards.length >= 2)
                       Padding(
                         padding: const EdgeInsets.only(bottom: 4),
                         child: Text(
@@ -2280,7 +1700,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
                   ),
                   builder: (context, value, child) => CustomPaint(
                     size: const Size(100, 126),
-                    painter: _RoundedRectProgressPainter(
+                    painter: RoundedRectProgressPainter(
                       progress: value,
                       color: _remainingSeconds <= 2 ? Colors.red : Colors.white,
                       strokeWidth: 4,
@@ -2422,33 +1842,11 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
     );
   }
 
-  String _getShortHandName(HandRank rank) {
-    switch (rank) {
-      case HandRank.royalFlush:
-        return 'Royal!';
-      case HandRank.straightFlush:
-        return 'Str Flush';
-      case HandRank.fourOfAKind:
-        return 'Quads';
-      case HandRank.fullHouse:
-        return 'Full House';
-      case HandRank.flush:
-        return 'Flush';
-      case HandRank.straight:
-        return 'Straight';
-      case HandRank.threeOfAKind:
-        return 'Trips';
-      case HandRank.twoPair:
-        return 'Two Pair';
-      case HandRank.onePair:
-        return 'Pair';
-      case HandRank.highCard:
-        return 'High Card';
-    }
-  }
+  // Use getShortHandName from game_utils.dart
+  String _getShortHandName(HandRank rank) => getShortHandName(rank);
 
   String _getCurrentHandStrength(List<PlayingCard> holeCards, List<PlayingCard> communityCards) {
-    if (holeCards.length < 2 || communityCards.length < 3) return '';
+    if (holeCards.length < 2 || communityCards.length < 3) return 'High Card';
 
     final hand = HandEvaluator.evaluateBestHand(holeCards, communityCards);
     return _getShortHandName(hand.rank);
@@ -2832,85 +2230,4 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
   }
 }
 
-/// Custom painter for rounded rectangle progress border
-class _RoundedRectProgressPainter extends CustomPainter {
-  final double progress;
-  final Color color;
-  final double strokeWidth;
-
-  _RoundedRectProgressPainter({
-    required this.progress,
-    required this.color,
-    required this.strokeWidth,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth
-      ..strokeCap = StrokeCap.round;
-
-    // Calculate path length for the rounded rect
-    final perimeter = 2 * (size.width + size.height - strokeWidth * 2);
-    final progressLength = perimeter * progress;
-
-    // Create path for rounded rect starting from top-center
-    final path = Path();
-    // Start from top-center
-    path.moveTo(size.width / 2, strokeWidth / 2);
-    // Draw to top-right corner
-    path.lineTo(size.width - strokeWidth / 2 - 16, strokeWidth / 2);
-    path.arcToPoint(
-      Offset(size.width - strokeWidth / 2, strokeWidth / 2 + 16),
-      radius: const Radius.circular(16),
-    );
-    // Right side
-    path.lineTo(size.width - strokeWidth / 2, size.height - strokeWidth / 2 - 16);
-    path.arcToPoint(
-      Offset(size.width - strokeWidth / 2 - 16, size.height - strokeWidth / 2),
-      radius: const Radius.circular(16),
-    );
-    // Bottom side
-    path.lineTo(strokeWidth / 2 + 16, size.height - strokeWidth / 2);
-    path.arcToPoint(
-      Offset(strokeWidth / 2, size.height - strokeWidth / 2 - 16),
-      radius: const Radius.circular(16),
-    );
-    // Left side
-    path.lineTo(strokeWidth / 2, strokeWidth / 2 + 16);
-    path.arcToPoint(
-      Offset(strokeWidth / 2 + 16, strokeWidth / 2),
-      radius: const Radius.circular(16),
-    );
-    // Back to start
-    path.lineTo(size.width / 2, strokeWidth / 2);
-
-    // Create dash effect based on progress
-    final pathMetrics = path.computeMetrics();
-    final progressPath = Path();
-
-    for (final metric in pathMetrics) {
-      final extractPath = metric.extractPath(0, progressLength);
-      progressPath.addPath(extractPath, Offset.zero);
-    }
-
-    canvas.drawPath(progressPath, paint);
-
-    // Add glow effect
-    final glowPaint = Paint()
-      ..color = color.withValues(alpha: 0.3)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth + 4
-      ..strokeCap = StrokeCap.round
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
-
-    canvas.drawPath(progressPath, glowPaint);
-  }
-
-  @override
-  bool shouldRepaint(_RoundedRectProgressPainter oldDelegate) {
-    return oldDelegate.progress != progress || oldDelegate.color != color;
-  }
-}
+// RoundedRectProgressPainter is now imported from timer_progress_painter.dart
