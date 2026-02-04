@@ -114,6 +114,7 @@ class RoomService {
           displayName: currentUserName,
           chips: startingChips,
           lastActiveAt: DateTime.now(),
+          avatarIndex: UserPreferences.avatarIndex,
         )
       ],
       bigBlind: bigBlind,
@@ -227,6 +228,7 @@ class RoomService {
           displayName: currentUserName,
           chips: startingChips,
           lastActiveAt: DateTime.now(),
+          avatarIndex: UserPreferences.avatarIndex,
         )
       ],
       bigBlind: bigBlind,
@@ -272,6 +274,7 @@ class RoomService {
           chips: startingChips,
           lastActiveAt: DateTime.now(),
           isReady: true,
+          avatarIndex: UserPreferences.avatarIndex,
         )
       ],
       maxPlayers: 6,
@@ -376,6 +379,7 @@ class RoomService {
         isReady: true,
         hasFolded: isJoiningMidGame,
         lastActiveAt: DateTime.now(),
+        avatarIndex: UserPreferences.avatarIndex,
       );
 
       final updatedPlayers = [...room.players, newPlayer];

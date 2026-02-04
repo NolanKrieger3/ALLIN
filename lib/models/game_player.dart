@@ -16,6 +16,7 @@ class GamePlayer {
   final bool hasActed; // Track if player has acted in current betting round
   final String? lastAction; // Track last action for UI indicator (CALL, CHECK, FOLD, RAISE, ALL-IN)
   final DateTime? lastActiveAt; // Heartbeat timestamp for detecting disconnected players
+  final int avatarIndex; // Player's selected avatar index
 
   GamePlayer({
     required this.uid,
@@ -29,6 +30,7 @@ class GamePlayer {
     this.hasActed = false,
     this.lastAction,
     this.lastActiveAt,
+    this.avatarIndex = 0,
   });
 
   Map<String, dynamic> toJson() => {
@@ -43,6 +45,7 @@ class GamePlayer {
         'hasActed': hasActed,
         'lastAction': lastAction,
         'lastActiveAt': lastActiveAt?.toIso8601String(),
+        'avatarIndex': avatarIndex,
       };
 
   factory GamePlayer.fromJson(Map<String, dynamic> json) {
@@ -59,6 +62,7 @@ class GamePlayer {
       hasActed: json['hasActed'] as bool? ?? false,
       lastAction: json['lastAction'] as String?,
       lastActiveAt: json['lastActiveAt'] != null ? DateTime.tryParse(json['lastActiveAt'] as String) : null,
+      avatarIndex: json['avatarIndex'] as int? ?? 0,
     );
   }
 
@@ -86,6 +90,7 @@ class GamePlayer {
     bool? hasActed,
     Object? lastAction = _sentinel,
     Object? lastActiveAt = _sentinel,
+    int? avatarIndex,
   }) {
     return GamePlayer(
       uid: uid ?? this.uid,
@@ -99,6 +104,7 @@ class GamePlayer {
       hasActed: hasActed ?? this.hasActed,
       lastAction: lastAction == _sentinel ? this.lastAction : lastAction as String?,
       lastActiveAt: lastActiveAt == _sentinel ? this.lastActiveAt : lastActiveAt as DateTime?,
+      avatarIndex: avatarIndex ?? this.avatarIndex,
     );
   }
 

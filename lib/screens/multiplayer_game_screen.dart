@@ -2265,14 +2265,14 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
             ],
           ),
           const SizedBox(height: 8),
-          // Player label
+          // Player label - show username instead of "YOU"
           Text(
-            'YOU',
+            player.displayName.length > 8 ? '${player.displayName.substring(0, 8)}...' : player.displayName,
             style: TextStyle(
-              color: isMyTurn ? const Color(0xFF00D46A) : Colors.white.withValues(alpha: 0.5),
+              color: isMyTurn ? const Color(0xFF00D46A) : Colors.white.withValues(alpha: 0.7),
               fontSize: 10,
               fontWeight: FontWeight.w600,
-              letterSpacing: 1,
+              letterSpacing: 0.5,
             ),
           ),
           const SizedBox(height: 2),
