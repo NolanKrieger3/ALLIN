@@ -95,6 +95,9 @@ class _QuickPlayScreenState extends State<QuickPlayScreen> {
 
       String? roomId;
 
+      // Clean up stale/finished rooms before matchmaking
+      await _gameService.cleanupStaleRooms();
+
       // FAST matchmaking: Try to find a room immediately, create if none exist
       print('🔍 Quick matchmaking for blind $bigBlind');
 

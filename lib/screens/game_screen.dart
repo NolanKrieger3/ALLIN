@@ -1367,18 +1367,28 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     final userBalance = UserPreferences.chips;
     final selectedLevel = _blindLevels[_selectedBlindIndex];
     final minBuyIn = selectedLevel['minBuyIn'] as int;
-    final maxBuyIn = selectedLevel['maxBuyIn'] as int;
     final canAfford = userBalance >= minBuyIn;
+    final bigBlind = selectedLevel['bigBlind'] as int;
+    final smallBlind = bigBlind ~/ 2;
+
+    // Get the highest blind level the user can afford
+    int maxAffordableIndex = 0;
+    for (int i = _blindLevels.length - 1; i >= 0; i--) {
+      if (userBalance >= (_blindLevels[i]['minBuyIn'] as int)) {
+        maxAffordableIndex = i;
+        break;
+      }
+    }
 
     return MobileWrapper(
       child: Scaffold(
         backgroundColor: const Color(0xFF0A0A0A),
         body: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32),
             child: Column(
               children: [
-                const SizedBox(height: 16),
+                const SizedBox(height: 24),
                 // Top bar with back button and balance
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1400,12 +1410,13 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       decoration: BoxDecoration(
                         color: Colors.white.withValues(alpha: 0.06),
-                        borderRadius: BorderRadius.circular(20),
+                        borderRadius: BorderRadius.circular(12),
                       ),
                       child: Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Text('💰', style: TextStyle(fontSize: 16)),
-                          const SizedBox(width: 6),
+                          Icon(Icons.monetization_on, color: Colors.amber.withValues(alpha: 0.8), size: 18),
+                          const SizedBox(width: 8),
                           Text(
                             _formatChipsLong(userBalance),
                             style: const TextStyle(
@@ -1420,272 +1431,221 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                   ],
                 ),
 
+                const Spacer(flex: 2),
+
+                // Big centered blinds display
+                Text(
+                  '${_formatChipsLong(smallBlind)}/${_formatChipsLong(bigBlind)}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 64,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -2,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'BLINDS',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.4),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: 4,
+                  ),
+                ),
+
                 const SizedBox(height: 24),
 
-                // Title
-                const Text(
-                  'PRACTICE',
+                // Buy-in display with affordability indicator
+                Text(
+                  '\$${_formatChipsLong(minBuyIn)}',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: canAfford ? Colors.white.withValues(alpha: 0.6) : Colors.red.withValues(alpha: 0.8),
                     fontSize: 28,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 2,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  'Play against AI bots',
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.5),
-                    fontSize: 14,
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    if (!canAfford) ...[
+                      Icon(Icons.lock, color: Colors.red.withValues(alpha: 0.6), size: 12),
+                      const SizedBox(width: 4),
+                    ],
+                    Text(
+                      canAfford ? 'BUY-IN' : 'INSUFFICIENT CHIPS',
+                      style: TextStyle(
+                        color: canAfford ? Colors.white.withValues(alpha: 0.3) : Colors.red.withValues(alpha: 0.5),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        letterSpacing: 3,
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 48),
+
+                // Slider for blind level selection
+                SliderTheme(
+                  data: SliderTheme.of(context).copyWith(
+                    activeTrackColor: canAfford ? Colors.white : Colors.red.withValues(alpha: 0.6),
+                    inactiveTrackColor: Colors.white.withValues(alpha: 0.1),
+                    thumbColor: canAfford ? Colors.white : Colors.red.withValues(alpha: 0.8),
+                    overlayColor: Colors.white.withValues(alpha: 0.1),
+                    trackHeight: 4,
+                    thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
+                  ),
+                  child: Slider(
+                    value: _selectedBlindIndex.toDouble(),
+                    min: 0,
+                    max: (_blindLevels.length - 1).toDouble(),
+                    divisions: _blindLevels.length - 1,
+                    onChanged: (value) {
+                      final newIndex = value.round();
+                      // Clamp to max affordable index
+                      if (newIndex > maxAffordableIndex) {
+                        ScaffoldMessenger.of(context).clearSnackBars();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'Need ${_formatChipsLong(_blindLevels[newIndex]['minBuyIn'] as int)} chips for ${_blindLevels[newIndex]['name']} stakes.',
+                            ),
+                            backgroundColor: Colors.orange.shade700,
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+                        setState(() => _selectedBlindIndex = maxAffordableIndex);
+                      } else {
+                        setState(() {
+                          _selectedBlindIndex = newIndex;
+                          _buyInAmount = _blindLevels[newIndex]['minBuyIn'] as int;
+                        });
+                      }
+                    },
+                  ),
+                ),
+
+                // Min/Max labels
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        _blindLevels.first['name'] as String,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.3),
+                          fontSize: 12,
+                        ),
+                      ),
+                      Text(
+                        maxAffordableIndex < _blindLevels.length - 1
+                            ? 'Max: ${_blindLevels[maxAffordableIndex]['name']}'
+                            : _blindLevels.last['name'] as String,
+                        style: TextStyle(
+                          color: maxAffordableIndex < _blindLevels.length - 1
+                              ? Colors.amber.withValues(alpha: 0.5)
+                              : Colors.white.withValues(alpha: 0.3),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
 
                 const SizedBox(height: 32),
 
-                // Blind Level Selection
-                Text(
-                  'SELECT STAKES',
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.4),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                    letterSpacing: 3,
+                // Opponents and Difficulty in a row
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.04),
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                ),
-                const SizedBox(height: 12),
-
-                // Blind level cards
-                ...List.generate(_blindLevels.length, (index) {
-                  final level = _blindLevels[index];
-                  final isSelected = _selectedBlindIndex == index;
-                  final levelMinBuyIn = level['minBuyIn'] as int;
-                  final isLocked = userBalance < levelMinBuyIn;
-
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: _AnimatedPressButton(
-                      onTap: isLocked
-                          ? null
-                          : () {
-                              setState(() {
-                                _selectedBlindIndex = index;
-                                _buyInAmount = levelMinBuyIn;
-                              });
-                            },
-                      child: Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? const Color(0xFF00D46A).withValues(alpha: 0.2)
-                              : Colors.white.withValues(alpha: isLocked ? 0.02 : 0.06),
-                          borderRadius: BorderRadius.circular(16),
-                          border: isSelected ? Border.all(color: const Color(0xFF00D46A), width: 2) : null,
-                        ),
-                        child: Row(
+                  child: Row(
+                    children: [
+                      // Opponents
+                      Expanded(
+                        child: Column(
                           children: [
-                            // Level info
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Text(
-                                        level['name'] as String,
-                                        style: TextStyle(
-                                          color: isLocked ? Colors.white38 : Colors.white,
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                      if (isLocked) ...[
-                                        const SizedBox(width: 8),
-                                        const Icon(Icons.lock, color: Colors.white38, size: 16),
-                                      ],
-                                    ],
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    'Blinds: ${_formatChipsLong((level['bigBlind'] as int) ~/ 2)}/${_formatChipsLong(level['bigBlind'] as int)}',
-                                    style: TextStyle(
-                                      color: isLocked ? Colors.white24 : Colors.white54,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                ],
+                            Text(
+                              'BOTS',
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.4),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                                letterSpacing: 2,
                               ),
                             ),
-                            // Buy-in range
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.end,
+                            const SizedBox(height: 8),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Text(
-                                  '${_formatChipsLong(level['minBuyIn'] as int)} - ${_formatChipsLong(level['maxBuyIn'] as int)}',
-                                  style: TextStyle(
-                                    color: isLocked ? Colors.white24 : Colors.white70,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w500,
+                                _AnimatedPressButton(
+                                  onTap: _numberOfBots > 1 ? () => setState(() => _numberOfBots--) : null,
+                                  child: Container(
+                                    width: 32,
+                                    height: 32,
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Icon(Icons.remove,
+                                        color: _numberOfBots > 1 ? Colors.white : Colors.white24, size: 18),
                                   ),
                                 ),
-                                if (isLocked)
-                                  Text(
-                                    'Need ${_formatChipsLong(levelMinBuyIn)}',
-                                    style: const TextStyle(
-                                      color: Colors.orange,
-                                      fontSize: 11,
-                                    ),
+                                const SizedBox(width: 12),
+                                Text(
+                                  '$_numberOfBots',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.w700,
                                   ),
+                                ),
+                                const SizedBox(width: 12),
+                                _AnimatedPressButton(
+                                  onTap: _numberOfBots < 7 ? () => setState(() => _numberOfBots++) : null,
+                                  child: Container(
+                                    width: 32,
+                                    height: 32,
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Icon(Icons.add,
+                                        color: _numberOfBots < 7 ? Colors.white : Colors.white24, size: 18),
+                                  ),
+                                ),
                               ],
                             ),
                           ],
                         ),
                       ),
-                    ),
-                  );
-                }),
-
-                const SizedBox(height: 24),
-
-                // Buy-in slider (only if can afford selected level)
-                if (canAfford) ...[
-                  Text(
-                    'BUY-IN AMOUNT',
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.4),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      letterSpacing: 3,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    _formatChipsLong(_buyInAmount),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 36,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  SliderTheme(
-                    data: SliderTheme.of(context).copyWith(
-                      activeTrackColor: const Color(0xFF00D46A),
-                      inactiveTrackColor: Colors.white.withValues(alpha: 0.1),
-                      thumbColor: const Color(0xFF00D46A),
-                      overlayColor: const Color(0xFF00D46A).withValues(alpha: 0.2),
-                      trackHeight: 4,
-                      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 10),
-                    ),
-                    child: Slider(
-                      value: _buyInAmount
-                          .toDouble()
-                          .clamp(minBuyIn.toDouble(), userBalance.clamp(minBuyIn, maxBuyIn).toDouble()),
-                      min: minBuyIn.toDouble(),
-                      max: userBalance.clamp(minBuyIn, maxBuyIn).toDouble(),
-                      onChanged: (value) {
-                        setState(() => _buyInAmount = value.toInt());
-                      },
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(_formatChipsLong(minBuyIn),
-                            style: TextStyle(color: Colors.white.withValues(alpha: 0.3), fontSize: 12)),
-                        Text(_formatChipsLong(userBalance.clamp(minBuyIn, maxBuyIn)),
-                            style: TextStyle(color: Colors.white.withValues(alpha: 0.3), fontSize: 12)),
-                      ],
-                    ),
-                  ),
-                ],
-
-                const SizedBox(height: 24),
-
-                // Opponents and Difficulty in a row
-                Row(
-                  children: [
-                    // Opponents
-                    Expanded(
-                      child: Column(
-                        children: [
-                          Text(
-                            'OPPONENTS',
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.4),
-                              fontSize: 11,
-                              fontWeight: FontWeight.w500,
-                              letterSpacing: 2,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              _AnimatedPressButton(
-                                onTap: _numberOfBots > 1 ? () => setState(() => _numberOfBots--) : null,
-                                child: Container(
-                                  width: 36,
-                                  height: 36,
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.1),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Icon(Icons.remove,
-                                      color: _numberOfBots > 1 ? Colors.white : Colors.white24, size: 20),
-                                ),
-                              ),
-                              const SizedBox(width: 16),
-                              Text(
-                                '$_numberOfBots',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 28,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              const SizedBox(width: 16),
-                              _AnimatedPressButton(
-                                onTap: _numberOfBots < 7 ? () => setState(() => _numberOfBots++) : null,
-                                child: Container(
-                                  width: 36,
-                                  height: 36,
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.1),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Icon(Icons.add,
-                                      color: _numberOfBots < 7 ? Colors.white : Colors.white24, size: 20),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
+                      // Vertical divider
+                      Container(
+                        width: 1,
+                        height: 50,
+                        color: Colors.white.withValues(alpha: 0.1),
                       ),
-                    ),
-                    // Difficulty
-                    Expanded(
-                      child: Column(
-                        children: [
-                          Text(
-                            'DIFFICULTY',
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.4),
-                              fontSize: 11,
-                              fontWeight: FontWeight.w500,
-                              letterSpacing: 2,
+                      // Difficulty
+                      Expanded(
+                        child: Column(
+                          children: [
+                            Text(
+                              'DIFFICULTY',
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.4),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                                letterSpacing: 2,
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 8),
-                          Container(
-                            padding: const EdgeInsets.all(4),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.06),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
+                            const SizedBox(height: 8),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
                               children: ['Easy', 'Medium', 'Hard'].map((diff) {
                                 final isSelected = _difficulty == diff;
                                 final label = diff == 'Easy'
@@ -1696,7 +1656,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                                 return _AnimatedPressButton(
                                   onTap: () => setState(() => _difficulty = diff),
                                   child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                     decoration: BoxDecoration(
                                       color: isSelected ? Colors.white : Colors.transparent,
                                       borderRadius: BorderRadius.circular(8),
@@ -1709,45 +1669,47 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                                 );
                               }).toList(),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
 
-                const SizedBox(height: 32),
+                const Spacer(flex: 2),
 
                 // Play button
-                _AnimatedPressButton(
-                  onTap: canAfford
-                      ? () async {
-                          // Deduct buy-in from user balance
-                          await UserPreferences.setChips(userBalance - _buyInAmount);
+                SizedBox(
+                  width: double.infinity,
+                  child: _AnimatedPressButton(
+                    onTap: canAfford
+                        ? () async {
+                            // Deduct buy-in from user balance
+                            await UserPreferences.setChips(userBalance - _buyInAmount);
 
-                          setState(() {
-                            _gameStarted = true;
-                            _playerChips = _buyInAmount;
-                            _bigBlind = selectedLevel['bigBlind'] as int;
-                          });
-                          _startNewHand();
-                        }
-                      : null,
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 18),
-                    decoration: BoxDecoration(
-                      color: canAfford ? const Color(0xFF00D46A) : Colors.white.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Center(
-                      child: Text(
-                        canAfford ? 'PLAY' : 'NOT ENOUGH CHIPS',
-                        style: TextStyle(
-                          color: canAfford ? Colors.white : Colors.white38,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 2,
+                            setState(() {
+                              _gameStarted = true;
+                              _playerChips = _buyInAmount;
+                              _bigBlind = selectedLevel['bigBlind'] as int;
+                            });
+                            _startNewHand();
+                          }
+                        : null,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 18),
+                      decoration: BoxDecoration(
+                        color: canAfford ? const Color(0xFF00D46A) : Colors.white.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Center(
+                        child: Text(
+                          canAfford ? 'PLAY' : 'NOT ENOUGH CHIPS',
+                          style: TextStyle(
+                            color: canAfford ? Colors.white : Colors.white38,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 2,
+                          ),
                         ),
                       ),
                     ),
