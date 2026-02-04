@@ -547,23 +547,26 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
     // Use a simple animated reset
     const duration = Duration(milliseconds: 200);
     final startOffset = _dragOffset;
-    
+
     // Create a simple animation using a ticker
     late final AnimationController resetController;
     resetController = AnimationController(
       vsync: this,
       duration: duration,
-    )..addListener(() {
-      if (mounted) {
-        setState(() {
-          _dragOffset = startOffset * (1 - resetController.value);
-        });
-      }
-    })..addStatusListener((status) {
-      if (status == AnimationStatus.completed) {
-        resetController.dispose();
-      }
-    })..forward();
+    )
+      ..addListener(() {
+        if (mounted) {
+          setState(() {
+            _dragOffset = startOffset * (1 - resetController.value);
+          });
+        }
+      })
+      ..addStatusListener((status) {
+        if (status == AnimationStatus.completed) {
+          resetController.dispose();
+        }
+      })
+      ..forward();
   }
 
   /// Start a new hand after the current one finishes
@@ -776,17 +779,17 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
           // Check for when only 1 player has chips remaining
           final playersWithChips = room.players.where((p) => p.chips > 0).toList();
           final currentPlayerId = _gameService.currentUserId;
-          
+
           // Find current player in the room
           GamePlayer? currentPlayer = room.players.cast<GamePlayer?>().firstWhere(
-            (p) => p?.uid == currentPlayerId,
-            orElse: () => null,
-          );
-          
+                (p) => p?.uid == currentPlayerId,
+                orElse: () => null,
+              );
+
           // If player was removed from room (0 chips and got filtered out in newHand),
           // they need to buy back - create a placeholder for the check
           final playerWasRemoved = currentPlayer == null && currentPlayerId != null;
-          
+
           // Check if current player is out of chips and show buy-back dialog (for quick play)
           if (widget.allowRebuy && room.status == 'finished') {
             final playerHasNoChips = playerWasRemoved || (currentPlayer != null && currentPlayer.chips <= 0);
@@ -1455,7 +1458,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
 
   Widget _buildCommunityCardsMinimal(GameRoom room) {
     final isShowdown = room.phase == 'showdown' && _showdownAnimationComplete;
-    
+
     // Track new cards and trigger animations
     final currentCardCount = room.communityCards.length;
     if (currentCardCount > _lastCommunityCardCount) {
@@ -1502,11 +1505,11 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
                   final isHighlighted = isShowdown && card != null && _isCardInWinningHand(card, room);
                   final isDimmed = isShowdown && card != null && !_isCardInWinningHand(card, room);
                   final isNewCard = _animatedCardIndices.contains(i);
-                  
+
                   if (card == null) {
                     return _buildEmptyCardSlot();
                   }
-                  
+
                   // Animate new cards with a flip effect
                   if (isNewCard) {
                     return TweenAnimationBuilder<double>(
@@ -1541,7 +1544,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
                       },
                     );
                   }
-                  
+
                   return _buildMinimalCard(
                     card,
                     isHighlighted: isHighlighted,

@@ -579,14 +579,14 @@ class RoomService {
     final room = GameRoom.fromJson(roomData, roomId);
 
     final playerIndex = room.players.indexWhere((p) => p.uid == playerId);
-    
+
     if (playerIndex == -1) {
       // Player was removed - re-add them to the room
       print('⚠️ Player not found in room, re-adding with new chips...');
-      
-      final username = await _getUsername();
+
+      final username = currentUserName;
       final avatarIndex = UserPreferences.avatarIndex;
-      
+
       final newPlayer = GamePlayer(
         uid: playerId,
         displayName: username,
@@ -594,7 +594,7 @@ class RoomService {
         hasFolded: false,
         avatarIndex: avatarIndex,
       );
-      
+
       // Add player back to the room
       final newPlayerIndex = room.players.length;
       final addResponse = await http.patch(
@@ -602,11 +602,11 @@ class RoomService {
         headers: _jsonHeaders,
         body: jsonEncode(newPlayer.toJson()),
       );
-      
+
       if (addResponse.statusCode != 200) {
         throw Exception('Failed to re-add player to room');
       }
-      
+
       print('✅ Re-added player $playerId with $newChips chips');
       return;
     }
