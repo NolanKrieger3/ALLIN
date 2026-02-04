@@ -570,10 +570,16 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
   }
 
   /// Start a new hand after the current one finishes
-  Future<void> _triggerNewHand(GameRoom room) async {
+  /// If forceStart is true, any player can trigger (for buy-back scenarios)
+  Future<void> _triggerNewHand(GameRoom room, {bool forceStart = false}) async {
     if (_hasTriggeredNewHand || _isLoading) return;
-    final isHost = room.hostId == _gameService.currentUserId;
-    if (!isHost) return;
+
+    // For rebuy games (forceStart=true), allow any player to trigger
+    // For regular games, only host can trigger
+    if (!forceStart) {
+      final isHost = room.hostId == _gameService.currentUserId;
+      if (!isHost) return;
+    }
 
     _hasTriggeredNewHand = true;
 
@@ -805,17 +811,26 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
           // When game is finished and rebuy is allowed:
           // - If only 1 player has chips, wait for the busted player to decide
           // - Show the waiting screen for the player who still has chips
-          if (widget.allowRebuy && room.status == 'finished' && playersWithChips.length == 1) {
-            // Check if we are the player with chips
-            final amITheWinner = playersWithChips.first.uid == currentPlayerId;
-            if (amITheWinner) {
-              // Show waiting screen for the player who still has chips
-              return _buildWaitingForBuyBackScreen(room, playersWithChips.first);
+          // - But if BOTH players now have chips (opponent bought back), trigger new hand
+          if (widget.allowRebuy && room.status == 'finished') {
+            // Check if BOTH players have chips now (opponent bought back)
+            if (playersWithChips.length >= 2) {
+              // Both players have chips - trigger new hand immediately
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                _triggerNewHand(room, forceStart: true);
+              });
+            } else if (playersWithChips.length == 1) {
+              // Only 1 player has chips - show waiting screen
+              final amITheWinner = playersWithChips.first.uid == currentPlayerId;
+              if (amITheWinner) {
+                return _buildWaitingForBuyBackScreen(room, playersWithChips.first);
+              }
             }
           }
 
           // Auto-start new hand after game finishes (if 2+ players still have chips)
-          if (room.status == 'finished' && playersWithChips.length >= 2) {
+          // Note: This is for non-rebuy games - rebuy games handle this above
+          if (!widget.allowRebuy && room.status == 'finished' && playersWithChips.length >= 2) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
               _triggerNewHand(room);
             });
@@ -1443,6 +1458,13 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
     try {
       await _gameService.updatePlayerChips(widget.roomId, _gameService.currentUserId ?? '', amount);
       _showingBuyBackDialog = false;
+
+      // Reset new hand trigger flag so we can start a new hand
+      _hasTriggeredNewHand = false;
+
+      // After successful buy-back, check if we can start a new hand
+      // The stream will pick this up and trigger _triggerNewHand
+      print('✅ Buy-back successful! Waiting for new hand to start...');
     } catch (e) {
       print('Error processing buy-back: $e');
       if (mounted) {
