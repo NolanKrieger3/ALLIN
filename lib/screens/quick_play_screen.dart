@@ -143,10 +143,18 @@ class _QuickPlayScreenState extends State<QuickPlayScreen> {
       }
 
       if (mounted) {
+        final blindLevel = BlindLevels.all[_selectedBlindIndex];
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (_) => MultiplayerGameScreen(roomId: roomId!, autoStart: true),
+            builder: (_) => MultiplayerGameScreen(
+              roomId: roomId!,
+              autoStart: true,
+              allowRebuy: true,
+              bigBlind: blindLevel.big,
+              minBuyIn: blindLevel.buyIn,
+              maxBuyIn: blindLevel.buyIn * 2,
+            ),
           ),
         );
       }

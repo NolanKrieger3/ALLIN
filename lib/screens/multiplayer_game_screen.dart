@@ -746,13 +746,13 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
 
           // Check for when only 1 player has chips remaining
           final playersWithChips = room.players.where((p) => p.chips > 0).toList();
+          final currentPlayer = room.players.firstWhere(
+            (p) => p.uid == _gameService.currentUserId,
+            orElse: () => room.players.first,
+          );
 
           // Check if current player is out of chips and show buy-back dialog (for quick play)
           if (widget.allowRebuy && room.status == 'finished') {
-            final currentPlayer = room.players.firstWhere(
-              (p) => p.uid == _gameService.currentUserId,
-              orElse: () => room.players.first,
-            );
             if (currentPlayer.chips <= 0 && !_showingBuyBackDialog) {
               WidgetsBinding.instance.addPostFrameCallback((_) {
                 if (mounted && !_showingBuyBackDialog) {
@@ -760,6 +760,14 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
                 }
               });
             }
+          }
+
+          // When game is finished and rebuy is allowed:
+          // - If only 1 player has chips, wait for the busted player to decide
+          // - Show the waiting screen for the player who still has chips
+          if (widget.allowRebuy && room.status == 'finished' && playersWithChips.length == 1) {
+            // One player busted - show waiting screen
+            return _buildWaitingForBuyBackScreen(room, playersWithChips.first);
           }
 
           // Auto-start new hand after game finishes (if 2+ players still have chips)
@@ -859,10 +867,10 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
   }
 
   // ============================================================================
-  // WAITING FOR BUY-BACK SCREEN (for quickplay/cash games) - NO LONGER USED
+  // WAITING FOR BUY-BACK SCREEN (for quickplay/cash games)
+  // Shows when one player has chips and waiting for the busted player to rebuy
   // ============================================================================
 
-  // ignore: unused_element
   Widget _buildWaitingForBuyBackScreen(GameRoom room, GamePlayer lastPlayerWithChips) {
     final isMe = lastPlayerWithChips.uid == _gameService.currentUserId;
 
