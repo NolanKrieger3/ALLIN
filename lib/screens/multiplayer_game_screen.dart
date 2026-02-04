@@ -140,11 +140,11 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
     _heartbeatTimer?.cancel();
     // Send heartbeat immediately
     _gameService.sendHeartbeat(widget.roomId);
-    // Then every 5 seconds
-    _heartbeatTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+    // Then every 3 seconds (reduced from 5s for faster presence detection)
+    _heartbeatTimer = Timer.periodic(const Duration(seconds: 3), (_) {
       if (mounted) {
         _gameService.sendHeartbeat(widget.roomId);
-        // Also check for inactive players if we're the host
+        // Check for inactive players every heartbeat (any player can trigger this now)
         _gameService.removeInactivePlayers(widget.roomId);
       }
     });
@@ -158,6 +158,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
     final currentTurnId = room.currentTurnPlayerId;
     final isHost = room.hostId == _gameService.currentUserId;
     final isBotTurn = currentTurnId != null && _botService.isBot(currentTurnId);
+    final isMyTurn = currentTurnId == _gameService.currentUserId;
 
     // Handle bot turns - host controls bot actions
     if (isBotTurn && isHost && currentTurnId != _lastBotTurnId && !_isBotActing) {
@@ -182,8 +183,21 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
       print('🔄 NEW TURN: Player ${currentTurnId?.substring(0, 8)}, Full time: ${room.turnTimeLimit}s');
     }
 
-    // Start timer only once per turn
-    if (!_timerStarted && room.turnStartTime != null && room.status == 'playing' && room.phase != 'showdown') {
+    // CRITICAL: Only run timer when it's MY turn
+    // Stop timer if it's not my turn anymore
+    if (!isMyTurn && _turnTimer != null) {
+      _turnTimer?.cancel();
+      _turnTimer = null;
+      _timerStarted = false;
+      return;
+    }
+
+    // Start timer only once per turn AND only if it's my turn
+    if (!_timerStarted &&
+        isMyTurn &&
+        room.turnStartTime != null &&
+        room.status == 'playing' &&
+        room.phase != 'showdown') {
       _timerStarted = true;
 
       // Start new timer (100ms for smooth animation)
@@ -193,20 +207,33 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
           return;
         }
 
+        // CRITICAL FIX: Check FRESH room state, not stale captured variable
+        // Use _currentRoom which is updated every 500ms by StreamBuilder
+        final freshRoom = _currentRoom;
+        if (freshRoom == null) {
+          timer.cancel();
+          return;
+        }
+
+        final currentlyMyTurn = freshRoom.currentTurnPlayerId == _gameService.currentUserId;
+
+        // Stop timer immediately if it's no longer my turn
+        if (!currentlyMyTurn) {
+          timer.cancel();
+          _turnTimer = null;
+          _timerStarted = false;
+          return;
+        }
+
         setState(() {
           _remainingSeconds -= 0.1;
         });
 
-        // CRITICAL FIX: Check FRESH room state, not stale captured variable
-        // Use _currentRoom which is updated every 500ms by StreamBuilder
-        final freshRoom = _currentRoom;
-        if (freshRoom == null) return;
-
-        final currentlyMyTurn = freshRoom.currentTurnPlayerId == _gameService.currentUserId;
-
         // Auto-fold when time runs out (ONLY if it's CURRENTLY my turn, not stale check)
         if (_remainingSeconds <= 0 && currentlyMyTurn && !_hasAutoFolded && freshRoom.status == 'playing') {
           timer.cancel();
+          _turnTimer = null;
+          _timerStarted = false;
           _hasAutoFolded = true;
           print('⏰ AUTO-FOLD: Time expired for ${_gameService.currentUserId}');
           _gameService.playerAction(widget.roomId, 'fold');
