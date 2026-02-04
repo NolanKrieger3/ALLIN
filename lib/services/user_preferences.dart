@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'currency_service.dart';
 
 /// Lucky hand types with their display info and bonus rewards
 class LuckyHandType {
@@ -329,28 +330,9 @@ class UserPreferences {
   }
 
   /// Format number with K/M/B/T/Q suffixes for display
+  /// Delegates to CurrencyService.formatChips for consistency
   static String formatChips(int amount) {
-    if (amount >= 1000000000000000) {
-      final q = amount / 1000000000000000;
-      return '${q.toStringAsFixed(q % 1 == 0 ? 0 : 1)}Q';
-    }
-    if (amount >= 1000000000000) {
-      final t = amount / 1000000000000;
-      return '${t.toStringAsFixed(t % 1 == 0 ? 0 : 1)}T';
-    }
-    if (amount >= 1000000000) {
-      final b = amount / 1000000000;
-      return '${b.toStringAsFixed(b % 1 == 0 ? 0 : 1)}B';
-    }
-    if (amount >= 1000000) {
-      final m = amount / 1000000;
-      return '${m.toStringAsFixed(m % 1 == 0 ? 0 : 1)}M';
-    }
-    if (amount >= 10000) {
-      final k = amount / 1000;
-      return '${k.toStringAsFixed(k % 1 == 0 ? 0 : 1)}k';
-    }
-    return amount.toString();
+    return CurrencyService.formatChips(amount);
   }
 
   // ============================================================================
