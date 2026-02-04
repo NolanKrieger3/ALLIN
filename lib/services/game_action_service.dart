@@ -65,14 +65,14 @@ class GameActionService {
   List<GamePlayer> _mergeNewPlayers(List<GamePlayer> updatedPlayers, List<GamePlayer> currentPlayers) {
     final updatedUids = updatedPlayers.map((p) => p.uid).toSet();
     final newPlayers = currentPlayers.where((p) => !updatedUids.contains(p.uid)).toList();
-    
+
     if (newPlayers.isNotEmpty) {
       print('🔀 Merging ${newPlayers.length} new player(s) who joined mid-hand');
       for (final p in newPlayers) {
         print('   Adding: ${p.displayName} (${p.uid.substring(0, 8)})');
       }
     }
-    
+
     return [...updatedPlayers, ...newPlayers];
   }
 
