@@ -136,6 +136,10 @@ class _QuickPlayScreenState extends State<QuickPlayScreen> {
         );
         roomId = room.id;
         print('✅ Created room ${room.id}');
+
+        // Wait for Firebase to propagate the room data before navigating
+        // This prevents "Room not found" errors when the game screen starts polling
+        await Future.delayed(const Duration(milliseconds: 300));
       }
 
       if (mounted) {

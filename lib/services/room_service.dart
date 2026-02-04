@@ -733,9 +733,10 @@ class RoomService {
       Uri.parse('$databaseUrl/game_rooms.json?auth=$token'),
     );
 
-    print('🔍 FETCHING JOINABLE ROOMS for bigBlind=$bigBlind, gameType=$gameType');
+    print('🔍 FETCHING JOINABLE ROOMS for bigBlind=$bigBlind, gameType=$gameType, userId=$userId');
 
     if (response.statusCode != 200 || response.body == 'null') {
+      print('🔍 No rooms in database (empty response)');
       return [];
     }
 
@@ -744,6 +745,17 @@ class RoomService {
         data.entries.map((e) => GameRoom.fromJson(Map<String, dynamic>.from(e.value as Map), e.key)).toList();
 
     print('🔍 Total rooms in database: ${allRooms.length}');
+
+    // Debug: Show rooms matching our gameType
+    final matchingTypeRooms = allRooms.where((r) => r.gameType == gameType).toList();
+    print('🎮 Found ${matchingTypeRooms.length} rooms with gameType=$gameType:');
+    for (final room in matchingTypeRooms) {
+      final userInRoom = room.players.any((p) => p.uid == userId);
+      final matchesBlind = room.bigBlind == bigBlind;
+      print(
+          '   Room ${room.id}: blind=${room.bigBlind}, status=${room.status}, players=${room.players.length}/${room.maxPlayers}, private=${room.isPrivate}');
+      print('      matchesBlind=$matchesBlind, userInRoom=$userInRoom, isFull=${room.isFull}');
+    }
 
     // Debug: Show ALL rooms with sitandgo in gameType
     final sitAndGoRooms = allRooms.where((r) => r.gameType.contains('sitandgo')).toList();

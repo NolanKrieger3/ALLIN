@@ -45,6 +45,11 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
   bool _hasTriggeredNewHand = false;
   bool _showingBuyBackDialog = false; // Track if buy-back dialog is open
 
+  // Room connection tracking - prevent premature "Room not found" errors
+  int _nullRoomCount = 0;
+  static const int _maxNullRetries = 10; // Allow up to 5 seconds of null responses (10 * 500ms)
+  bool _roomVerified = false; // True once we've successfully received room data
+
   // Heartbeat timer for presence detection
   Timer? _heartbeatTimer;
 
@@ -667,7 +672,33 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
           }
 
           final room = snapshot.data;
+
+          // Track null responses to avoid premature "Room not found" errors
+          // This handles race conditions where room data hasn't propagated yet
           if (room == null) {
+            _nullRoomCount++;
+
+            // If we've previously verified the room exists, or we're still within retry window, show loading
+            if (_roomVerified || _nullRoomCount < _maxNullRetries) {
+              return Scaffold(
+                backgroundColor: Colors.black,
+                body: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const CircularProgressIndicator(color: Colors.white),
+                      const SizedBox(height: 16),
+                      Text(
+                        _roomVerified ? 'Reconnecting...' : 'Connecting to room...',
+                        style: const TextStyle(color: Colors.white70, fontSize: 14),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }
+
+            // Only show "Room not found" after exhausting retries
             return Scaffold(
               backgroundColor: Colors.black,
               body: Center(
@@ -684,6 +715,11 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
                       'Room not found',
                       style: TextStyle(color: Colors.white, fontSize: 18),
                     ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'The room may have been closed',
+                      style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13),
+                    ),
                     const SizedBox(height: 24),
                     ElevatedButton(
                       onPressed: () => Navigator.pop(context),
@@ -694,6 +730,10 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
               ),
             );
           }
+
+          // Room found! Reset null counter and mark as verified
+          _nullRoomCount = 0;
+          _roomVerified = true;
 
           // Auto-start the game immediately (skip waiting room)
           // Also handle when 2nd player joins a 'waiting_for_players' room
