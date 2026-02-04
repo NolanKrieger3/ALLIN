@@ -138,8 +138,16 @@ class GameFlowService {
       return;
     }
 
-    // Remove eliminated players
+    // Debug: Log all players before filtering
+    print('🔍 newHand: room.players count = ${room.players.length}');
+    for (final p in room.players) {
+      print('   Player: ${p.displayName} (${p.uid.substring(0, 8)}), chips=${p.chips}, hasFolded=${p.hasFolded}');
+    }
+
+    // Remove eliminated players (keep all players with chips > 0)
     var players = room.players.where((p) => p.chips > 0).toList();
+
+    print('🔍 newHand: After filtering, ${players.length} players with chips > 0');
     if (players.length < 2) {
       await http.patch(
         Uri.parse('${RoomService.databaseUrl}/game_rooms/$roomId.json?auth=$token'),

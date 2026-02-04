@@ -77,6 +77,10 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
   bool _isBotActing = false;
   String? _lastBotTurnId;
 
+  // Chip tracking for global balance
+  int? _initialBuyIn; // Track initial buy-in to calculate profit/loss
+  bool _hasDeductedBuyIn = false; // Track if we've deducted buy-in from global balance
+
   // Cache the stream to prevent flickering on rebuild
   late final Stream<GameRoom?> _roomStream;
 
@@ -88,6 +92,10 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
 
     // Cache the stream once - prevents recreation on every build which causes flickering
     _roomStream = _gameService.watchRoom(widget.roomId);
+
+    // Deduct buy-in from global balance when entering game
+    _deductInitialBuyIn();
+
     _foldAnimationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 400),
@@ -119,7 +127,8 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
     _turnTimer?.cancel();
     _foldAnimationController.dispose();
     _chatController.dispose();
-    // Leave room when disposed
+    // Save chips and leave room when disposed
+    _saveChipsOnExit();
     _gameService.leaveRoom(widget.roomId);
     super.dispose();
   }
@@ -128,12 +137,60 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
     if (state == AppLifecycleState.paused || state == AppLifecycleState.detached || state == AppLifecycleState.hidden) {
-      // App is going to background or closing - leave the room immediately
+      // App is going to background or closing - save chips and leave
+      _saveChipsOnExit();
       _gameService.leaveRoom(widget.roomId);
     } else if (state == AppLifecycleState.resumed) {
       // App is back - restart heartbeat
       _startHeartbeat();
     }
+  }
+
+  /// Deduct buy-in from global balance when entering multiplayer game
+  Future<void> _deductInitialBuyIn() async {
+    if (_hasDeductedBuyIn) return;
+
+    // Fetch room to get our current chips (which is our buy-in)
+    final room = await _gameService.fetchRoom(widget.roomId);
+    if (room == null) return;
+
+    final myPlayer = room.players.where((p) => p.uid == _gameService.currentUserId).firstOrNull;
+    if (myPlayer == null) return;
+
+    _initialBuyIn = myPlayer.chips;
+    _hasDeductedBuyIn = true;
+
+    // Deduct from global balance
+    final currentBalance = UserPreferences.chips;
+    final newBalance = currentBalance - myPlayer.chips;
+    await UserPreferences.setChips(newBalance);
+
+    print('💰 Deducted ${myPlayer.chips} chips from global balance (new balance: $newBalance)');
+  }
+
+  /// Save chips back to global balance when leaving game
+  Future<void> _saveChipsOnExit() async {
+    if (!_hasDeductedBuyIn) return; // Never deducted, don't add back
+
+    // Fetch room to get our current chips
+    final room = await _gameService.fetchRoom(widget.roomId);
+    if (room == null) {
+      // Room gone, can't recover chips - this shouldn't normally happen
+      print('⚠️ Room not found when trying to save chips');
+      return;
+    }
+
+    final myPlayer = room.players.where((p) => p.uid == _gameService.currentUserId).firstOrNull;
+    final currentChips = myPlayer?.chips ?? 0;
+
+    // Add current chips back to global balance
+    final currentBalance = UserPreferences.chips;
+    final newBalance = currentBalance + currentChips;
+    await UserPreferences.setChips(newBalance);
+
+    final profit = currentChips - (_initialBuyIn ?? 0);
+    print(
+        '💰 Saved $currentChips chips to global balance (profit: ${profit >= 0 ? "+" : ""}$profit, new balance: $newBalance)');
   }
 
   void _startHeartbeat() {
@@ -439,6 +496,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
           TextButton(
             onPressed: () async {
               Navigator.pop(dialogContext); // Close dialog first
+              await _saveChipsOnExit(); // Save chips before leaving
               await _gameService.leaveRoom(widget.roomId);
               if (!mounted) return;
               navigator.pop(); // Leave screen using captured navigator

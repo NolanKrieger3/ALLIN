@@ -60,6 +60,23 @@ class GameActionService {
     return playerId.startsWith('bot_');
   }
 
+  /// Merge players who joined mid-hand into the updated players list
+  /// This prevents race conditions where new players are overwritten
+  List<GamePlayer> _mergeNewPlayers(List<GamePlayer> updatedPlayers, List<GamePlayer> currentPlayers) {
+    final updatedUids = updatedPlayers.map((p) => p.uid).toSet();
+    final newPlayers = currentPlayers.where((p) => !updatedUids.contains(p.uid)).toList();
+    
+    if (newPlayers.isNotEmpty) {
+      print('🔀 Merging ${newPlayers.length} new player(s) who joined mid-hand');
+      for (final p in newPlayers) {
+        print('   Adding: ${p.displayName} (${p.uid.substring(0, 8)})');
+      }
+    }
+    
+    return [...updatedPlayers, ...newPlayers];
+  }
+  }
+
   /// Player action (fold, check, call, raise, allin)
   Future<void> playerAction(String roomId, String action, {int? raiseAmount}) async {
     final userId = currentUserId;
@@ -367,6 +384,12 @@ class GameActionService {
   }) async {
     final token = await _getAuthToken();
 
+    // Re-fetch room to get any new players who joined mid-hand
+    final currentRoom = await _roomService.fetchRoom(roomId);
+    if (currentRoom != null) {
+      updatedPlayers = _mergeNewPlayers(updatedPlayers, currentRoom.players);
+    }
+
     // Check if hand is over (only one player left)
     final activePlayers = updatedPlayers.where((p) => !p.hasFolded).toList();
     if (activePlayers.length == 1) {
@@ -612,6 +635,12 @@ class GameActionService {
     final communityCards = List<PlayingCard>.from(room.communityCards);
     final currentPhase = GamePhase.fromString(room.phase);
     GamePhase nextPhase;
+
+    // Re-fetch room to get any new players who joined mid-hand
+    final currentRoom = await _roomService.fetchRoom(roomId);
+    if (currentRoom != null) {
+      players = _mergeNewPlayers(players, currentRoom.players);
+    }
 
     var updatedPlayers = players.map((p) => p.copyWith(currentBet: 0, hasActed: false, lastAction: null)).toList();
 
