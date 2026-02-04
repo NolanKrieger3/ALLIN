@@ -78,6 +78,10 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
   String? _lastShowdownPhase;
   EvaluatedHand? _winningHand;
 
+  // Community card animation tracking
+  int _lastCommunityCardCount = 0;
+  List<int> _animatedCardIndices = [];
+
   // Bot handling
   bool _isBotActing = false;
   String? _lastBotTurnId;
@@ -103,21 +107,21 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
 
     _foldAnimationController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 400),
+      duration: const Duration(milliseconds: 350),
     );
     _foldSlideAnimation = Tween<Offset>(
       begin: Offset.zero,
-      end: const Offset(0, -2),
+      end: const Offset(0, -1.5),
     ).animate(CurvedAnimation(
       parent: _foldAnimationController,
-      curve: Curves.easeInBack,
+      curve: Curves.easeOutCubic,
     ));
     _foldOpacityAnimation = Tween<double>(
       begin: 1.0,
       end: 0.0,
     ).animate(CurvedAnimation(
       parent: _foldAnimationController,
-      curve: Curves.easeOut,
+      curve: const Interval(0.5, 1.0, curve: Curves.easeOut),
     ));
 
     // Start heartbeat to show we're active (every 5 seconds)
@@ -527,6 +531,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
     setState(() {
       _isFolding = true;
       _foldedCards = List.from(cards);
+      _dragOffset = 0; // Reset drag offset
     });
 
     await _foldAnimationController.forward();
@@ -535,6 +540,30 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
     // Reset animation for next hand
     _foldAnimationController.reset();
     if (mounted) setState(() => _isFolding = false);
+  }
+
+  /// Smoothly animate drag offset back to zero
+  void _animateDragReset() {
+    // Use a simple animated reset
+    const duration = Duration(milliseconds: 200);
+    final startOffset = _dragOffset;
+    
+    // Create a simple animation using a ticker
+    late final AnimationController resetController;
+    resetController = AnimationController(
+      vsync: this,
+      duration: duration,
+    )..addListener(() {
+      if (mounted) {
+        setState(() {
+          _dragOffset = startOffset * (1 - resetController.value);
+        });
+      }
+    })..addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        resetController.dispose();
+      }
+    })..forward();
   }
 
   /// Start a new hand after the current one finishes
@@ -746,14 +775,22 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
 
           // Check for when only 1 player has chips remaining
           final playersWithChips = room.players.where((p) => p.chips > 0).toList();
-          final currentPlayer = room.players.firstWhere(
-            (p) => p.uid == _gameService.currentUserId,
-            orElse: () => room.players.first,
+          final currentPlayerId = _gameService.currentUserId;
+          
+          // Find current player in the room
+          GamePlayer? currentPlayer = room.players.cast<GamePlayer?>().firstWhere(
+            (p) => p?.uid == currentPlayerId,
+            orElse: () => null,
           );
-
+          
+          // If player was removed from room (0 chips and got filtered out in newHand),
+          // they need to buy back - create a placeholder for the check
+          final playerWasRemoved = currentPlayer == null && currentPlayerId != null;
+          
           // Check if current player is out of chips and show buy-back dialog (for quick play)
           if (widget.allowRebuy && room.status == 'finished') {
-            if (currentPlayer.chips <= 0 && !_showingBuyBackDialog) {
+            final playerHasNoChips = playerWasRemoved || (currentPlayer != null && currentPlayer.chips <= 0);
+            if (playerHasNoChips && !_showingBuyBackDialog) {
               WidgetsBinding.instance.addPostFrameCallback((_) {
                 if (mounted && !_showingBuyBackDialog) {
                   _showBuyBackDialog();
@@ -766,8 +803,12 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
           // - If only 1 player has chips, wait for the busted player to decide
           // - Show the waiting screen for the player who still has chips
           if (widget.allowRebuy && room.status == 'finished' && playersWithChips.length == 1) {
-            // One player busted - show waiting screen
-            return _buildWaitingForBuyBackScreen(room, playersWithChips.first);
+            // Check if we are the player with chips
+            final amITheWinner = playersWithChips.first.uid == currentPlayerId;
+            if (amITheWinner) {
+              // Show waiting screen for the player who still has chips
+              return _buildWaitingForBuyBackScreen(room, playersWithChips.first);
+            }
           }
 
           // Auto-start new hand after game finishes (if 2+ players still have chips)
@@ -1414,6 +1455,22 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
 
   Widget _buildCommunityCardsMinimal(GameRoom room) {
     final isShowdown = room.phase == 'showdown' && _showdownAnimationComplete;
+    
+    // Track new cards and trigger animations
+    final currentCardCount = room.communityCards.length;
+    if (currentCardCount > _lastCommunityCardCount) {
+      // New cards dealt - animate them
+      for (int i = _lastCommunityCardCount; i < currentCardCount; i++) {
+        if (!_animatedCardIndices.contains(i)) {
+          _animatedCardIndices.add(i);
+        }
+      }
+      _lastCommunityCardCount = currentCardCount;
+    } else if (currentCardCount < _lastCommunityCardCount) {
+      // New hand started - reset animation tracking
+      _lastCommunityCardCount = currentCardCount;
+      _animatedCardIndices.clear();
+    }
 
     return Column(
       children: [
@@ -1444,9 +1501,47 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
                   final card = i < room.communityCards.length ? room.communityCards[i] : null;
                   final isHighlighted = isShowdown && card != null && _isCardInWinningHand(card, room);
                   final isDimmed = isShowdown && card != null && !_isCardInWinningHand(card, room);
+                  final isNewCard = _animatedCardIndices.contains(i);
+                  
                   if (card == null) {
                     return _buildEmptyCardSlot();
                   }
+                  
+                  // Animate new cards with a flip effect
+                  if (isNewCard) {
+                    return TweenAnimationBuilder<double>(
+                      duration: Duration(milliseconds: 300 + (i * 100)), // Stagger animation
+                      tween: Tween(begin: 0.0, end: 1.0),
+                      builder: (context, value, child) {
+                        return Transform(
+                          alignment: Alignment.center,
+                          transform: Matrix4.identity()
+                            ..setEntry(3, 2, 0.001)
+                            ..rotateY((1 - value) * 3.14159 / 2), // Flip from side
+                          child: Opacity(
+                            opacity: value,
+                            child: Transform.scale(
+                              scale: 0.8 + (0.2 * value), // Scale up slightly
+                              child: _buildMinimalCard(
+                                card,
+                                isHighlighted: isHighlighted,
+                                isDimmed: isDimmed,
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                      onEnd: () {
+                        // Remove from animated list after animation completes
+                        if (mounted) {
+                          setState(() {
+                            _animatedCardIndices.remove(i);
+                          });
+                        }
+                      },
+                    );
+                  }
+                  
                   return _buildMinimalCard(
                     card,
                     isHighlighted: isHighlighted,
@@ -1785,7 +1880,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
                       : () async {
                           // Debounce: prevent rapid button presses
                           final now = DateTime.now();
-                          if (_lastActionTime != null && now.difference(_lastActionTime!).inMilliseconds < 300) {
+                          if (_lastActionTime != null && now.difference(_lastActionTime!).inMilliseconds < 200) {
                             return;
                           }
 
@@ -1794,14 +1889,13 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
                             _lastActionTime = now;
                           });
 
-                          // Add slight delay for smoother feel
-                          await Future.delayed(const Duration(milliseconds: 150));
-                          await _gameService.playerAction(widget.roomId, canCheck ? 'check' : 'call');
-
-                          // Reset after action completes
-                          await Future.delayed(const Duration(milliseconds: 200));
-                          if (mounted) {
-                            setState(() => _isProcessingAction = false);
+                          try {
+                            await _gameService.playerAction(widget.roomId, canCheck ? 'check' : 'call');
+                          } finally {
+                            // Reset after action completes
+                            if (mounted) {
+                              setState(() => _isProcessingAction = false);
+                            }
                           }
                         },
                   padding: const EdgeInsets.symmetric(vertical: 14),
@@ -1869,8 +1963,8 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
                       if (_isProcessingAction) return;
                       setState(() {
                         _dragOffset += details.delta.dy;
-                        // Clamp to only allow upward drag
-                        if (_dragOffset > 0) _dragOffset = 0;
+                        // Clamp to only allow upward drag (max -150)
+                        _dragOffset = _dragOffset.clamp(-150.0, 0.0);
                       });
                     },
                     onVerticalDragEnd: (details) async {
@@ -1880,18 +1974,23 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
                         return;
                       }
 
-                      // If swiped up enough (past threshold) or fast enough, trigger fold
-                      if (_dragOffset < -80 || (details.primaryVelocity != null && details.primaryVelocity! < -300)) {
+                      // Lower threshold for easier fold trigger
+                      // Also detect fast swipes even if distance is small
+                      final velocity = details.primaryVelocity ?? 0;
+                      if (_dragOffset < -60 || velocity < -400) {
                         setState(() => _isProcessingAction = true);
-                        await Future.delayed(const Duration(milliseconds: 100));
                         _animateFold(player.cards);
-                        await Future.delayed(const Duration(milliseconds: 300));
+                        await Future.delayed(const Duration(milliseconds: 350));
                         if (mounted) {
                           setState(() => _isProcessingAction = false);
                         }
+                      } else {
+                        // Animate back to original position
+                        _animateDragReset();
                       }
-                      // Reset drag offset
-                      setState(() => _dragOffset = 0);
+                    },
+                    onVerticalDragCancel: () {
+                      _animateDragReset();
                     },
                     child: _isFolding
                         ? SlideTransition(

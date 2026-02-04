@@ -565,6 +565,7 @@ class RoomService {
   }
 
   /// Update a player's chips (for buy-back/rebuy functionality)
+  /// If player was removed from room, this will re-add them
   Future<void> updatePlayerChips(String roomId, String playerId, int newChips) async {
     final token = await getAuthToken();
 
@@ -578,8 +579,36 @@ class RoomService {
     final room = GameRoom.fromJson(roomData, roomId);
 
     final playerIndex = room.players.indexWhere((p) => p.uid == playerId);
+    
     if (playerIndex == -1) {
-      throw Exception('Player not found in room');
+      // Player was removed - re-add them to the room
+      print('⚠️ Player not found in room, re-adding with new chips...');
+      
+      final username = await _getUsername();
+      final avatarIndex = UserPreferences.avatarIndex;
+      
+      final newPlayer = GamePlayer(
+        uid: playerId,
+        displayName: username,
+        chips: newChips,
+        hasFolded: false,
+        avatarIndex: avatarIndex,
+      );
+      
+      // Add player back to the room
+      final newPlayerIndex = room.players.length;
+      final addResponse = await http.patch(
+        Uri.parse('$databaseUrl/game_rooms/$roomId/players/$newPlayerIndex.json?auth=$token'),
+        headers: _jsonHeaders,
+        body: jsonEncode(newPlayer.toJson()),
+      );
+      
+      if (addResponse.statusCode != 200) {
+        throw Exception('Failed to re-add player to room');
+      }
+      
+      print('✅ Re-added player $playerId with $newChips chips');
+      return;
     }
 
     // Patch the player's chips
@@ -604,8 +633,9 @@ class RoomService {
   // ============================================================================
 
   /// Listen to a specific room (polling-based)
+  /// Uses 750ms interval for better performance while maintaining responsiveness
   Stream<GameRoom?> watchRoom(String roomId) {
-    return Stream.periodic(const Duration(milliseconds: 500)).asyncMap((_) => fetchRoom(roomId));
+    return Stream.periodic(const Duration(milliseconds: 750)).asyncMap((_) => fetchRoom(roomId));
   }
 
   /// Fetch a single room
