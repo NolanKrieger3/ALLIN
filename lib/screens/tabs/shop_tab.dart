@@ -292,122 +292,101 @@ class ShopTabState extends State<ShopTab> with SingleTickerProviderStateMixin {
   }
 
   Widget _buildStarterPackCard() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            const Color(0xFF0D3B4A),
-            const Color(0xFF0A2530),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+    return AnimatedTapButton(
+      onTap: () {
+        // TODO: Handle starter pack purchase
+      },
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.03),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFF6366F1).withValues(alpha: 0.25), width: 1),
         ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF4DD0E1).withValues(alpha: 0.3), width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF4DD0E1).withValues(alpha: 0.1),
-            blurRadius: 20,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          // Rocket icon with glow
-          Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF4DD0E1), Color(0xFF26C6DA)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
+        child: Row(
+          children: [
+            // Rocket icon with subtle glow
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                color: const Color(0xFF6366F1).withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(12),
               ),
-              borderRadius: BorderRadius.circular(14),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF4DD0E1).withValues(alpha: 0.4),
-                  blurRadius: 12,
-                ),
-              ],
+              child: const Icon(Icons.rocket_launch_rounded, color: Color(0xFF6366F1), size: 26),
             ),
-            child: const Icon(Icons.rocket_launch_rounded, color: Colors.white, size: 28),
-          ),
-          const SizedBox(width: 14),
-          // Content
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    const Text(
-                      'Starter Pack',
-                      style: TextStyle(
-                        color: Color(0xFF4DD0E1),
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
+            const SizedBox(width: 14),
+            // Content
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Text(
+                        'Starter Pack',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF4DD0E1).withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(4),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF22C55E).withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text(
+                          '50% OFF',
+                          style: TextStyle(color: Color(0xFF22C55E), fontSize: 9, fontWeight: FontWeight.w700),
+                        ),
                       ),
-                      child: const Text(
-                        '50% OFF',
-                        style: TextStyle(color: Color(0xFF4DD0E1), fontSize: 9, fontWeight: FontWeight.w700),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    _buildStarterItem(Icons.paid_rounded, '10K'),
-                    const SizedBox(width: 12),
-                    _buildStarterItem(Icons.diamond_rounded, '50'),
-                    const SizedBox(width: 12),
-                    _buildStarterItem(Icons.style_rounded, 'Card'),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          // Price column
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                '\$5.99',
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.35),
-                  fontSize: 11,
-                  decoration: TextDecoration.lineThrough,
-                  decorationColor: Colors.white.withValues(alpha: 0.35),
-                ),
-              ),
-              const SizedBox(height: 4),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF4DD0E1), Color(0xFF00ACC1)],
+                    ],
                   ),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Text(
-                  '\$2.99',
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14),
-                ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      _buildStarterItem(Icons.paid_rounded, '10K'),
+                      const SizedBox(width: 12),
+                      _buildStarterItem(Icons.diamond_rounded, '50'),
+                      const SizedBox(width: 12),
+                      _buildStarterItem(Icons.style_rounded, 'Card'),
+                    ],
+                  ),
+                ],
               ),
-            ],
-          ),
-        ],
+            ),
+            // Price column
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  '\$5.99',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.3),
+                    fontSize: 11,
+                    decoration: TextDecoration.lineThrough,
+                    decorationColor: Colors.white.withValues(alpha: 0.3),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF6366F1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Text(
+                    '\$2.99',
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -416,173 +395,148 @@ class ShopTabState extends State<ShopTab> with SingleTickerProviderStateMixin {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, color: const Color(0xFF4DD0E1).withValues(alpha: 0.7), size: 14),
+        Icon(icon, color: Colors.white.withValues(alpha: 0.5), size: 14),
         const SizedBox(width: 3),
         Text(
           label,
-          style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 11, fontWeight: FontWeight.w500),
+          style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 11, fontWeight: FontWeight.w500),
         ),
       ],
     );
   }
 
   Widget _buildVIPBundleCard() {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF2D1F0D), Color(0xFF1A1208)],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        ),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          width: 2,
-          color: const Color(0xFFD4AF37).withValues(alpha: 0.5),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFFD4AF37).withValues(alpha: 0.15),
-            blurRadius: 24,
-            offset: const Offset(0, 8),
+    return AnimatedTapButton(
+      onTap: () {
+        // TODO: Handle VIP bundle purchase
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              const Color(0xFFD4AF37).withValues(alpha: 0.08),
+              const Color(0xFFD4AF37).withValues(alpha: 0.02),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
-        ],
-      ),
-      child: Column(
-        children: [
-          // Crown header
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 10),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  const Color(0xFFD4AF37).withValues(alpha: 0.2),
-                  const Color(0xFFD4AF37).withValues(alpha: 0.05),
-                ],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            width: 1,
+            color: const Color(0xFFD4AF37).withValues(alpha: 0.25),
+          ),
+        ),
+        child: Column(
+          children: [
+            // Best Value header - subtle
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFD4AF37).withValues(alpha: 0.1),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(13)),
               ),
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.auto_awesome, color: const Color(0xFFD4AF37).withValues(alpha: 0.8), size: 14),
+                  const SizedBox(width: 6),
+                  Text(
+                    'BEST VALUE',
+                    style: TextStyle(
+                      color: const Color(0xFFD4AF37).withValues(alpha: 0.9),
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Icon(Icons.auto_awesome, color: const Color(0xFFD4AF37).withValues(alpha: 0.8), size: 14),
+                ],
+              ),
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.auto_awesome, color: Color(0xFFD4AF37), size: 16),
-                const SizedBox(width: 6),
-                const Text(
-                  'BEST VALUE',
-                  style: TextStyle(
-                    color: Color(0xFFD4AF37),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 1.5,
-                  ),
-                ),
-                const SizedBox(width: 6),
-                const Icon(Icons.auto_awesome, color: Color(0xFFD4AF37), size: 16),
-              ],
-            ),
-          ),
-          // Main content
-          Padding(
-            padding: const EdgeInsets.all(18),
-            child: Row(
-              children: [
-                // Premium emblem
-                Container(
-                  width: 64,
-                  height: 64,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFFFFD700), Color(0xFFD4AF37), Color(0xFFB8860B)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
+            // Main content
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  // Premium emblem - more subtle
+                  Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFD4AF37).withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(14),
                     ),
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFFD4AF37).withValues(alpha: 0.5),
-                        blurRadius: 16,
-                      ),
-                    ],
+                    child: const Icon(Icons.workspace_premium_rounded, color: Color(0xFFD4AF37), size: 28),
                   ),
-                  child: const Icon(Icons.workspace_premium_rounded, color: Colors.white, size: 32),
-                ),
-                const SizedBox(width: 16),
-                // VIP content
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'VIP Bundle',
-                        style: TextStyle(
-                          color: Color(0xFFFFD700),
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      _buildVIPItem(Icons.paid_rounded, '100,000 Chips'),
-                      const SizedBox(height: 4),
-                      _buildVIPItem(Icons.diamond_rounded, '500 Gems'),
-                      const SizedBox(height: 4),
-                      _buildVIPItem(Icons.collections_rounded, 'Royal Card Set'),
-                    ],
-                  ),
-                ),
-                // Price
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEF4444).withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: const Text(
-                        'SAVE 60%',
-                        style: TextStyle(color: Color(0xFFEF4444), fontSize: 9, fontWeight: FontWeight.w700),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      '\$49.99',
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.35),
-                        fontSize: 12,
-                        decoration: TextDecoration.lineThrough,
-                        decorationColor: Colors.white.withValues(alpha: 0.35),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFFFFD700), Color(0xFFD4AF37)],
-                        ),
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFFD4AF37).withValues(alpha: 0.4),
-                            blurRadius: 12,
-                            offset: const Offset(0, 4),
+                  const SizedBox(width: 14),
+                  // VIP content
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'VIP Bundle',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
                           ),
-                        ],
-                      ),
-                      child: const Text(
-                        '\$19.99',
-                        style: TextStyle(color: Colors.black, fontWeight: FontWeight.w800, fontSize: 16),
-                      ),
+                        ),
+                        const SizedBox(height: 6),
+                        _buildVIPItem(Icons.paid_rounded, '100,000 Chips'),
+                        const SizedBox(height: 3),
+                        _buildVIPItem(Icons.diamond_rounded, '500 Gems'),
+                        const SizedBox(height: 3),
+                        _buildVIPItem(Icons.collections_rounded, 'Royal Card Set'),
+                      ],
                     ),
-                  ],
-                ),
-              ],
+                  ),
+                  // Price
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF22C55E).withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text(
+                          'SAVE 60%',
+                          style: TextStyle(color: Color(0xFF22C55E), fontSize: 9, fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        '\$49.99',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.3),
+                          fontSize: 11,
+                          decoration: TextDecoration.lineThrough,
+                          decorationColor: Colors.white.withValues(alpha: 0.3),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFD4AF37),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Text(
+                          '\$19.99',
+                          style: TextStyle(color: Colors.black, fontWeight: FontWeight.w700, fontSize: 14),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -590,11 +544,11 @@ class ShopTabState extends State<ShopTab> with SingleTickerProviderStateMixin {
   Widget _buildVIPItem(IconData icon, String label) {
     return Row(
       children: [
-        Icon(icon, color: const Color(0xFFD4AF37).withValues(alpha: 0.8), size: 14),
+        Icon(icon, color: const Color(0xFFD4AF37).withValues(alpha: 0.7), size: 13),
         const SizedBox(width: 6),
         Text(
           label,
-          style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 12),
+          style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 11),
         ),
       ],
     );
