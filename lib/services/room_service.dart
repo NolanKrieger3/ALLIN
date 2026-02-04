@@ -662,25 +662,31 @@ class RoomService {
           '🎰 SitAndGo Room ${room.id}: status=${room.status}, players=${room.players.length}/${room.maxPlayers}, isFull=${room.isFull}, userInRoom=$userInRoom');
     }
 
-    final filteredRooms = allRooms
-        .where(
-          (room) =>
-              room.status == 'waiting' &&
-              !room.isFull &&
-              room.gameType == gameType &&
-              !room.isPrivate &&
-              !room.players.any((p) => p.uid == userId),
-        )
-        .toList();
+    final filteredRooms = allRooms.where(
+      (room) {
+        // Sit & Go only allows joining waiting rooms
+        // Cash/quickplay allows joining playing rooms too
+        bool isJoinable;
+        if (gameType == 'sitandgo') {
+          isJoinable = room.status == RoomStatus.waiting;
+        } else {
+          isJoinable = room.status == RoomStatus.waiting || room.status == RoomStatus.playing;
+        }
+        return isJoinable &&
+            !room.isFull &&
+            room.gameType == gameType &&
+            !room.isPrivate &&
+            !room.players.any((p) => p.uid == userId);
+      },
+    ).toList();
 
     print('✅ Found ${filteredRooms.length} joinable $gameType rooms');
     return filteredRooms;
   }
 
   /// Fetch joinable rooms by blind level
+  /// Note: Call cleanupStaleRooms() separately if needed, not on every fetch
   Future<List<GameRoom>> fetchJoinableRoomsByBlind(int bigBlind, {String gameType = 'cash', int? maxPlayers}) async {
-    await cleanupStaleRooms();
-
     final token = await getAuthToken();
     final userId = currentUserId;
 
@@ -832,13 +838,15 @@ class RoomService {
     final roomData = jsonDecode(response.body) as Map<String, dynamic>;
     final room = GameRoom.fromJson(roomData, roomId);
 
-    if (room.hostId != userId) return;
+    // Allow any player to trigger cleanup (not just host)
+    // This ensures inactive players are removed even if host disconnects
+    if (!room.players.any((p) => p.uid == userId)) return;
     // Allow removal from both waiting and playing rooms
     if (room.status == RoomStatus.finished) return;
 
     final now = DateTime.now();
-    // Reduced timeout from 45s to 15s for quicker disconnect detection
-    const inactiveTimeoutSeconds = 15;
+    // Reduced timeout to 10s for quicker disconnect detection (heartbeat is every 3s)
+    const inactiveTimeoutSeconds = 10;
     final activePlayers = room.players.where((p) {
       // Bots are always considered active - they don't send heartbeats
       if (p.uid.startsWith('bot_')) {
@@ -901,12 +909,23 @@ class RoomService {
           return;
         }
 
+        // Calculate forfeited chips from removed players
+        final removedPlayers = room.players.where((p) => !activePlayers.any((ap) => ap.uid == p.uid)).toList();
+        final forfeitedChips = removedPlayers.fold<int>(0, (sum, p) => sum + p.chips);
+
+        // If game is in progress, add forfeited chips to pot
+        final newPot = room.status == RoomStatus.playing ? room.pot + forfeitedChips : room.pot;
+        if (forfeitedChips > 0 && room.status == RoomStatus.playing) {
+          print('💸 Inactive players forfeited $forfeitedChips chips. Pot is now $newPot');
+        }
+
         final patchResponse = await http.patch(
           Uri.parse('$databaseUrl/game_rooms/$roomId.json?auth=$token'),
           headers: _jsonHeaders,
           body: jsonEncode({
             'players': activePlayers.map((p) => p.toJson()).toList(),
             'hostId': newHostId,
+            'pot': newPot,
             'lastActivityAt': DateTime.now().millisecondsSinceEpoch,
           }),
         );

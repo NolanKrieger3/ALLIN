@@ -100,26 +100,34 @@ class _QuickPlayScreenState extends State<QuickPlayScreen> {
       // FAST matchmaking: Try to find a room immediately, create if none exist
       print('🔍 Quick matchmaking for blind $bigBlind');
 
-      // Step 1: Search for joinable rooms
-      final rooms = await _gameService.fetchJoinableRoomsByBlind(bigBlind, gameType: 'quickplay');
+      // Step 1: Search for joinable rooms with retry
+      // Retry up to 3 times to handle race conditions where room state changes
+      for (int attempt = 0; attempt < 3 && roomId == null; attempt++) {
+        if (attempt > 0) {
+          print('🔄 Retry attempt $attempt - re-fetching rooms');
+          await Future.delayed(const Duration(milliseconds: 200));
+        }
 
-      if (rooms.isNotEmpty) {
-        // Try to join the first available room
-        for (final room in rooms) {
-          try {
-            print('🎯 Joining room ${room.id}');
-            await _gameService.joinRoom(room.id, startingChips: buyIn);
-            roomId = room.id;
-            print('✅ Joined room ${room.id}');
-            break;
-          } catch (e) {
-            print('❌ Room ${room.id} unavailable: $e');
-            continue;
+        final rooms = await _gameService.fetchJoinableRoomsByBlind(bigBlind, gameType: 'quickplay');
+
+        if (rooms.isNotEmpty) {
+          // Try to join the first available room
+          for (final room in rooms) {
+            try {
+              print('🎯 Joining room ${room.id}');
+              await _gameService.joinRoom(room.id, startingChips: buyIn);
+              roomId = room.id;
+              print('✅ Joined room ${room.id}');
+              break;
+            } catch (e) {
+              print('❌ Room ${room.id} unavailable: $e');
+              continue;
+            }
           }
         }
       }
 
-      // Step 2: If no room found, create one immediately
+      // Step 2: If no room found after retries, create one
       if (roomId == null) {
         print('📦 Creating new room');
         final room = await _gameService.createRoom(
