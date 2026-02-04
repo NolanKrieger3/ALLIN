@@ -725,10 +725,7 @@ class RoomService {
   /// Fetch joinable rooms by blind level
   /// Note: Call cleanupStaleRooms() separately if needed, not on every fetch
   Future<List<GameRoom>> fetchJoinableRoomsByBlind(int bigBlind, {String gameType = 'cash', int? maxPlayers}) async {
-<<<<<<< HEAD
-=======
     // Note: Stale room cleanup now happens periodically, not on every fetch
->>>>>>> 744bc1ca92d111c8f067ab7766cb844c9b9883a5
     final token = await getAuthToken();
     final userId = currentUserId;
 
