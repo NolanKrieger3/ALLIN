@@ -10,6 +10,7 @@ class Bot {
   int chips;
   List<PlayingCard> cards;
   int currentBet;
+  int totalBetThisHand; // Total bet for entire hand (for side pots)
   bool hasFolded;
   bool hasActed;
   String? lastAction;
@@ -20,6 +21,7 @@ class Bot {
     this.chips = 50000,
     List<PlayingCard>? cards,
     this.currentBet = 0,
+    this.totalBetThisHand = 0,
     this.hasFolded = false,
     this.hasActed = false,
     this.lastAction,
@@ -28,6 +30,7 @@ class Bot {
   void reset() {
     cards = [];
     currentBet = 0;
+    totalBetThisHand = 0;
     hasFolded = false;
     hasActed = false;
     lastAction = null;
@@ -35,6 +38,14 @@ class Bot {
 
   bool get isAllIn => chips == 0 && !hasFolded;
   bool get isActive => !hasFolded && chips >= 0;
+}
+
+// Side pot structure for all-in situations
+class _SidePot {
+  final int amount;
+  final List<int> eligibleSeats; // Seats eligible to win this pot
+
+  _SidePot({required this.amount, required this.eligibleSeats});
 }
 
 class GameScreen extends StatefulWidget {
@@ -72,6 +83,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   int _pot = 0;
   int _playerChips = 0; // Table chips (from buy-in)
   int _playerBet = 0; // Player's current bet this round
+  int _playerTotalBetThisHand = 0; // Total amount bet this entire hand (for side pots)
   int _currentBet = 0; // The current bet to match
   int _lastRaiseAmount = 0; // For minimum raise calculation
   int _bigBlind = 100; // Now dynamic based on selected blind level
@@ -81,6 +93,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   bool _bbHasOption = true; // Big blind's option to raise preflop
   bool _playerHasActed = false; // Track if player has acted this betting round
   bool _playerHasFolded = false; // Track if player has folded
+  bool _playerIsAllIn = false; // Track if player is all-in
   int _currentActorIndex = 0; // Index of current actor (0 = player, 1+ = bot index + 1)
 
   // Cards
@@ -184,8 +197,10 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       // Reset player state
       _playerCards = [_deck.removeLast(), _deck.removeLast()];
       _playerBet = 0;
+      _playerTotalBetThisHand = 0;
       _playerHasActed = false;
       _playerHasFolded = false;
+      _playerIsAllIn = false;
       _foldedCards = []; // Clear folded cards for new hand
 
       // Reset and deal to bots
@@ -198,8 +213,19 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
 
       _communityCards = [];
 
-      // Rotate dealer position each hand
-      _dealerPosition = (_dealerPosition + 1) % _getTotalPlayers();
+      // Rotate dealer position - skip eliminated players
+      int nextDealer = (_dealerPosition + 1) % _getTotalPlayers();
+      // Find next active seat for dealer button
+      for (int i = 0; i < _getTotalPlayers(); i++) {
+        int seat = (nextDealer + i) % _getTotalPlayers();
+        if (seat == 0 && !_playerHasFolded && _playerChips > 0) {
+          _dealerPosition = seat;
+          break;
+        } else if (seat > 0 && seat - 1 < _bots.length && _bots[seat - 1].chips > 0) {
+          _dealerPosition = seat;
+          break;
+        }
+      }
 
       // Post blinds based on positions
       final smallBlind = _bigBlind ~/ 2;
@@ -220,12 +246,15 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       if (sbSeat == 0) {
         int sb = smallBlind > _playerChips ? _playerChips : smallBlind;
         _playerBet = sb;
+        _playerTotalBetThisHand = sb;
         _playerChips -= sb;
         _pot = sb;
+        if (_playerChips == 0) _playerIsAllIn = true;
       } else {
         final bot = _bots[sbSeat - 1];
         int sb = smallBlind > bot.chips ? bot.chips : smallBlind;
         bot.currentBet = sb;
+        bot.totalBetThisHand = sb;
         bot.chips -= sb;
         _pot = sb;
       }
@@ -234,13 +263,16 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       if (bbSeat == 0) {
         int bb = _bigBlind > _playerChips ? _playerChips : _bigBlind;
         _playerBet = bb;
+        _playerTotalBetThisHand = bb;
         _playerChips -= bb;
         _pot += bb;
         _currentBet = bb; // Current bet is the big blind amount
+        if (_playerChips == 0) _playerIsAllIn = true;
       } else {
         final bot = _bots[bbSeat - 1];
         int bb = _bigBlind > bot.chips ? bot.chips : _bigBlind;
         bot.currentBet = bb;
+        bot.totalBetThisHand = bb;
         bot.chips -= bb;
         _pot += bb;
         _currentBet = bb;
@@ -290,24 +322,38 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
 
   void _dealCommunityCards() {
     setState(() {
+      // Safety check: ensure we have enough cards in deck
+      if (_deck.length < 2) {
+        // Not enough cards, skip to showdown
+        _gamePhase = 'river';
+        _advancePhase();
+        return;
+      }
+
       if (_gamePhase == 'preflop') {
-        // Burn one card, then deal flop (3 cards)
-        _deck.removeLast(); // Burn
-        _communityCards = [
-          _deck.removeLast(),
-          _deck.removeLast(),
-          _deck.removeLast(),
-        ];
+        // Burn one card, then deal flop (3 cards) - need 4 cards minimum
+        if (_deck.length >= 4) {
+          _deck.removeLast(); // Burn
+          _communityCards = [
+            _deck.removeLast(),
+            _deck.removeLast(),
+            _deck.removeLast(),
+          ];
+        }
         _gamePhase = 'flop';
       } else if (_gamePhase == 'flop') {
-        // Burn one card, then deal turn (1 card)
-        _deck.removeLast(); // Burn
-        _communityCards.add(_deck.removeLast());
+        // Burn one card, then deal turn (1 card) - need 2 cards minimum
+        if (_deck.length >= 2) {
+          _deck.removeLast(); // Burn
+          _communityCards.add(_deck.removeLast());
+        }
         _gamePhase = 'turn';
       } else if (_gamePhase == 'turn') {
-        // Burn one card, then deal river (1 card)
-        _deck.removeLast(); // Burn
-        _communityCards.add(_deck.removeLast());
+        // Burn one card, then deal river (1 card) - need 2 cards minimum
+        if (_deck.length >= 2) {
+          _deck.removeLast(); // Burn
+          _communityCards.add(_deck.removeLast());
+        }
         _gamePhase = 'river';
       }
 
@@ -367,11 +413,13 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
         case 'call':
           // Call the difference between current bet and what player has already bet
           int callAmount = _currentBet - _playerBet;
-          if (callAmount > _playerChips) {
+          if (callAmount >= _playerChips) {
             callAmount = _playerChips; // All-in if not enough
+            _playerIsAllIn = true;
           }
           _playerChips -= callAmount;
           _playerBet += callAmount;
+          _playerTotalBetThisHand += callAmount;
           _pot += callAmount;
           _moveToNextPlayer();
           break;
@@ -385,13 +433,15 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
           }
           int raiseBy = totalBet - _currentBet;
           int addAmount = totalBet - _playerBet;
-          if (addAmount > _playerChips) {
+          if (addAmount >= _playerChips) {
             addAmount = _playerChips;
             totalBet = _playerBet + addAmount;
             raiseBy = totalBet - _currentBet;
+            _playerIsAllIn = true;
           }
           _playerChips -= addAmount;
           _playerBet = totalBet;
+          _playerTotalBetThisHand += addAmount;
           _pot += addAmount;
           _lastRaiseAmount = raiseBy > 0 ? raiseBy : _bigBlind;
           _currentBet = totalBet;
@@ -409,24 +459,26 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
           int newTotalBet = _playerBet + allInAmount;
           _pot += allInAmount;
           _playerBet = newTotalBet;
+          _playerTotalBetThisHand += allInAmount;
           _playerChips = 0;
+          _playerIsAllIn = true;
 
           // Update current bet if this all-in is higher
           if (newTotalBet > _currentBet) {
             int raiseBy = newTotalBet - _currentBet;
-            if (raiseBy >= _lastRaiseAmount) {
+            // Only reopen betting if this is at least a minimum raise
+            bool isFullRaise = raiseBy >= _lastRaiseAmount;
+            if (isFullRaise) {
               _lastRaiseAmount = raiseBy;
+              // Reset acted flags for all active bots - full raise reopens betting
+              for (var bot in _bots) {
+                if (bot.isActive && !bot.isAllIn && bot.chips > 0) {
+                  bot.hasActed = false;
+                }
+              }
             }
             _currentBet = newTotalBet;
             _bbHasOption = false;
-          }
-
-          // ALWAYS reset acted flags for all active bots when player goes all-in
-          // This gives them the chance to call or fold
-          for (var bot in _bots) {
-            if (bot.isActive && !bot.isAllIn && bot.chips > 0 && bot.currentBet < _currentBet) {
-              bot.hasActed = false;
-            }
           }
 
           _moveToNextPlayer();
@@ -459,7 +511,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
 
       if (nextSeat == 0) {
         // Player's turn
-        if (!_playerHasFolded) {
+        if (!_playerHasFolded && !_playerIsAllIn) {
           // Player needs to act if:
           // 1. They haven't acted yet AND have chips, OR
           // 2. They haven't matched the current bet AND have chips
@@ -572,6 +624,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
             }
             bot.chips -= actualCall;
             bot.currentBet += actualCall;
+            bot.totalBetThisHand += actualCall;
             _pot += actualCall;
           } else {
             bot.lastAction = 'CHECK';
@@ -591,6 +644,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
 
           bot.chips -= addAmount;
           bot.currentBet = totalBet;
+          bot.totalBetThisHand += addAmount;
           _pot += addAmount;
           if (raiseBy >= _lastRaiseAmount) {
             _lastRaiseAmount = raiseBy;
@@ -598,10 +652,10 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
           _currentBet = totalBet;
           _bbHasOption = false;
 
-          // Reset all other players' acted flags since there's a new bet to respond to
-          // Only reset if this was a meaningful raise (not just a call that happens to be the max)
-          if (raiseBy > 0) {
-            if (!_playerHasFolded && _playerChips > 0) {
+          // Reset all other players' acted flags only if this is a full raise
+          bool isFullRaise = raiseBy >= _lastRaiseAmount;
+          if (isFullRaise && raiseBy > 0) {
+            if (!_playerHasFolded && _playerChips > 0 && !_playerIsAllIn) {
               _playerHasActed = false;
             }
             for (var otherBot in _bots) {
@@ -641,13 +695,13 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
 
     for (int seat in activePlayers) {
       if (seat == 0) {
-        // Player can act if they have chips
-        if (_playerChips > 0) playersCanAct++;
+        // Player can act if they have chips and aren't all-in
+        if (_playerChips > 0 && !_playerIsAllIn) playersCanAct++;
 
         // Player needs to act if:
         // 1. They haven't matched the current bet AND have chips to do so
         // 2. OR they haven't acted at all this round AND have chips
-        if (_playerChips > 0) {
+        if (_playerChips > 0 && !_playerIsAllIn) {
           if (_playerBet < _currentBet) {
             allMatched = false;
           } else if (!_playerHasActed) {
@@ -656,13 +710,13 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
         }
       } else {
         final bot = _bots[seat - 1];
-        // Bot can act if they have chips
-        if (bot.chips > 0) playersCanAct++;
+        // Bot can act if they have chips and aren't all-in
+        if (bot.chips > 0 && !bot.isAllIn) playersCanAct++;
 
         // Bot needs to act if:
         // 1. They haven't matched the current bet AND have chips to do so
         // 2. OR they haven't acted at all this round AND have chips
-        if (bot.chips > 0) {
+        if (bot.chips > 0 && !bot.isAllIn) {
           if (bot.currentBet < _currentBet) {
             allMatched = false;
           } else if (!bot.hasActed) {
@@ -686,14 +740,17 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
         final totalPlayers = _getTotalPlayers();
         int bbSeat = totalPlayers == 2 ? (_dealerPosition + 1) % totalPlayers : (_dealerPosition + 2) % totalPlayers;
 
-        if (bbSeat == 0 && !_playerHasFolded && _playerChips > 0) {
+        if (bbSeat == 0 && !_playerHasFolded && !_playerIsAllIn && _playerChips > 0) {
           setState(() {
             _currentActorIndex = 0;
             _isPlayerTurn = true;
             _playerHasActed = false;
           });
           return;
-        } else if (bbSeat > 0 && _bots[bbSeat - 1].isActive && _bots[bbSeat - 1].chips > 0) {
+        } else if (bbSeat > 0 &&
+            _bots[bbSeat - 1].isActive &&
+            !_bots[bbSeat - 1].isAllIn &&
+            _bots[bbSeat - 1].chips > 0) {
           _bots[bbSeat - 1].hasActed = false;
           _currentActorIndex = bbSeat;
           _isPlayerTurn = false;
@@ -709,46 +766,49 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     }
   }
 
-  void _dealToShowdown() {
-    setState(() {
-      // Deal remaining community cards based on current phase
-      switch (_gamePhase) {
-        case 'preflop':
-          // Burn + flop
-          _deck.removeLast();
-          _communityCards = [
-            _deck.removeLast(),
-            _deck.removeLast(),
-            _deck.removeLast(),
-          ];
-          // Burn + turn
-          _deck.removeLast();
-          _communityCards.add(_deck.removeLast());
-          // Burn + river
-          _deck.removeLast();
-          _communityCards.add(_deck.removeLast());
-          break;
-        case 'flop':
-          // Burn + turn
-          _deck.removeLast();
-          _communityCards.add(_deck.removeLast());
-          // Burn + river
-          _deck.removeLast();
-          _communityCards.add(_deck.removeLast());
-          break;
-        case 'turn':
-          // Burn + river
-          _deck.removeLast();
-          _communityCards.add(_deck.removeLast());
-          break;
-      }
-      _gamePhase = 'showdown';
-    });
+  void _dealToShowdown() async {
+    // Deal remaining community cards phase by phase with animation delays
+    final startingPhase = _gamePhase;
 
-    // Short delay then go to showdown
-    Future.delayed(const Duration(milliseconds: 500), () {
-      if (mounted) _showdown();
-    });
+    // Phase 1: Deal flop if we're in preflop
+    if (startingPhase == 'preflop') {
+      setState(() {
+        _deck.removeLast(); // burn
+        _communityCards = [
+          _deck.removeLast(),
+          _deck.removeLast(),
+          _deck.removeLast(),
+        ];
+        _gamePhase = 'flop';
+      });
+      await Future.delayed(const Duration(milliseconds: 1500));
+      if (!mounted) return;
+    }
+
+    // Phase 2: Deal turn if we're at flop or came from preflop
+    if (startingPhase == 'preflop' || startingPhase == 'flop') {
+      setState(() {
+        _deck.removeLast(); // burn
+        _communityCards.add(_deck.removeLast());
+        _gamePhase = 'turn';
+      });
+      await Future.delayed(const Duration(milliseconds: 1500));
+      if (!mounted) return;
+    }
+
+    // Phase 3: Deal river if we're at turn or came from earlier
+    if (startingPhase == 'preflop' || startingPhase == 'flop' || startingPhase == 'turn') {
+      setState(() {
+        _deck.removeLast(); // burn
+        _communityCards.add(_deck.removeLast());
+        _gamePhase = 'river';
+      });
+      await Future.delayed(const Duration(milliseconds: 1500));
+      if (!mounted) return;
+    }
+
+    // Final: Go to showdown
+    _showdown();
   }
 
   void _advancePhase() {
@@ -760,86 +820,182 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   }
 
   void _showdown() {
-    setState(() {
-      _gamePhase = 'showdown';
-      _showdownAnimationComplete = false;
+    // Evaluate all active hands
+    final activePlayers = _getActivePlayers();
+    Map<int, _EvaluatedHand> hands = {};
 
-      // Evaluate all active hands
-      final activePlayers = _getActivePlayers();
-      Map<int, _EvaluatedHand> hands = {};
+    // Safety check: need at least 5 community cards for proper evaluation
+    if (_communityCards.length < 5) {
+      // Fill in missing community cards if somehow missing
+      while (_communityCards.length < 5 && _deck.isNotEmpty) {
+        _communityCards.add(_deck.removeLast());
+      }
+    }
 
-      for (int seat in activePlayers) {
-        if (seat == 0) {
+    for (int seat in activePlayers) {
+      if (seat == 0) {
+        // Only evaluate if player has cards
+        if (_playerCards.length >= 2) {
           hands[0] = _evaluateBestHand(_playerCards, _communityCards);
-        } else {
-          final bot = _bots[seat - 1];
+        }
+      } else {
+        final bot = _bots[seat - 1];
+        // Only evaluate if bot has cards
+        if (bot.cards.length >= 2) {
           hands[seat] = _evaluateBestHand(bot.cards, _communityCards);
         }
       }
+    }
 
-      // Store hands for UI display
-      _showdownHands = hands;
+    // Calculate side pots
+    List<_SidePot> sidePots = _calculateSidePots();
 
-      // Find best hand(s)
+    // Distribute each side pot to the best hand(s) among eligible players
+    Map<int, int> winnings = {}; // seat -> total winnings
+    String winnerDesc = '';
+
+    for (var sidePot in sidePots) {
+      // Find best hand among eligible players
       _EvaluatedHand? bestHand;
-      List<int> winners = [];
+      List<int> potWinners = [];
 
-      for (var entry in hands.entries) {
-        if (bestHand == null || entry.value.compareTo(bestHand) > 0) {
-          bestHand = entry.value;
-          winners = [entry.key];
-        } else if (entry.value.compareTo(bestHand) == 0) {
-          winners.add(entry.key);
-        }
-      }
-
-      // Set winner for animation (first winner if split pot)
-      _winningSeat = winners.isNotEmpty ? winners[0] : null;
-
-      if (winners.length == 1) {
-        final winner = winners[0];
-        if (winner == 0) {
-          _winnerDescription = 'You win with ${_getShortHandName(bestHand!.rank)}';
-        } else {
-          _winnerDescription = '${_bots[winner - 1].name} wins with ${_getShortHandName(bestHand!.rank)}';
-        }
-      } else {
-        _winnerDescription = 'Split pot! ${winners.length} players tie with ${_getShortHandName(bestHand!.rank)}';
-      }
-
-      // Start animation delay - show all hands for 1 second before highlighting winner
-      Future.delayed(const Duration(seconds: 1), () {
-        if (mounted) {
-          setState(() => _showdownAnimationComplete = true);
-        }
-      });
-
-      // End hand after 3 seconds total
-      Future.delayed(const Duration(seconds: 3), () {
-        if (mounted) {
-          if (winners.length == 1) {
-            _endHand(winnerSeat: winners[0]);
-          } else {
-            _splitPot(winners);
+      for (int seat in sidePot.eligibleSeats) {
+        if (hands.containsKey(seat)) {
+          if (bestHand == null || hands[seat]!.compareTo(bestHand) > 0) {
+            bestHand = hands[seat];
+            potWinners = [seat];
+          } else if (hands[seat]!.compareTo(bestHand) == 0) {
+            potWinners.add(seat);
           }
         }
-      });
+      }
+
+      if (potWinners.isNotEmpty) {
+        int share = sidePot.amount ~/ potWinners.length;
+        int oddChips = sidePot.amount % potWinners.length;
+
+        // Give odd chips to player closest to dealer position
+        int oddChipRecipient = _getClosestToDealer(potWinners);
+
+        for (int seat in potWinners) {
+          int amount = share + (seat == oddChipRecipient ? oddChips : 0);
+          winnings[seat] = (winnings[seat] ?? 0) + amount;
+        }
+      }
+    }
+
+    // Build winner description from overall best hand
+    _EvaluatedHand? overallBest;
+    List<int> overallWinners = [];
+    for (var entry in hands.entries) {
+      if (overallBest == null || entry.value.compareTo(overallBest) > 0) {
+        overallBest = entry.value;
+        overallWinners = [entry.key];
+      } else if (entry.value.compareTo(overallBest) == 0) {
+        overallWinners.add(entry.key);
+      }
+    }
+
+    if (overallWinners.length == 1) {
+      final winner = overallWinners[0];
+      if (winner == 0) {
+        winnerDesc = 'You win with ${_getShortHandName(overallBest!.rank)}';
+      } else {
+        winnerDesc = '${_bots[winner - 1].name} wins with ${_getShortHandName(overallBest!.rank)}';
+      }
+    } else {
+      winnerDesc = 'Split pot! ${overallWinners.length} players tie with ${_getShortHandName(overallBest!.rank)}';
+    }
+
+    // Update state synchronously
+    setState(() {
+      _gamePhase = 'showdown';
+      _showdownAnimationComplete = false;
+      _showdownHands = hands;
+      _winningSeat = overallWinners.isNotEmpty ? overallWinners[0] : null;
+      _winnerDescription = winnerDesc;
+    });
+
+    // Start animation delay - show all hands for 1 second before highlighting winner
+    Future.delayed(const Duration(seconds: 1), () {
+      if (mounted) {
+        setState(() => _showdownAnimationComplete = true);
+      }
+    });
+
+    // End hand after 3 seconds total - distribute winnings
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted) {
+        _distributeWinnings(winnings);
+      }
     });
   }
 
-  void _splitPot(List<int> winners) {
+  List<_SidePot> _calculateSidePots() {
+    // Get all contributions from active (non-folded) players
+    List<Map<String, dynamic>> contributions = [];
+
+    // Player contribution
+    if (!_playerHasFolded) {
+      contributions.add({'seat': 0, 'amount': _playerTotalBetThisHand});
+    }
+
+    // Bot contributions
+    for (int i = 0; i < _bots.length; i++) {
+      if (!_bots[i].hasFolded) {
+        contributions.add({'seat': i + 1, 'amount': _bots[i].totalBetThisHand});
+      }
+    }
+
+    if (contributions.isEmpty) {
+      return [
+        _SidePot(amount: _pot, eligibleSeats: [0])
+      ];
+    }
+
+    // Sort by contribution amount
+    contributions.sort((a, b) => (a['amount'] as int).compareTo(b['amount'] as int));
+
+    List<_SidePot> sidePots = [];
+    int previousLevel = 0;
+
+    for (int i = 0; i < contributions.length; i++) {
+      int currentLevel = contributions[i]['amount'] as int;
+      if (currentLevel > previousLevel) {
+        int potContribution = currentLevel - previousLevel;
+        int playersAtThisLevel = contributions.length - i;
+        int potAmount = potContribution * playersAtThisLevel;
+
+        // Eligible seats are those who contributed at least this level
+        List<int> eligible = contributions.skip(i).map((c) => c['seat'] as int).toList();
+
+        sidePots.add(_SidePot(amount: potAmount, eligibleSeats: eligible));
+        previousLevel = currentLevel;
+      }
+    }
+
+    return sidePots;
+  }
+
+  int _getClosestToDealer(List<int> seats) {
+    // Return the seat closest to the left of the dealer (first to act)
+    int totalPlayers = _getTotalPlayers();
+    for (int i = 1; i <= totalPlayers; i++) {
+      int seat = (_dealerPosition + i) % totalPlayers;
+      if (seats.contains(seat)) {
+        return seat;
+      }
+    }
+    return seats.first;
+  }
+
+  void _distributeWinnings(Map<int, int> winnings) {
     setState(() {
-      final share = _pot ~/ winners.length;
-      final oddChips = _pot % winners.length;
-
-      for (int i = 0; i < winners.length; i++) {
-        int seat = winners[i];
-        int amount = share + (i == 0 ? oddChips : 0); // First winner gets odd chips
-
-        if (seat == 0) {
-          _playerChips += amount;
+      for (var entry in winnings.entries) {
+        if (entry.key == 0) {
+          _playerChips += entry.value;
         } else {
-          _bots[seat - 1].chips += amount;
+          _bots[entry.key - 1].chips += entry.value;
         }
       }
       _pot = 0;
@@ -879,22 +1035,35 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       return; // Don't continue until player decides
     }
 
-    // If all bots are eliminated, add new ones to keep the game going
+    // If all bots are eliminated, automatically reinitialize them and continue
     if (_bots.isEmpty) {
       setState(() {
-        _initializeBots(); // Re-add bots with fresh chips
+        _initializeBots();
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('You eliminated all bots! New opponents joining...'),
-          duration: Duration(seconds: 2),
-          backgroundColor: Color(0xFF22C55E),
-        ),
-      );
+      // Brief delay to show new opponents joining, then start new hand
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('New opponents joined the table!'),
+              duration: Duration(seconds: 1),
+              backgroundColor: Color(0xFF22C55E),
+            ),
+          );
+          _startNewHand();
+        }
+      });
+      return;
     }
 
     // Continue to next hand
     _startNewHand();
+  }
+
+  // ignore: unused_element
+  void _showWaitingForOpponentsDialog() {
+    // This dialog is no longer used - bots automatically buy back in
+    // Keeping for reference in case we want to restore this behavior
   }
 
   void _showBuyBackDialog() {
@@ -974,10 +1143,10 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                 ),
                 SliderTheme(
                   data: SliderTheme.of(context).copyWith(
-                    activeTrackColor: const Color(0xFFD4AF37),
+                    activeTrackColor: const Color(0xFF00D46A),
                     inactiveTrackColor: Colors.white.withValues(alpha: 0.1),
-                    thumbColor: const Color(0xFFD4AF37),
-                    overlayColor: const Color(0xFFD4AF37).withValues(alpha: 0.2),
+                    thumbColor: const Color(0xFF00D46A),
+                    overlayColor: const Color(0xFF00D46A).withValues(alpha: 0.2),
                   ),
                   child: Slider(
                     value: selectedBuyIn.toDouble(),
@@ -1045,7 +1214,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                   _processBuyBack(selectedBuyIn);
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFD4AF37),
+                  backgroundColor: const Color(0xFF00D46A),
                 ),
                 child: const Text('Buy In', style: TextStyle(color: Colors.white)),
               ),
@@ -1172,7 +1341,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
               navigator.pop(); // Exit game
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFD4AF37),
+              backgroundColor: const Color(0xFF00D46A),
             ),
             child: const Text('Cash Out', style: TextStyle(color: Colors.white)),
           ),
@@ -1308,10 +1477,10 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
                           color: isSelected
-                              ? const Color(0xFFD4AF37).withValues(alpha: 0.2)
+                              ? const Color(0xFF00D46A).withValues(alpha: 0.2)
                               : Colors.white.withValues(alpha: isLocked ? 0.02 : 0.06),
                           borderRadius: BorderRadius.circular(16),
-                          border: isSelected ? Border.all(color: const Color(0xFFD4AF37), width: 2) : null,
+                          border: isSelected ? Border.all(color: const Color(0xFF00D46A), width: 2) : null,
                         ),
                         child: Row(
                           children: [
@@ -1400,10 +1569,10 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                   ),
                   SliderTheme(
                     data: SliderTheme.of(context).copyWith(
-                      activeTrackColor: const Color(0xFFD4AF37),
+                      activeTrackColor: const Color(0xFF00D46A),
                       inactiveTrackColor: Colors.white.withValues(alpha: 0.1),
-                      thumbColor: const Color(0xFFD4AF37),
-                      overlayColor: const Color(0xFFD4AF37).withValues(alpha: 0.2),
+                      thumbColor: const Color(0xFF00D46A),
+                      overlayColor: const Color(0xFF00D46A).withValues(alpha: 0.2),
                       trackHeight: 4,
                       thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 10),
                     ),
@@ -1568,7 +1737,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(vertical: 18),
                     decoration: BoxDecoration(
-                      color: canAfford ? const Color(0xFFD4AF37) : Colors.white.withValues(alpha: 0.1),
+                      color: canAfford ? const Color(0xFF00D46A) : Colors.white.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Center(
@@ -2011,9 +2180,14 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
         boxShadow: [
           if (isHighlighted) ...[
             BoxShadow(
-              color: const Color(0xFFFFD700).withValues(alpha: 0.8),
-              blurRadius: 8,
-              spreadRadius: 1,
+              color: const Color(0xFFFFD700).withValues(alpha: 0.9),
+              blurRadius: 10,
+              spreadRadius: 2,
+            ),
+            BoxShadow(
+              color: const Color(0xFFFFD700).withValues(alpha: 0.5),
+              blurRadius: 16,
+              spreadRadius: 4,
             ),
           ] else
             BoxShadow(
@@ -2022,7 +2196,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
               offset: const Offset(0, 2),
             ),
         ],
-        border: isHighlighted ? Border.all(color: const Color(0xFFFFD700), width: 1.5) : null,
+        border: isHighlighted ? Border.all(color: const Color(0xFFFFD700), width: 2) : null,
       ),
       child: AnimatedOpacity(
         duration: const Duration(milliseconds: 300),
@@ -2147,14 +2321,14 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
         boxShadow: [
           if (isHighlighted) ...[
             BoxShadow(
-              color: const Color(0xFFFFD700).withValues(alpha: 0.8),
-              blurRadius: 12,
-              spreadRadius: 2,
+              color: const Color(0xFFFFD700).withValues(alpha: 0.9),
+              blurRadius: 16,
+              spreadRadius: 3,
             ),
             BoxShadow(
-              color: const Color(0xFFFFD700).withValues(alpha: 0.4),
-              blurRadius: 20,
-              spreadRadius: 4,
+              color: const Color(0xFFFFD700).withValues(alpha: 0.5),
+              blurRadius: 25,
+              spreadRadius: 6,
             ),
           ] else
             BoxShadow(
@@ -2163,7 +2337,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
               offset: const Offset(0, 4),
             ),
         ],
-        border: isHighlighted ? Border.all(color: const Color(0xFFFFD700), width: 2) : null,
+        border: isHighlighted ? Border.all(color: const Color(0xFFFFD700), width: 3) : null,
       ),
       child: AnimatedOpacity(
         duration: const Duration(milliseconds: 300),
@@ -2327,6 +2501,9 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   Widget _buildPlayerActionArea() {
     final callAmount = _currentBet - _playerBet;
     final canCheck = callAmount <= 0;
+    // Player can only raise if they have more chips than needed to call
+    // If opponent's bet >= player's total chips, they can only call (all-in) or fold
+    final canRaise = _playerChips > callAmount;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 40),
@@ -2337,7 +2514,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
             children: [
               Expanded(
                 child: _AnimatedGameButton(
-                  onTap: () => _playerAction(canCheck ? 'check' : 'call'),
+                  onTap: () => _playerAction(canCheck ? 'check' : (callAmount >= _playerChips ? 'allin' : 'call')),
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   decoration: BoxDecoration(
                     color: Colors.transparent,
@@ -2346,7 +2523,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                   ),
                   child: Center(
                     child: Text(
-                      canCheck ? 'Check' : 'Call ${_formatChips(callAmount)}',
+                      canCheck ? 'Check' : (callAmount >= _playerChips ? 'All-In' : 'Call ${_formatChips(callAmount)}'),
                       style: const TextStyle(color: Colors.white, fontSize: 16),
                     ),
                   ),
@@ -2355,19 +2532,25 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
               const SizedBox(width: 12),
               Expanded(
                 child: _AnimatedGameButton(
-                  onTap: () {
-                    final minRaise = _currentBet + _lastRaiseAmount;
-                    _showRaiseSlider(minRaise);
-                  },
+                  onTap: canRaise
+                      ? () {
+                          final minRaise = _currentBet + _lastRaiseAmount;
+                          _showRaiseSlider(minRaise);
+                        }
+                      : null,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: canRaise ? Colors.white : Colors.grey.withValues(alpha: 0.3),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Center(
+                  child: Center(
                     child: Text(
                       'Raise',
-                      style: TextStyle(color: Colors.black, fontSize: 16, fontWeight: FontWeight.w600),
+                      style: TextStyle(
+                        color: canRaise ? Colors.black : Colors.black.withValues(alpha: 0.3),
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ),
@@ -2491,9 +2674,14 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
         boxShadow: [
           if (isHighlighted) ...[
             BoxShadow(
-              color: const Color(0xFFFFD700).withValues(alpha: 0.8),
-              blurRadius: 12,
-              spreadRadius: 2,
+              color: const Color(0xFFFFD700).withValues(alpha: 0.9),
+              blurRadius: 16,
+              spreadRadius: 4,
+            ),
+            BoxShadow(
+              color: const Color(0xFFFFD700).withValues(alpha: 0.5),
+              blurRadius: 30,
+              spreadRadius: 8,
             ),
           ] else
             BoxShadow(
@@ -2502,7 +2690,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
               offset: const Offset(0, 4),
             ),
         ],
-        border: isHighlighted ? Border.all(color: const Color(0xFFFFD700), width: 2) : null,
+        border: isHighlighted ? Border.all(color: const Color(0xFFFFD700), width: 3) : null,
       ),
       child: AnimatedOpacity(
         duration: const Duration(milliseconds: 300),
@@ -2552,7 +2740,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                   ),
                   child: Center(
                     child: Text(
-                      canCheck ? 'Check' : 'Call ${_formatChips(callAmount)}',
+                      canCheck ? 'Check' : (callAmount >= _playerChips ? 'All-In' : 'Call ${_formatChips(callAmount)}'),
                       style: TextStyle(color: Colors.white.withValues(alpha: 0.3), fontSize: 16),
                     ),
                   ),
@@ -2609,13 +2797,13 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
         ),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isMyTurn ? const Color(0xFFD4AF37) : Colors.white.withValues(alpha: 0.1),
+          color: isMyTurn ? const Color(0xFF00D46A) : Colors.white.withValues(alpha: 0.1),
           width: isMyTurn ? 2 : 1,
         ),
         boxShadow: isMyTurn
             ? [
                 BoxShadow(
-                  color: const Color(0xFFD4AF37).withValues(alpha: 0.3),
+                  color: const Color(0xFF00D46A).withValues(alpha: 0.3),
                   blurRadius: 16,
                   spreadRadius: 0,
                 ),
@@ -2634,9 +2822,9 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                 height: 52,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: isMyTurn ? const Color(0xFFD4AF37) : Colors.white.withValues(alpha: 0.1),
+                  color: isMyTurn ? const Color(0xFF00D46A) : Colors.white.withValues(alpha: 0.1),
                   border: Border.all(
-                    color: isMyTurn ? const Color(0xFFD4AF37) : Colors.white.withValues(alpha: 0.2),
+                    color: isMyTurn ? const Color(0xFF00D46A) : Colors.white.withValues(alpha: 0.2),
                     width: 2,
                   ),
                 ),
@@ -2685,7 +2873,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
           Text(
             'YOU',
             style: TextStyle(
-              color: isMyTurn ? const Color(0xFFD4AF37) : Colors.white.withValues(alpha: 0.5),
+              color: isMyTurn ? const Color(0xFF00D46A) : Colors.white.withValues(alpha: 0.5),
               fontSize: 10,
               fontWeight: FontWeight.w600,
               letterSpacing: 1,
@@ -2717,8 +2905,15 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   }
 
   void _showRaiseSlider(int minRaise) {
-    int raiseAmount = minRaise;
     final maxRaise = _playerChips + _playerBet;
+
+    // If min raise is greater than max, player can only go all-in
+    if (minRaise >= maxRaise) {
+      _playerAction('allin');
+      return;
+    }
+
+    int raiseAmount = minRaise;
 
     showDialog(
       context: context,
@@ -3020,13 +3215,13 @@ class _ActionButtonState extends State<_ActionButton> with SingleTickerProviderS
 /// Animated button widget with scale animation on press
 class _AnimatedGameButton extends StatefulWidget {
   final Widget child;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   final BoxDecoration? decoration;
   final EdgeInsetsGeometry? padding;
 
   const _AnimatedGameButton({
     required this.child,
-    required this.onTap,
+    this.onTap,
     this.decoration,
     this.padding,
   });
@@ -3063,13 +3258,16 @@ class _AnimatedGameButtonState extends State<_AnimatedGameButton> with SingleTic
 
   @override
   Widget build(BuildContext context) {
+    final isEnabled = widget.onTap != null;
     return GestureDetector(
-      onTapDown: (_) => _controller.forward(),
-      onTapUp: (_) {
-        _controller.reverse();
-        widget.onTap();
-      },
-      onTapCancel: () => _controller.reverse(),
+      onTapDown: isEnabled ? (_) => _controller.forward() : null,
+      onTapUp: isEnabled
+          ? (_) {
+              _controller.reverse();
+              widget.onTap!();
+            }
+          : null,
+      onTapCancel: isEnabled ? () => _controller.reverse() : null,
       child: AnimatedBuilder(
         animation: _controller,
         builder: (context, child) => Transform.scale(

@@ -1011,22 +1011,22 @@ FUNCTION: newHand(roomId)
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│  multiplayer_game_screen.dart - Heartbeat                        │
+│  multiplayer_game_screen.dart - Heartbeat                       │
 ├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  _startHeartbeat() called on initState:                          │
-│                                                                  │
-│  1. Send immediate heartbeat                                     │
-│     └── _gameService.sendHeartbeat(roomId)                       │
-│                                                                  │
-│  2. Start periodic timer (every 5 seconds):                      │
-│     └── Timer.periodic(Duration(seconds: 5), (_) {               │
-│           _gameService.sendHeartbeat(roomId);                    │
-│           _gameService.removeInactivePlayers(roomId);  // host   │
-│         });                                                      │
-│                                                                  │
-│  _stopHeartbeat() called on dispose                              │
-│                                                                  │
+│                                                                 │
+│  _startHeartbeat() called on initState:                         │
+│                                                                 │
+│  1. Send immediate heartbeat                                    │
+│     └── _gameService.sendHeartbeat(roomId)                      │
+│                                                                 │
+│  2. Start periodic timer (every 5 seconds):                     │
+│     └── Timer.periodic(Duration(seconds: 5), (_) {              │
+│           _gameService.sendHeartbeat(roomId);                   │
+│           _gameService.removeInactivePlayers(roomId);  // host  │
+│         });                                                     │
+│                                                                 │
+│  _stopHeartbeat() called on dispose                             │
+│                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
 

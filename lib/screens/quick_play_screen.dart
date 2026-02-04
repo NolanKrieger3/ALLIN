@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import '../services/game_service.dart';
-import '../services/bot_service.dart';
 import '../services/currency_service.dart';
 import '../widgets/mobile_wrapper.dart';
 import 'multiplayer_game_screen.dart';
@@ -16,7 +15,6 @@ class QuickPlayScreen extends StatefulWidget {
 class _QuickPlayScreenState extends State<QuickPlayScreen> {
   final AuthService _authService = AuthService();
   final GameService _gameService = GameService();
-  final BotService _botService = BotService();
 
   bool _isLoading = false;
   int _selectedBlindIndex = 1; // Default to second level
@@ -154,72 +152,6 @@ class _QuickPlayScreenState extends State<QuickPlayScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed to start game: $e'),
-            backgroundColor: const Color(0xFFFF4444),
-          ),
-        );
-      }
-    }
-
-    if (mounted) {
-      setState(() => _isLoading = false);
-    }
-  }
-
-  Future<void> _startGameWithBots() async {
-    if (!_authService.isLoggedIn) {
-      await _authService.signInAnonymously();
-    }
-
-    final blindLevel = BlindLevels.all[_selectedBlindIndex];
-    final buyIn = blindLevel.buyIn;
-
-    // Check if user can afford the buy-in
-    if (_chipBalance < buyIn) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-                'Not enough chips! You need ${CurrencyService.formatChips(buyIn)} but only have ${CurrencyService.formatChips(_chipBalance)}'),
-            backgroundColor: const Color(0xFFFF4444),
-          ),
-        );
-      }
-      return;
-    }
-
-    setState(() => _isLoading = true);
-
-    try {
-      final bigBlind = blindLevel.big;
-
-      // Create a new private room for testing
-      print('🤖 Creating test room with bots');
-      final room = await _gameService.createRoom(
-        bigBlind: bigBlind,
-        startingChips: buyIn,
-        gameType: 'quickplay',
-        isPrivate: true,
-        maxPlayers: 5, // You + 4 bots
-      );
-
-      // Add 4 bots to the room
-      await _botService.addBotsToRoom(room.id, 4);
-      print('✅ Added 4 bots to room ${room.id}');
-
-      if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (_) => MultiplayerGameScreen(roomId: room.id, autoStart: true),
-          ),
-        );
-      }
-    } catch (e) {
-      print('❌ Failed to create test game: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to start test game: $e'),
             backgroundColor: const Color(0xFFFF4444),
           ),
         );
@@ -434,54 +366,6 @@ class _QuickPlayScreenState extends State<QuickPlayScreen> {
                                 letterSpacing: 2,
                               ),
                             ),
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 12),
-
-                // Test with bots button - also disabled if can't afford
-                GestureDetector(
-                  onTap: (_isLoading || !canAffordSelected) ? null : _startGameWithBots,
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    decoration: BoxDecoration(
-                      color: canAffordSelected
-                          ? Colors.white.withValues(alpha: 0.08)
-                          : Colors.white.withValues(alpha: 0.03),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: canAffordSelected
-                            ? Colors.white.withValues(alpha: 0.1)
-                            : Colors.white.withValues(alpha: 0.05),
-                      ),
-                    ),
-                    child: Center(
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.smart_toy,
-                            color: canAffordSelected
-                                ? Colors.white.withValues(alpha: 0.6)
-                                : Colors.white.withValues(alpha: 0.2),
-                            size: 18,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            'TEST WITH 2 BOTS',
-                            style: TextStyle(
-                              color: canAffordSelected
-                                  ? Colors.white.withValues(alpha: 0.7)
-                                  : Colors.white.withValues(alpha: 0.3),
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 1,
-                            ),
-                          ),
-                        ],
-                      ),
                     ),
                   ),
                 ),

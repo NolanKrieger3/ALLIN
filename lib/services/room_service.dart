@@ -430,12 +430,15 @@ class RoomService {
     final roomData = jsonDecode(response.body) as Map<String, dynamic>;
     final room = GameRoom.fromJson(roomData, roomId);
 
-    // Find the leaving player to get their chips (for forfeit in Sit & Go)
+    // Find the leaving player
     final leavingPlayer = room.players.firstWhere(
       (p) => p.uid == userId,
       orElse: () => GamePlayer(uid: '', displayName: '', chips: 0),
     );
-    final forfeitedChips = leavingPlayer.chips;
+
+    // For Sit & Go: forfeit all chips. For quickplay/cash: only forfeit current hand contribution
+    final isSitAndGo = room.gameType.contains('sitandgo');
+    final forfeitedChips = isSitAndGo ? leavingPlayer.chips : leavingPlayer.totalContributed;
 
     final updatedPlayers = room.players.where((p) => p.uid != userId).toList();
 
@@ -450,7 +453,7 @@ class RoomService {
       // CRITICAL: If game is in progress and only 1 player remains, they win!
       if (room.status == RoomStatus.playing && updatedPlayers.length == 1) {
         final winner = updatedPlayers.first;
-        // Award both the pot AND the leaving player's forfeited chips
+        // Award the pot plus forfeited chips (all chips for sitandgo, hand contribution for quickplay)
         final totalWinnings = room.pot + forfeitedChips;
         final winnerWithPot = GamePlayer(
           uid: winner.uid,
@@ -555,6 +558,41 @@ class RoomService {
     if (patchResponse.statusCode != 200) {
       print('⚠️ Failed to toggle ready status');
     }
+  }
+
+  /// Update a player's chips (for buy-back/rebuy functionality)
+  Future<void> updatePlayerChips(String roomId, String playerId, int newChips) async {
+    final token = await getAuthToken();
+
+    final response = await http.get(Uri.parse('$databaseUrl/game_rooms/$roomId.json?auth=$token'));
+
+    if (response.statusCode != 200 || response.body == 'null') {
+      throw Exception('Failed to fetch room');
+    }
+
+    final roomData = jsonDecode(response.body) as Map<String, dynamic>;
+    final room = GameRoom.fromJson(roomData, roomId);
+
+    final playerIndex = room.players.indexWhere((p) => p.uid == playerId);
+    if (playerIndex == -1) {
+      throw Exception('Player not found in room');
+    }
+
+    // Patch the player's chips
+    final patchResponse = await http.patch(
+      Uri.parse('$databaseUrl/game_rooms/$roomId/players/$playerIndex.json?auth=$token'),
+      headers: _jsonHeaders,
+      body: jsonEncode({
+        'chips': newChips,
+        'hasFolded': false, // Reset folded status for new hand
+      }),
+    );
+
+    if (patchResponse.statusCode != 200) {
+      throw Exception('Failed to update player chips');
+    }
+
+    print('✅ Updated player $playerId chips to $newChips');
   }
 
   // ============================================================================
@@ -687,6 +725,10 @@ class RoomService {
   /// Fetch joinable rooms by blind level
   /// Note: Call cleanupStaleRooms() separately if needed, not on every fetch
   Future<List<GameRoom>> fetchJoinableRoomsByBlind(int bigBlind, {String gameType = 'cash', int? maxPlayers}) async {
+<<<<<<< HEAD
+=======
+    // Note: Stale room cleanup now happens periodically, not on every fetch
+>>>>>>> 744bc1ca92d111c8f067ab7766cb844c9b9883a5
     final token = await getAuthToken();
     final userId = currentUserId;
 

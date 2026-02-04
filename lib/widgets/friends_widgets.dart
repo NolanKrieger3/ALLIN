@@ -741,7 +741,7 @@ class _AddFriendDialogState extends State<AddFriendDialog> {
                                     ),
                                     child: Center(
                                       child: Text(
-                                        user.username[0].toUpperCase(),
+                                        user.username.isNotEmpty ? user.username[0].toUpperCase() : '?',
                                         style: const TextStyle(
                                           color: Colors.white,
                                           fontSize: 18,
@@ -791,19 +791,18 @@ class _AddFriendDialogState extends State<AddFriendDialog> {
                                         : () async {
                                             setState(() => _pendingRequests.add(user.id));
                                             final success = await _friendsService.sendFriendRequest(user.id);
-                                            if (mounted) {
-                                              ScaffoldMessenger.of(context).showSnackBar(
-                                                SnackBar(
-                                                  content: Text(
-                                                    success
-                                                        ? 'Friend request sent to ${user.username}!'
-                                                        : 'Could not send request',
-                                                  ),
-                                                  backgroundColor:
-                                                      success ? const Color(0xFF4CAF50) : const Color(0xFFFF4444),
+                                            if (!mounted) return;
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              SnackBar(
+                                                content: Text(
+                                                  success
+                                                      ? 'Friend request sent to ${user.username}!'
+                                                      : 'Could not send request',
                                                 ),
-                                              );
-                                            }
+                                                backgroundColor:
+                                                    success ? const Color(0xFF4CAF50) : const Color(0xFFFF4444),
+                                              ),
+                                            );
                                           },
                                     child: Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
@@ -991,7 +990,7 @@ class _FriendsListDialogState extends State<FriendsListDialog> {
                 ),
                 child: Center(
                   child: Text(
-                    friend.username[0].toUpperCase(),
+                    friend.username.isNotEmpty ? friend.username[0].toUpperCase() : '?',
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 20,

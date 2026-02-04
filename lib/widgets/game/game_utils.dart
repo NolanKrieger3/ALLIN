@@ -1,10 +1,10 @@
 import '../../services/hand_evaluator.dart';
+import '../../services/currency_service.dart';
 
-/// Format chips for display (e.g., 1500 -> "1.5k", 1000000 -> "1M")
+/// Format chips for display (e.g., 12000 -> "12k", 1000000 -> "1M")
+/// Delegates to CurrencyService.formatChips for consistency
 String formatChips(int chips) {
-  if (chips >= 1000000) return '${(chips / 1000000).toStringAsFixed(1)}M';
-  if (chips >= 1000) return '${(chips / 1000).toStringAsFixed(chips % 1000 == 0 ? 0 : 1)}k';
-  return chips.toString();
+  return CurrencyService.formatChips(chips);
 }
 
 /// Get short hand name for display

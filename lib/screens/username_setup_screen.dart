@@ -88,12 +88,12 @@ class _UsernameSetupScreenState extends State<UsernameSetupScreen> {
                     width: 56,
                     height: 56,
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.08),
+                      color: Colors.white.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Icon(
                       Icons.person_add_outlined,
-                      color: Colors.white.withOpacity(0.6),
+                      color: Colors.white.withValues(alpha: 0.6),
                       size: 28,
                     ),
                   ),
@@ -103,7 +103,7 @@ class _UsernameSetupScreenState extends State<UsernameSetupScreen> {
                   Text(
                     'Create Account',
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.9),
+                      color: Colors.white.withValues(alpha: 0.9),
                       fontSize: 22,
                       fontWeight: FontWeight.w600,
                     ),
@@ -112,7 +112,7 @@ class _UsernameSetupScreenState extends State<UsernameSetupScreen> {
                   Text(
                     'Choose a username and password',
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.4),
+                      color: Colors.white.withValues(alpha: 0.4),
                       fontSize: 13,
                     ),
                   ),
@@ -124,18 +124,18 @@ class _UsernameSetupScreenState extends State<UsernameSetupScreen> {
                       constraints: const BoxConstraints(maxWidth: 340),
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.red.withOpacity(0.08),
+                        color: Colors.red.withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: Colors.red.withOpacity(0.2)),
+                        border: Border.all(color: Colors.red.withValues(alpha: 0.2)),
                       ),
                       child: Row(
                         children: [
-                          Icon(Icons.error_outline, color: Colors.red.withOpacity(0.8), size: 18),
+                          Icon(Icons.error_outline, color: Colors.red.withValues(alpha: 0.8), size: 18),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
                               _errorMessage!,
-                              style: TextStyle(color: Colors.red.withOpacity(0.9), fontSize: 12),
+                              style: TextStyle(color: Colors.red.withValues(alpha: 0.9), fontSize: 12),
                             ),
                           ),
                         ],
@@ -149,7 +149,7 @@ class _UsernameSetupScreenState extends State<UsernameSetupScreen> {
                     constraints: const BoxConstraints(maxWidth: 340),
                     child: TextFormField(
                       controller: _usernameController,
-                      style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 15),
+                      style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 15),
                       decoration: _inputDecoration(
                         hintText: 'Username',
                         prefixIcon: Icons.person_outline,
@@ -179,14 +179,14 @@ class _UsernameSetupScreenState extends State<UsernameSetupScreen> {
                     child: TextFormField(
                       controller: _passwordController,
                       obscureText: _obscurePassword,
-                      style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 15),
+                      style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 15),
                       decoration: _inputDecoration(
                         hintText: 'Password',
                         prefixIcon: Icons.lock_outline,
                         suffixIcon: IconButton(
                           icon: Icon(
                             _obscurePassword ? Icons.visibility_off : Icons.visibility,
-                            color: Colors.white.withOpacity(0.3),
+                            color: Colors.white.withValues(alpha: 0.3),
                             size: 20,
                           ),
                           onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
@@ -211,7 +211,7 @@ class _UsernameSetupScreenState extends State<UsernameSetupScreen> {
                     child: Text(
                       'Remember your password to sign in on other devices',
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.3),
+                        color: Colors.white.withValues(alpha: 0.3),
                         fontSize: 11,
                       ),
                       textAlign: TextAlign.center,
@@ -233,7 +233,7 @@ class _UsernameSetupScreenState extends State<UsernameSetupScreen> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                         elevation: 0,
-                        disabledBackgroundColor: Colors.white.withOpacity(0.5),
+                        disabledBackgroundColor: Colors.white.withValues(alpha: 0.5),
                       ),
                       child: _isLoading
                           ? const SizedBox(
@@ -269,30 +269,30 @@ class _UsernameSetupScreenState extends State<UsernameSetupScreen> {
   }) {
     return InputDecoration(
       hintText: hintText,
-      hintStyle: TextStyle(color: Colors.white.withOpacity(0.25)),
-      prefixIcon: Icon(prefixIcon, color: Colors.white.withOpacity(0.35), size: 20),
+      hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.25)),
+      prefixIcon: Icon(prefixIcon, color: Colors.white.withValues(alpha: 0.35), size: 20),
       suffixIcon: suffixIcon,
       filled: true,
-      fillColor: Colors.white.withOpacity(0.05),
+      fillColor: Colors.white.withValues(alpha: 0.05),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.white.withOpacity(0.06)),
+        borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.06)),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.white.withOpacity(0.06)),
+        borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.06)),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.white.withOpacity(0.15)),
+        borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.15)),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.red.withOpacity(0.4)),
+        borderSide: BorderSide(color: Colors.red.withValues(alpha: 0.4)),
       ),
       focusedErrorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.red.withOpacity(0.6)),
+        borderSide: BorderSide(color: Colors.red.withValues(alpha: 0.6)),
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
     );

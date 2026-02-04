@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
 import '../models/game_room.dart';
-import '../services/room_service.dart';
 import '../services/game_service.dart';
+import '../services/bot_service.dart';
 import '../widgets/mobile_wrapper.dart';
 import '../widgets/animated_buttons.dart';
 import 'multiplayer_game_screen.dart';
@@ -26,6 +26,7 @@ class PrivateGameWaitingScreen extends StatefulWidget {
 
 class _PrivateGameWaitingScreenState extends State<PrivateGameWaitingScreen> {
   final GameService _gameService = GameService();
+  final BotService _botService = BotService();
   StreamSubscription? _roomSubscription;
   Timer? _heartbeatTimer;
   GameRoom? _room;
@@ -367,6 +368,55 @@ class _PrivateGameWaitingScreenState extends State<PrivateGameWaitingScreen> {
                 ),
 
                 const SizedBox(height: 24),
+
+                // Fill with Bots button (Host only)
+                if (widget.isHost && (_room?.players.length ?? 0) < (_room?.maxPlayers ?? 8))
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: GestureDetector(
+                      onTap: () async {
+                        try {
+                          await _botService.fillRoomWithBots(widget.roomId);
+                        } catch (e) {
+                          if (!mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Failed to add bots: $e'),
+                              backgroundColor: const Color(0xFFEF4444),
+                            ),
+                          );
+                        }
+                      },
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF4CAF50), Color(0xFF2E7D32)],
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Center(
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.smart_toy, color: Colors.white, size: 18),
+                              SizedBox(width: 8),
+                              Text(
+                                'FILL WITH BOTS',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: 1,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
 
                 // Start Game Button (Host only)
                 if (widget.isHost)

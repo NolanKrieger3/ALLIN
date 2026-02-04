@@ -56,6 +56,10 @@ class GameService {
   /// Toggle ready status
   Future<void> toggleReady(String roomId) => _roomService.toggleReady(roomId);
 
+  /// Update player chips (for buy-back/rebuy)
+  Future<void> updatePlayerChips(String roomId, String playerId, int chips) =>
+      _roomService.updatePlayerChips(roomId, playerId, chips);
+
   /// Send heartbeat to show player is active
   Future<void> sendHeartbeat(String roomId) => _roomService.sendHeartbeat(roomId);
 
