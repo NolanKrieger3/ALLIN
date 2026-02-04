@@ -1343,9 +1343,11 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
       width: 58,
       height: 82,
       decoration: BoxDecoration(
-        color: Colors.transparent,
+        color: Colors.white.withValues(alpha: 0.03),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.15), width: 2),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.08),
+        ),
       ),
     );
   }
@@ -1356,7 +1358,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
       bool isHighlighted = false,
       bool isDimmed = false,
       bool isGhost = false}) {
-    // Match game_screen.dart sizes: 58x82 for community cards, 70x98 for hole cards
+    // Match game_screen.dart sizes exactly: 58x82 for community cards, 70x98 for hole cards
     final width = isHoleCard ? 70.0 : 58.0;
     final height = isHoleCard ? 98.0 : 82.0;
 
@@ -1374,7 +1376,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
 
     final isRed = card.suit == '♥' || card.suit == '♦';
 
-    // Ghost card style for folded cards
+    // Ghost card style for folded cards (identical to game_screen.dart)
     if (isGhost) {
       return Container(
         width: width,
@@ -1407,6 +1409,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
       );
     }
 
+    // Identical to game_screen.dart _buildMinimalCard
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
       width: width,
@@ -1417,14 +1420,14 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
         boxShadow: [
           if (isHighlighted) ...[
             BoxShadow(
-              color: const Color(0xFFFFD700).withValues(alpha: 0.8),
-              blurRadius: 12,
-              spreadRadius: 2,
+              color: const Color(0xFFFFD700).withValues(alpha: 0.9),
+              blurRadius: 16,
+              spreadRadius: 3,
             ),
             BoxShadow(
-              color: const Color(0xFFFFD700).withValues(alpha: 0.4),
-              blurRadius: 20,
-              spreadRadius: 4,
+              color: const Color(0xFFFFD700).withValues(alpha: 0.5),
+              blurRadius: 25,
+              spreadRadius: 6,
             ),
           ] else
             BoxShadow(
@@ -1433,7 +1436,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
               offset: const Offset(0, 4),
             ),
         ],
-        border: isHighlighted ? Border.all(color: const Color(0xFFFFD700), width: 2) : null,
+        border: isHighlighted ? Border.all(color: const Color(0xFFFFD700), width: 3) : null,
       ),
       child: AnimatedOpacity(
         duration: const Duration(milliseconds: 300),
@@ -1445,7 +1448,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
               card.rank,
               style: TextStyle(
                 color: isDimmed ? Colors.grey : (isRed ? Colors.red.shade700 : Colors.black),
-                fontSize: 24,
+                fontSize: isHoleCard ? 24 : 24,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -1453,7 +1456,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
               card.suit,
               style: TextStyle(
                 color: isDimmed ? Colors.grey : (isRed ? Colors.red.shade700 : Colors.black),
-                fontSize: 26,
+                fontSize: isHoleCard ? 26 : 26,
               ),
             ),
           ],
@@ -1489,6 +1492,10 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
     String message = 'Wait for the next hand';
     bool showSpinner = false;
 
+    final isShowdown = room.phase == 'showdown';
+    final isPlayerWinner = room.winnerId == player.uid;
+    final isPlayerLoser = isShowdown && _showdownAnimationComplete && !isPlayerWinner && !player.hasFolded;
+
     // Priority 1: Not enough players to start - show waiting message
     if (room.status == 'waiting' && room.players.length < 2) {
       message = 'Waiting for opponent...';
@@ -1500,6 +1507,9 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
     } else if (room.phase == 'waiting_for_players') {
       message = 'Waiting for players...';
       showSpinner = true;
+    } else if (isShowdown) {
+      // During showdown, show simple status (matching game_screen.dart)
+      message = isPlayerWinner ? 'You win!' : 'Showdown';
     } else if (player.hasFolded) {
       message = 'You folded';
     } else if (room.status == 'finished') {
@@ -1510,14 +1520,20 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Column(
         children: [
-          // Message bar
+          // Message bar - with winner highlight matching game_screen.dart
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(vertical: 16),
             decoration: BoxDecoration(
-              color: Colors.transparent,
+              color: isShowdown && _showdownAnimationComplete && isPlayerWinner
+                  ? const Color(0xFFFFD700).withValues(alpha: 0.1)
+                  : Colors.transparent,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+              border: Border.all(
+                color: isShowdown && _showdownAnimationComplete && isPlayerWinner
+                    ? const Color(0xFFFFD700).withValues(alpha: 0.5)
+                    : Colors.white.withValues(alpha: 0.2),
+              ),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -1536,49 +1552,79 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
                 Text(
                   message,
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.6),
+                    color: isShowdown && _showdownAnimationComplete && isPlayerWinner
+                        ? const Color(0xFFFFD700)
+                        : Colors.white.withValues(alpha: 0.6),
                     fontSize: 16,
+                    fontWeight: isPlayerWinner ? FontWeight.bold : FontWeight.normal,
                   ),
                 ),
               ],
             ),
           ),
           const SizedBox(height: 16),
-          // Bottom area: cards and player info
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              // Player's cards - fixed width to prevent shifting
-              SizedBox(
-                width: 120, // Fixed width for 2 overlapping cards (70 * 2 - 20 overlap)
-                height: 98,
-                child: player.hasFolded && _foldedCards.isNotEmpty
-                    ? Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          _buildMinimalCard(_foldedCards[0], isHoleCard: true, isGhost: true),
-                          if (_foldedCards.length > 1)
-                            Positioned(
-                              left: 50, // 70 - 20 overlap
-                              child: _buildMinimalCard(_foldedCards[1], isHoleCard: true, isGhost: true),
-                            ),
-                        ],
-                      )
-                    : Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          _buildCardBack(width: 70, height: 98),
-                          Positioned(
-                            left: 50, // 70 - 20 overlap
-                            child: _buildCardBack(width: 70, height: 98),
+          // Bottom area: cards and player info (matching game_screen.dart layout)
+          AnimatedOpacity(
+            duration: const Duration(milliseconds: 300),
+            opacity: isPlayerLoser ? 0.5 : 1.0,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                // Player's cards - using large cards like game_screen.dart during showdown
+                if (isShowdown && player.cards.isNotEmpty)
+                  SizedBox(
+                    width: 165, // 90 * 2 - 15 overlap (large cards)
+                    height: 126,
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        _buildLargeCard(
+                          player.cards[0],
+                          isHighlighted: _showdownAnimationComplete &&
+                              isPlayerWinner &&
+                              !player.hasFolded &&
+                              _isCardInWinningHand(player.cards[0], room),
+                          isDimmed: isPlayerLoser || player.hasFolded,
+                        ),
+                        Positioned(
+                          left: 75, // 90 - 15 overlap
+                          child: _buildLargeCard(
+                            player.cards.length > 1 ? player.cards[1] : player.cards[0],
+                            isHighlighted: _showdownAnimationComplete &&
+                                isPlayerWinner &&
+                                !player.hasFolded &&
+                                player.cards.length > 1 &&
+                                _isCardInWinningHand(player.cards[1], room),
+                            isDimmed: isPlayerLoser || player.hasFolded,
                           ),
-                        ],
-                      ),
-              ),
-              const Spacer(),
-              // Player info
-              _buildPlayerAvatarLarge(player, room: room),
-            ],
+                        ),
+                      ],
+                    ),
+                  )
+                else if (player.hasFolded && _foldedCards.isNotEmpty)
+                  // Show ghost outline of folded cards (like game_screen.dart)
+                  SizedBox(
+                    width: _foldedCards.length > 1 ? 165 : 90, // 90 * 2 - 15 overlap
+                    height: 126,
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        _buildLargeCard(_foldedCards[0], isGhost: true),
+                        if (_foldedCards.length > 1)
+                          Positioned(
+                            left: 75, // 90 - 15 overlap
+                            child: _buildLargeCard(_foldedCards[1], isGhost: true),
+                          ),
+                      ],
+                    ),
+                  )
+                else
+                  _buildPlayerCardsLarge(player),
+                const Spacer(),
+                // Player info
+                _buildPlayerAvatarLarge(player, room: room),
+              ],
+            ),
           ),
         ],
       ),
@@ -1601,28 +1647,30 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
             children: [
               Expanded(
                 child: _AnimatedGameButton(
-                  onTap: _isProcessingAction ? null : () async {
-                    // Debounce: prevent rapid button presses
-                    final now = DateTime.now();
-                    if (_lastActionTime != null && now.difference(_lastActionTime!).inMilliseconds < 300) {
-                      return;
-                    }
+                  onTap: _isProcessingAction
+                      ? null
+                      : () async {
+                          // Debounce: prevent rapid button presses
+                          final now = DateTime.now();
+                          if (_lastActionTime != null && now.difference(_lastActionTime!).inMilliseconds < 300) {
+                            return;
+                          }
 
-                    setState(() {
-                      _isProcessingAction = true;
-                      _lastActionTime = now;
-                    });
+                          setState(() {
+                            _isProcessingAction = true;
+                            _lastActionTime = now;
+                          });
 
-                    // Add slight delay for smoother feel
-                    await Future.delayed(const Duration(milliseconds: 150));
-                    await _gameService.playerAction(widget.roomId, canCheck ? 'check' : 'call');
+                          // Add slight delay for smoother feel
+                          await Future.delayed(const Duration(milliseconds: 150));
+                          await _gameService.playerAction(widget.roomId, canCheck ? 'check' : 'call');
 
-                    // Reset after action completes
-                    await Future.delayed(const Duration(milliseconds: 200));
-                    if (mounted) {
-                      setState(() => _isProcessingAction = false);
-                    }
-                  },
+                          // Reset after action completes
+                          await Future.delayed(const Duration(milliseconds: 200));
+                          if (mounted) {
+                            setState(() => _isProcessingAction = false);
+                          }
+                        },
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   decoration: BoxDecoration(
                     color: Colors.transparent,
@@ -1631,7 +1679,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
                   ),
                   child: Center(
                     child: Text(
-                      canCheck ? 'Check' : 'Call ${_formatChips(callAmount)}',
+                      canCheck ? 'Check' : (callAmount >= player.chips ? 'All-In' : 'Call ${_formatChips(callAmount)}'),
                       style: const TextStyle(color: Colors.white, fontSize: 16),
                     ),
                   ),
@@ -1640,9 +1688,11 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
               const SizedBox(width: 12),
               Expanded(
                 child: _AnimatedGameButton(
-                  onTap: (!canRaise || _isProcessingAction) ? null : () {
-                    _showRaiseDialog(room, player);
-                  },
+                  onTap: (!canRaise || _isProcessingAction)
+                      ? null
+                      : () {
+                          _showRaiseDialog(room, player);
+                        },
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   decoration: BoxDecoration(
                     color: canRaise ? Colors.white : Colors.grey.withValues(alpha: 0.3),
@@ -1799,79 +1849,60 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
   }
 
   Widget _buildPlayerAreaWithCards(GamePlayer player, GameRoom room) {
-    final isShowdown = room.phase == 'showdown';
-    final isPlayerWinner = isShowdown && room.winnerId == player.uid;
-    final isPlayerLoser = isShowdown && _showdownAnimationComplete && room.winnerId != player.uid && !player.hasFolded;
+    // Show disabled action buttons while waiting (identical to game_screen.dart)
+    final callAmount = room.currentBet - player.currentBet;
+    final canCheck = callAmount <= 0;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
+      padding: const EdgeInsets.symmetric(horizontal: 40),
       child: Column(
         children: [
-          // Waiting indicator
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            decoration: BoxDecoration(
-              color: isShowdown && _showdownAnimationComplete && isPlayerWinner
-                  ? const Color(0xFFFFD700).withValues(alpha: 0.08)
-                  : Colors.transparent,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: isShowdown && _showdownAnimationComplete && isPlayerWinner
-                    ? const Color(0xFFFFD700).withValues(alpha: 0.4)
-                    : Colors.white.withValues(alpha: 0.2),
-              ),
-            ),
-            child: Center(
-              child: Text(
-                isShowdown && _showdownAnimationComplete && isPlayerWinner ? 'You win!' : 'Waiting for opponent...',
-                style: TextStyle(
-                  color: isShowdown && _showdownAnimationComplete && isPlayerWinner
-                      ? const Color(0xFFFFD700)
-                      : Colors.white.withValues(alpha: 0.6),
-                  fontSize: 16,
-                  fontWeight: isPlayerWinner ? FontWeight.bold : FontWeight.normal,
+          // Disabled action buttons (grayed out while opponent acts)
+          Row(
+            children: [
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  decoration: BoxDecoration(
+                    color: Colors.transparent,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+                  ),
+                  child: Center(
+                    child: Text(
+                      canCheck ? 'Check' : (callAmount >= player.chips ? 'All-In' : 'Call ${_formatChips(callAmount)}'),
+                      style: TextStyle(color: Colors.white.withValues(alpha: 0.3), fontSize: 16),
+                    ),
+                  ),
                 ),
               ),
-            ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Center(
+                    child: Text(
+                      'Raise',
+                      style: TextStyle(
+                          color: Colors.black.withValues(alpha: 0.4), fontSize: 16, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 16),
-          // Cards and player info with large cards
-          AnimatedOpacity(
-            duration: const Duration(milliseconds: 300),
-            opacity: isPlayerLoser ? 0.5 : 1.0,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                // Player's large cards with overlapping layout - fixed width
-                SizedBox(
-                  width: 165, // Fixed width for 2 overlapping large cards (90 + 75)
-                  child: _buildPlayerCardsLarge(player),
-                ),
-                const Spacer(),
-                Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    // Hand strength indicator - always show "High Card" until a better hand is made
-                    if (player.cards.length >= 2)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 4),
-                        child: Text(
-                          _getCurrentHandStrength(player.cards, room.communityCards),
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.5),
-                            fontSize: 10,
-                            fontWeight: FontWeight.w500,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                      ),
-                    _buildPlayerAvatarLarge(player, room: room),
-                  ],
-                ),
-              ],
-            ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              _buildPlayerCardsLarge(player),
+              const Spacer(),
+              _buildPlayerAvatarLarge(player, room: room),
+            ],
           ),
         ],
       ),
@@ -1919,11 +1950,44 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
     );
   }
 
-  /// Build large card matching GameScreen's style
-  Widget _buildLargeCard(PlayingCard card, {bool isHighlighted = false, bool isDimmed = false}) {
+  /// Build large card identical to GameScreen's _buildLargeCard
+  Widget _buildLargeCard(PlayingCard card, {bool isHighlighted = false, bool isDimmed = false, bool isGhost = false}) {
     const width = 90.0;
     const height = 126.0;
     final isRed = card.suit == '♥' || card.suit == '♦';
+
+    // Ghost card style for folded cards
+    if (isGhost) {
+      return Container(
+        width: width,
+        height: height,
+        decoration: BoxDecoration(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.2), width: 2),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              card.rank,
+              style: TextStyle(
+                color: (isRed ? Colors.red.shade300 : Colors.white).withValues(alpha: 0.4),
+                fontSize: 32,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            Text(
+              card.suit,
+              style: TextStyle(
+                color: (isRed ? Colors.red.shade300 : Colors.white).withValues(alpha: 0.4),
+                fontSize: 34,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
@@ -1935,9 +1999,14 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
         boxShadow: [
           if (isHighlighted) ...[
             BoxShadow(
-              color: Colors.white.withValues(alpha: 0.6),
-              blurRadius: 12,
-              spreadRadius: 2,
+              color: const Color(0xFFFFD700).withValues(alpha: 0.9),
+              blurRadius: 16,
+              spreadRadius: 4,
+            ),
+            BoxShadow(
+              color: const Color(0xFFFFD700).withValues(alpha: 0.5),
+              blurRadius: 30,
+              spreadRadius: 8,
             ),
           ] else
             BoxShadow(
@@ -1946,7 +2015,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
               offset: const Offset(0, 4),
             ),
         ],
-        border: isHighlighted ? Border.all(color: Colors.white.withValues(alpha: 0.9), width: 2) : null,
+        border: isHighlighted ? Border.all(color: const Color(0xFFFFD700), width: 3) : null,
       ),
       child: AnimatedOpacity(
         duration: const Duration(milliseconds: 300),
@@ -2129,16 +2198,6 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
         ),
       ],
     );
-  }
-
-  // Use getShortHandName from game_utils.dart
-  String _getShortHandName(HandRank rank) => getShortHandName(rank);
-
-  String _getCurrentHandStrength(List<PlayingCard> holeCards, List<PlayingCard> communityCards) {
-    if (holeCards.length < 2 || communityCards.length < 3) return 'High Card';
-
-    final hand = HandEvaluator.evaluateBestHand(holeCards, communityCards);
-    return _getShortHandName(hand.rank);
   }
 
   void _showPlayerProfile(GamePlayer player) {
@@ -2391,29 +2450,23 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
                   // Quick bet buttons
                   Row(
                     children: [
-                      Expanded(
-                        child: _buildQuickBetButton('½ Pot', () {
-                          setDialogState(() {
-                            raiseAmount = ((room.pot / 2) + room.currentBet).toInt().clamp(minRaise, maxRaise);
-                          });
-                        }),
-                      ),
+                      _buildQuickBetButton('½ Pot', () {
+                        setDialogState(() {
+                          raiseAmount = ((room.pot / 2) + room.currentBet).toInt().clamp(minRaise, maxRaise);
+                        });
+                      }),
                       const SizedBox(width: 8),
-                      Expanded(
-                        child: _buildQuickBetButton('Pot', () {
-                          setDialogState(() {
-                            raiseAmount = (room.pot + room.currentBet).clamp(minRaise, maxRaise);
-                          });
-                        }),
-                      ),
+                      _buildQuickBetButton('Pot', () {
+                        setDialogState(() {
+                          raiseAmount = (room.pot + room.currentBet).clamp(minRaise, maxRaise);
+                        });
+                      }),
                       const SizedBox(width: 8),
-                      Expanded(
-                        child: _buildQuickBetButton('All In', () {
-                          setDialogState(() {
-                            raiseAmount = maxRaise;
-                          });
-                        }),
-                      ),
+                      _buildQuickBetButton('All In', () {
+                        setDialogState(() {
+                          raiseAmount = maxRaise;
+                        });
+                      }),
                     ],
                   ),
                   const SizedBox(height: 24),
@@ -2421,7 +2474,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
                   Row(
                     children: [
                       Expanded(
-                        child: GestureDetector(
+                        child: _AnimatedPressButton(
                           onTap: () => Navigator.pop(context),
                           child: Container(
                             padding: const EdgeInsets.symmetric(vertical: 16),
@@ -2444,7 +2497,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
                       ),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: GestureDetector(
+                        child: _AnimatedPressButton(
                           onTap: () async {
                             Navigator.pop(context);
                             // Add delay for smoother transition
@@ -2492,24 +2545,26 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen>
   }
 
   Widget _buildQuickBetButton(String label, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.06),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: Colors.white.withValues(alpha: 0.1),
+    return Expanded(
+      child: _AnimatedPressButton(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.1),
+            ),
           ),
-        ),
-        child: Center(
-          child: Text(
-            label,
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.8),
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
+          child: Center(
+            child: Text(
+              label,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.8),
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ),
         ),

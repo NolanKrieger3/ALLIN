@@ -72,7 +72,7 @@ class ParticipantAvatar extends StatelessWidget {
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.white.withValues(alpha: 0.4),
+                          color: const Color(0xFF6366F1).withValues(alpha: 0.6),
                           blurRadius: 12,
                           spreadRadius: 3,
                         ),
@@ -108,7 +108,7 @@ class ParticipantAvatar extends StatelessWidget {
                     height: 48,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.9), width: 3),
+                      border: Border.all(color: const Color(0xFF6366F1), width: 3),
                     ),
                   ),
                 // Avatar circle with tap handler
